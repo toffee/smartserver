@@ -2,4 +2,7 @@
 .vscode/
 config/*
 !config/demo/
+!config/jupiter/
+config/jupiter/vault/vault.yml
+config/jupiter/vault/wireguard_mobile/
 *.retry
