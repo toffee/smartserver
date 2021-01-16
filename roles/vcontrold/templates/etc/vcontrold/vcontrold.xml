@@ -5,10 +5,12 @@
       <username>nobody</username>
       <groupname>dialout</groupname>
       <serial>
-            <tty>/dev/ttyOpenHabHeizung</tty>
+            <tty>/dev/ttyOpenHabHeating</tty>
         </serial>
         <net>
             <port>3002</port>
+            <allow ip='127.0.0.1'/>
+            <allow ip='192.168.120.5'/>
         </net>
         <logging>
             <file>{{global_log}}vcontrold/vcontrold.log</file>
@@ -67,6 +69,12 @@
 	   <type>int</type>
 	   <entity></entity>
 	</unit>
+   	<unit name="Volumenstrom">
+      		<abbrev>VS</abbrev>
+      		<calc get="V" set="V"/>
+      		<type>ushort</type>
+      		<entity>l/h</entity>
+    	</unit>
 <unit name='Counter liter'>
 	   <abbrev>COL</abbrev>
 	   <calc get='V/1000' set='V*1000'/>
@@ -132,6 +140,11 @@
 	   <enum bytes='05' text='ABSCHALT'/>
 	   <enum text='UNKNOWN'/>
 	</unit>	   
+   <unit name='BetriebsArt Number'>
+        <abbrev>BAN</abbrev>
+        <calc get='V' set='V'/>
+        <type>uchar</type>
+    </unit>
 	 <unit name='SetReturnStatus'>
            <abbrev>SR</abbrev>
            <type>enum</type>

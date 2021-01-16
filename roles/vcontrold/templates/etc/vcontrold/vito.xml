@@ -197,7 +197,125 @@
 	     <len>1</len>
 	     <unit>RT</unit>
 	     <description>Sammelstoerung</description>
-	 </command>
-   </commands> 
+     	</command>
+	<command name="getVolStrom" protocmd="getaddr">
+      		<addr>0C24</addr>
+      		<len>2</len>
+      		<unit>VS</unit>
+      		<description>Ermittle den Volumenstrom l/h des Heizkreises</description>
+	</command>
+	<command name="getTempRL17A" protocmd="getaddr">
+      		<addr>080A</addr>
+      		<len>2</len>
+      		<unit>UT</unit>
+      		<description>Ermittle die Ruecklauftemperatur 17A in Grad C</description>
+      		<device ID="20CB">
+        		<addr>0808</addr>
+        		<len>2</len>
+        		<unit>UT</unit>
+      		</device>
+    </command>
+    <!-- AUSSENTEMPERATUR -->
+    <command name="getTempA" protocmd="getaddr">
+      <addr>0800</addr>
+      <len>2</len>
+      <unit>UT</unit>
+      <description>Ermittle die Aussentemperatur in Grad C</description>
+    </command>
+    <command name="getTempAtp" protocmd="getaddr">
+      <addr>5525</addr>
+      <len>2</len>
+      <unit>UT</unit>
+      <description>Ermittle die Aussentemperatur in Grad C (Tiefpass)</description>
+    </command>
+    <command name="getTempAged" protocmd="getaddr">
+      <addr>5527</addr>
+      <len>2</len>
+      <unit>UT</unit>
+      <description>Ermittle die Aussentemperatur in Grad C (Gedaempft)</description>
+    </command>
+    <command name="getNeigungM1" protocmd="getaddr">
+      <addr>2305</addr>
+      <len>1</len>
+      <unit>UN</unit>
+      <description>Ermittle Neigung Heizkennlinie M1</description>
+      <device ID="20CB">
+        <addr>27D3</addr>
+        <unit>UN</unit>
+        <len>1</len>
+      </device>
+    </command>
+    <command name="getNiveauM1" protocmd="getaddr">
+      <addr>2304</addr>
+      <len>1</len>
+      <unit>ST</unit>
+      <description>Ermittle Niveau Heizkennlinie M1</description>
+      <device ID="20CB">
+        <addr>27D4</addr>
+        <unit>ST</unit>
+        <len>1</len>
+      </device>
+    </command>
+    <command name="getTempRaumNorSollM1" protocmd="getaddr">
+      <addr>2306</addr>
+      <len>1</len>
+      <unit>UTI</unit>
+      <description>Ermittle die Raumsolltemperatur normal M1 in Grad C</description>
+     </command>
+    <command name="getTempRaumRedSollM1" protocmd="getaddr">
+      <addr>2307</addr>
+      <len>1</len>
+      <unit>UTI</unit>
+      <description>Ermittle die Raumsolltemperatur reduziert M1 in Grad C</description>
+    </command>
+     <command name="setNeigungM1" protocmd="setaddr">
+      <!-- min zul.0.2 0.1 und 0.0 nicht erlaubt -->
+      <addr>2305</addr>
+      <len>1</len>
+      <unit>UN</unit>
+      <description>Setze Neigung Heizkennlinie M1</description>
+      <device ID="20CB">
+        <addr>27D3</addr>
+        <unit>UN</unit>
+        <len>1</len>
+      </device>
+    </command>
+    <command name="setNiveauM1" protocmd="setaddr">
+      <addr>2304</addr>
+      <len>1</len>
+      <unit>ST</unit>
+      <description>Setze Niveau Heizkennlinie M1</description>
+      <device ID="20CB">
+        <addr>27D4</addr>
+        <unit>ST</unit>
+        <len>1</len>
+      </device>
+    </command>
+    <!-- Aufruf in vclient ganzzahlig 'setTempRaumNorSollM1 21' -->
+    <command name="setTempRaumNorSollM1" protocmd="setaddr">
+      <addr>2306</addr>
+      <len>1</len>
+      <unit>UTI</unit>
+      <description>Setze die Raumsolltemperatur normal M1 in Grad C</description>
+    </command>
+    <command name="setTempRaumRedSollM1" protocmd="setaddr">
+      <addr>2307</addr>
+      <len>1</len>
+      <unit>UTI</unit>
+      <description>Setze die Raumsolltemperatur reduziert M1 in Grad C</description>
+    </command>
+    <command name="getBetriebArt" protocmd="getaddr">
+      <addr>2323</addr>
+      <len>1</len>
+      <unit>BAN</unit>
+      <description>Betriebsart</description>
+    </command>
+    <command name="setBetriebArt" protocmd="setaddr">
+      <addr>2323</addr>
+      <len>1</len>
+      <unit>BAN</unit>
+      <description>Betriebsart</description>
+    </command>
+</commands>
 </vito>
 

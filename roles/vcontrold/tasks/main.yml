@@ -54,7 +54,7 @@
       - '{{global_etc}}vcontrold/:/etc/vcontrold:ro,z'
       - '{{global_log}}vcontrold/:{{global_log}}vcontrold:z'
     devices:
-      - "/dev/ttyOpenHabHeizung:/dev/ttyOpenHabHeizung:rwm"
+      - "/dev/ttyOpenHabHeating:/dev/ttyOpenHabHeating:rwm"
     exposed_ports:
       - "3002"
   notify: "restart vcontrold"

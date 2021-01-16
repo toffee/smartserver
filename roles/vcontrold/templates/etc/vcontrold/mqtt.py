@@ -16,7 +16,13 @@ class Handler(object):
         self.mqtt_client = None
         self.lastPublishTime = datetime.now()
 
-        self.cmds = ['getTempAussen', 'getTempAussenGedaempft', 'getTempVorlaufSoll','getTempVorlauf','getTempKesselSoll','getTempKessel','getHeizkreisPumpeDrehzahl','getBrennerStarts','getBrennerStunden','getTempWasserSpeicher','getTempSolarKollektor','getSolarStunden','getTempSolarSpeicher','getSolarLeistung','getSammelstoerung','getLeistungIst','getBetriebsart','getTempRaumSoll','getSolarPumpeStatus','getNachladeunterdrueckungStatus']
+        #self.cmds = ['getTempAussen', 'getTempAussenGedaempft', 'getTempVorlaufSoll','getTempVorlauf','getTempKesselSoll','getTempKessel','getHeizkreisPumpeDrehzahl','getBrennerStarts','getBrennerStunden','getTempWasserSpeicher','getTempSolarKollektor','getSolarStunden','getTempSolarSpeicher','getSolarLeistung','getSammelstoerung','getLeistungIst','getBetriebsart','getTempRaumSoll','getSolarPumpeStatus','getNachladeunterdrueckungStatus']
+        #commands with original vito.xml
+        self.cmds = ['getTempA', 'getTempAtp', 'getTempAged', 'getTempAussen', 'getTempAussenGedaempft', 'getTempVorlaufSoll','getTempVorlauf','getTempKesselSoll','getTempKessel','getHeizkreisPumpeDrehzahl','getBrennerStarts','getBrennerStunden','getTempWasserSpeicher','getSammelstoerung','getLeistungIst', 'getTempRL17A', 'getNeigungM1', 'getNiveauM1', 'getTempRaumNorSollM1', 'getTempRaumRedSollM1', 'getBetriebArt']
+        #commands with github vito.xml
+        #self.cmds = ['getTempAtp', 'getTempAged', 'getTempVLsollM1','getTempVListM1','getTempKsoll','getTempKtp','getPumpeStatusM1','getBrennerStarts','getBrennerStunden1','getTempStp','getStatusStoerung','getLeistungIst','getBetriebArt','getTempRaumNorSollM1','getSolarStatusWW','getTempRL17A']
+        
+        self.writeCmds = ['setNeigungM1', 'setNiveauM1', 'setTempRaumNorSollM1', 'setTempRaumRedSollM1', 'setBetriebArt']
 
     def startDaemon(self):
         print("Start vcontrold ...", end='', flush=True)
@@ -75,7 +81,9 @@ class Handler(object):
         print("Connected to mqtt with result code:"+str(rc), flush=True)
         if rc == 0:
             # subscribe for all devices of user
-            client.subscribe('+/vcontrol/setBetriebsartTo')
+            #client.subscribe('+/vcontrol/setBetriebsartTo')
+            for i, entry in enumerate(self.writeCmds):
+                client.subscribe("+/vcontrol/{}".format(entry))
         
     def on_disconnect(self,client, userdata, rc):
         print("Disconnect from mqtt with result code:"+str(rc), flush=True)
@@ -85,8 +93,12 @@ class Handler(object):
             raise Exception("Vcontrold died") 
         
         print("Topic " + msg.topic + ", message:" + str(msg.payload), flush=True)
-        
-        cmd = "setBetriebsartTo{}".format(int(float(msg.payload.decode("ascii"))))
+        # Topic /vcontrol/setTempRaumRedSollM1, message:b'4'
+        vcommand = msg.topic[len("/vcontrol/"):]
+        #print("Write command " + vcommand, flush=True)
+        #cmd = "setBetriebsartTo{}".format(int(float(msg.payload.decode("ascii"))))
+        cmd = vcommand + " {}".format(msg.payload.decode("ascii"))
+        #print("Sent command " + cmd, flush=True)
         self.telnet_client.write(cmd.encode('ascii') + b"\n")
         out = self.telnet_client.read_until(b"vctrld>",10)
         if len(out) == 0:
@@ -103,6 +115,7 @@ class Handler(object):
             for cmd in self.cmds:
                 self.telnet_client.write(cmd.encode('ascii') + b"\n")
                 out = self.telnet_client.read_until(b"vctrld>",10)
+                #print("OUT " + out.decode("ascii"), flush=True)
                 if len(out) == 0:
                     print(" failed with empty result", flush=True, file=sys.stderr)
                     return
