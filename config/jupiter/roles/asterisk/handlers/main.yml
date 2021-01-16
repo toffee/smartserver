@@ -1,0 +1,8 @@
+- name: restart asterisk
+  systemd:
+    name: asterisk
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    masked: no
+  listen: "restart asterisk"
