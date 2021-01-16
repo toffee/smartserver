@@ -1,0 +1,10 @@
+- name: copy config and service
+  template:
+    src: "templates{{item.src}}"
+    dest: "{{item.dest}}"
+    owner: root
+    group: root
+    mode: 0640
+  with_items:
+    - { src: "/etc/udev/rules.d/99-paradox.rules", dest: "/etc/udev/rules.d/99-paradox.rules" } 
+
