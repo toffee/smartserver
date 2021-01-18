@@ -1,0 +1,3 @@
+{% for peer_name in cloud_vpn.peers %}
+/cloud/local/{{peer_name}} {{vpn_cloud_services.remote[peer_name].nfs}}(fsid=0,rw,sync,no_root_squash,no_subtree_check)
+{% endfor %}

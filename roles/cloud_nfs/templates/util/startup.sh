@@ -1,5 +1,5 @@
 #!/bin/sh
-cd /etc/wireguard
+cd /etc/cloud_nfs
 
 source ./peers
 
@@ -32,23 +32,8 @@ stop()
     #kill -TERM $pid1 > /dev/null 2>&1
     kill -TERM $pid1 $pid2 > /dev/null 2>&1
 
-    echo "shutting down wireguard interface"
-    wg-quick down wg0
-
     echo "done"
     exit
-}
-
-startWireguard()
-{
-    ip link del dev wg0 > /dev/null 2>&1
-
-    #echo "exported folder"
-    #cat /etc/exports
-
-    echo "setting up wireguard interface"
-    wg-quick up ./wg0.conf
-    
 }
 
 exportLocalShares()
@@ -121,7 +106,7 @@ mountRemoteShares()
             
             for name in $peers
             do
-                if [ ! $(mountpoint -q /cloud/mount/$name) ]
+                if ! mountpoint -q /cloud/remote/$name
                 then
                     eval "nfs_server_ip=\$nfs_server_ip_$name"
                     echo "check reachability of $nfs_server_ip"
@@ -142,7 +127,7 @@ mountRemoteShares()
                 echo "...done"
                 break
             else
-                sleep 15
+                sleep 15 & wait
             fi
         done
     else
@@ -151,8 +136,6 @@ mountRemoteShares()
 }
 
 trap "stop" SIGTERM SIGINT
-
-startWireguard
 
 exportLocalShares
 
