@@ -1,3 +1,17 @@
+- name: collect sip endpoints
+  set_fact:
+    sip_endpoints: |
+      {
+      {% for username in userdata %}
+      {% if userdata[username].sip_endpoints is defined %}
+      {% for sip_endpoint in userdata[username].sip_endpoints %}
+      "{{sip_endpoint}}": "{{userdata[username].sip_endpoints[sip_endpoint]}}",
+      {% endfor %}
+      {% endif %}
+      {% endfor %}
+      }
+  tags: [ 'user' ]
+  
 - name: prepare needed folder
   file:
     path: '{{item}}'
@@ -33,7 +47,6 @@
     - "pjsip.conf"
     - "pjsip_notify.conf"
     - "queues.conf"
-    - "sip.conf"
     - "stasis.conf"
     - "voicemail.conf"
 
@@ -45,8 +58,8 @@
 
 - name: copy manager.d folder
   copy:
-    src: "templates/etc/asterisk/manager.d"
-    dest: "{{global_etc}}/asterisk/manager.d"
+    src: "templates/etc/asterisk/manager.d/"
+    dest: "{{global_etc}}/asterisk/manager.d/"
     owner: root
     group: root
     mode: 0750
