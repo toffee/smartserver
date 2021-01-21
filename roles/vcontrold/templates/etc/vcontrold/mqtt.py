@@ -81,9 +81,9 @@ class Handler(object):
         print("Connected to mqtt with result code:"+str(rc), flush=True)
         if rc == 0:
             # subscribe for all devices of user
-            #client.subscribe('+/vcontrol/setBetriebsartTo')
+            #client.subscribe('vcontrol/setBetriebsartTo')
             for i, entry in enumerate(self.writeCmds):
-                client.subscribe("+/vcontrol/{}".format(entry))
+                client.subscribe("vcontrol/{}".format(entry))
         
     def on_disconnect(self,client, userdata, rc):
         print("Disconnect from mqtt with result code:"+str(rc), flush=True)
@@ -122,10 +122,10 @@ class Handler(object):
                 else:
                     search = re.search(r'[-]?[0-9]*\.?[0-9]+', out.decode("ascii"))
                     if search == None:
-                        self.mqtt_client.publish('/vcontrol/getSammelstoerung', payload=999, qos=0, retain=False)
+                        self.mqtt_client.publish('vcontrol/getSammelstoerung', payload=999, qos=0, retain=False)
                         print(out.decode("ascii"), flush=True, file=sys.stderr)
                     else:
-                        self.mqtt_client.publish('/vcontrol/' + cmd, payload=round(float(search.group(0)),2), qos=0, retain=False)                            
+                        self.mqtt_client.publish('vcontrol/' + cmd, payload=round(float(search.group(0)),2), qos=0, retain=False)                            
             print(" successful", flush=True)
         except Exception as e:
             print(" failed", flush=True)
