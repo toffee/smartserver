@@ -42,6 +42,8 @@ docker_default_network:           "172.17.0.0"
 docker_onlyoffice_ip:             "172.30.1.200"
 docker_php_ip:                    "172.30.2.200"
 docker_grafana_ip:                "172.30.3.200"
+docker_zigbee2mqtt_ip:            "172.30.4.200"
+docker_recorder_ip:               "172.30.5.200"
 #docker_openhab_ip:                "172.30.4.200"
 
 # 0 => production, 1 => production

@@ -1,0 +1,108 @@
+- name: set version
+  set_fact:
+    recorder_version: "0.8.6-12"
+  tags: [ 'update_notifier_configs' ]
+
+- name: prepare needed folders
+  file:
+    path: "{{item}}"
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+  with_items:
+    - "{{global_etc}}recorder"
+    - "{{global_log}}recorder"
+    - "{{global_lib}}recorder"
+    - "{{global_lib}}recorder/store"
+
+- name: copy config
+  template:
+    src: "templates/recorder.conf"
+    dest: "{{global_etc}}recorder/recorder.conf"
+    owner: root
+    group: root
+    mode: 0755
+  notify: "restart recorder"
+
+- name: check started docker
+  systemd:
+    name: docker
+    state: started
+
+- name: create docker network
+  docker_network:
+    name: recorder
+    ipam_config:
+      - subnet: "{{docker_recorder_ip.split('.')[:3] | join('.')}}.0/24"
+        gateway: "{{docker_recorder_ip.split('.')[:3] | join('.')}}.1"
+    connected:
+      - mosquitto
+    appends: yes
+  tags: ['mosquitto']
+
+- name: create docker container
+  docker_container:
+    name: recorder
+    image: "owntracks/recorder:{{recorder_version}}"
+    state: present
+    env:
+      TZ: "{{timezone}}"
+      OTR_HOST: "mosquitto"
+    log_driver: journald
+    log_options:
+      tag: recorder
+    networks:
+      - name: "recorder"
+        ipv4_address: "{{docker_recorder_ip}}" 
+    networks_cli_compatible: yes
+    volumes:
+      - '{{global_etc}}recorder:/config:z'
+      - '{{global_lib}}recorder/store:/store:z'
+      - '{{global_log}}recorder:/log:z'
+    published_ports:
+     - "8083:8083"
+  notify: "restart recorder"
+    
+- name: add container name
+  vars:
+    host_name: "recorder"
+    host_ip_address: "{{docker_recorder_ip}}"
+  import_tasks: roles/network/tasks/add_to_hosts.yml
+
+# ***** FINALIZE *****
+- name: allow http recorder service
+  vars:
+    name: "http.recorder"
+    rule: "proto tcp dport 8083"
+  import_tasks: roles/firewall/tasks/allow_service.yml
+  tags: [ 'firewall_config' ]
+
+- name: copy apache config
+  vars:
+    config_file: "templates/etc/apache2/_.ansible.conf.d/recorder.conf"
+  import_tasks: roles/apache/tasks/add_config.yml 
+
+- name: create systemd service
+  vars:
+    container_name: "recorder"
+    container_after: [ "mosquitto" ]
+  import_tasks: roles/container/tasks/add_docker_service.yml
+
+- name: register update notifier
+  vars:
+    name: "recorder"
+    type: "github"
+    url: "https://github.com/owntracks/recorder/releases"
+    config: { 
+      project: "owntracks/recorder", 
+      pattern: "^([0-9\\.]+)$",
+      version: "{{recorder_version}}" 
+    }
+  import_tasks: roles/update_notifier/tasks/add_notifier.yml
+  
+- name: trigger recorder handler
+  vars:
+    notify: "restart recorder"
+    service: "recorder.service"
+  import_tasks: roles/_shared/tasks/service_check.yml

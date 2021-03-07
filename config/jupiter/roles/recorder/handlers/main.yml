@@ -1,0 +1,8 @@
+- name: restart recorder
+  systemd:
+    name: recorder
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    masked: no
+  listen: "restart recorder"

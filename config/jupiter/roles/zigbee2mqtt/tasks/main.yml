@@ -1,0 +1,95 @@
+- name: set zigbee2mqtt version
+  set_fact:
+    zigbee2mqtt_version: "1.17.1"
+ 
+- name: prepare needed folder
+  file:
+    path: '{{item}}'
+    state: directory
+    owner: root
+    group: root
+    mode: 0750
+  with_items:
+    - "{{ global_etc}}zigbee2mqtt"
+    - "{{ global_log}}zigbee2mqtt"
+
+- name: copy config
+  template:
+    src: "templates/etc/zigbee2mqtt/{{item}}"
+    dest: "{{ global_etc }}zigbee2mqtt/{{item}}"
+    owner: root
+    group: root
+    mode: 0640
+  with_items:
+    - "configuration.yaml"
+    - "devices.yaml"
+    - "groups.yaml"
+
+- name: build docker image
+  vars:
+    name: "zigbee2mqtt"
+    image_name: "custom_zigbee2mqtt"
+    image_version: "{{zigbee2mqtt_version}}"
+    files:
+      - "{{config_path}}roles/zigbee2mqtt/templates/container/Dockerfile"
+  import_tasks: roles/container/tasks/build_docker_image.yml
+ 
+- name: create docker network
+  docker_network:
+    name: zigbee2mqtt
+    ipam_config:
+      - subnet: "{{docker_zigbee2mqtt_ip.split('.')[:3] | join('.')}}.0/24"
+        gateway: "{{docker_zigbee2mqtt_ip.split('.')[:3] | join('.')}}.1"
+    connected:
+      - mosquitto
+    appends: yes
+  tags: ['mosquitto'] 
+  
+- name: create docker container
+  docker_container:
+    name: zigbee2mqtt
+    image: "custom_zigbee2mqtt:{{zigbee2mqtt_version}}"
+    state: present
+#    recreate: true
+    env:
+      TZ: "{{timezone}}"
+    log_driver: journald
+    log_options:
+      tag: zigbee2mqtt
+    networks:
+      - name: "zigbee2mqtt"
+        ipv4_address: "{{docker_zigbee2mqtt_ip}}"
+    networks_cli_compatible: yes 
+    volumes:
+      - '{{global_etc}}zigbee2mqtt:/app/data:z'
+      - '{{global_log}}zigbee2mqtt:/app/data/log:z'
+    devices:
+      - '/dev/ttyOpenHabZigbee:/dev/ttyOpenHabZigbee:rwm'
+    published_ports:
+     - "8084:8084"
+  notify: "restart zigbee2mqtt"
+
+- name: add container name
+  vars:
+    host_name: "zigbee2mqtt"
+    host_ip_address: "{{docker_zigbee2mqtt_ip}}"
+  import_tasks: roles/network/tasks/add_to_hosts.yml
+
+  # ***** FINALIZE *****
+- name: copy apache config
+  vars:
+    config_file: "templates/etc/apache2/_.ansible.conf.d/zigbee2mqtt.conf"
+  import_tasks: roles/apache/tasks/add_config.yml
+  
+- name: create systemd service
+  vars:
+    container_name: "zigbee2mqtt"
+    container_after: [ "mosquitto" ] 
+  import_tasks: roles/container/tasks/add_docker_service.yml
+
+- name: trigger zigbee2mqtt handler
+  vars:
+    notify: "restart zigbee2mqtt"
+    service: "zigbee2mqtt.service"
+  import_tasks: roles/_shared/tasks/service_check.yml
+

@@ -10,6 +10,8 @@
 - { import_role: { name: cloud_mosquitto }, tags: [ 'cloud_mosquitto', 'alpine' ] }     # [docker,user:1883]
 #- { import_role: { name: cloud_backup }, tags: [ 'cloud_backup' ], vars: { cloud_backup_sync_target_path: "{{cloud_path}}remote/<client1>/" } }
 
+- { import_role: { name: weather_forecast }, tags: [ 'weather_forecast', 'alpine' ], vars: { publish_topic: no } } 
+
 # *** OPTIONAL OTHERS ***
 - { import_role: { name: vcontrold }, tags: [ 'vcontrold', 'debian' ] }                  # heating control for viessmann vitodens            [docker,user:nobody|dialout]
 
@@ -21,4 +23,7 @@
 
 - { import_role: { name: "config/jupiter/roles/asterisk" }, tags: [ 'asterisk' ] }          # asterisk SIP server
 - { import_role: { name: "config/jupiter/roles/paradox" }, tags: [ 'paradox' ] }            # configuration for alarm system
+- { import_role: { name: "config/jupiter/roles/zigbee2mqtt" }, tags: [ 'zigbee2mqtt' ] }    # configuration of zigbee2mqtt
+- { import_role: { name: "config/jupiter/roles/recorder" }, tags: [ 'recorder' ] }          # configuration of OwnTracks Recorder
+- { import_role: { name: "config/jupiter/roles/flexisip" }, tags: [ 'flexisip' ] }          
     

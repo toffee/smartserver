@@ -1,0 +1,8 @@
+- name: restart zigbee2mqtt
+  systemd:
+    name: zigbee2mqtt
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    masked: no
+  listen: "restart zigbee2mqtt"
