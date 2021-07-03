@@ -1,0 +1,8 @@
+- name: restart unifi
+  systemd:
+    name: unifi
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    masked: no
+  listen: "restart unifi"

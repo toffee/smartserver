@@ -1,0 +1,86 @@
+- name: ensure user and group exists
+  vars:
+    user: { name: "unifi", system: true, home: "{{global_etc}}unifi" }
+    group: { name: "unifi", system: true }
+  import_tasks: roles/user/tasks/add_system_user.yml
+
+- name: set unifi version
+  set_fact:
+    unifi_version: "6.0.45-ls100"
+    unifi_uid: "{{system_users['unifi'].id}}"
+    unifi_user: "{{system_users['unifi'].name}}"
+    unifi_gid: "{{system_groups['unifi'].id}}"
+    unifi_group: "{{system_groups['unifi'].name}}"
+  tags: [ 'update_notifier_configs' ]
+
+- name: prepare needed config folder
+  file:
+    path:  "{{item}}"
+    state: directory
+    owner: "{{unifi_user}}"
+    group: "{{unifi_group}}"
+    mode: 0750
+  with_items:
+    - "{{global_etc}}unifi"
+
+- name: check started docker
+  systemd:
+    name: docker
+    state: started
+
+- name: create docker container
+  docker_container:
+    name: unifi
+    image: "linuxserver/unifi-controller:{{unifi_version}}"
+    state: present
+    env:
+      TZ: "{{timezone}}"
+      PUID: "{{unifi_uid}}"
+      PGID: "{{unifi_gid}}"
+      MEM_LIMIT: "1024M"
+    network_mode: host
+    log_driver: journald
+    log_options:
+      tag: unifi
+    volumes:
+      - '{{global_etc}}unifi/:/config:z'
+    exposed_ports:
+      - "3478:3478/udp"
+      - "10001:10001/udp"  
+      - "28080:28080"
+      - "28443:28443"
+  notify: "restart unifi"
+
+- name: add container name
+  vars:
+    host_name: "unifi"
+    host_ip_address: "127.0.0.1"
+  import_tasks: roles/network/tasks/add_to_hosts.yml
+  
+# ***** FINALIZE *****    
+- name: create systemd service
+  vars:
+    container_name: "unifi"
+  import_tasks: roles/container/tasks/add_docker_service.yml
+  
+- name: register service watcher
+  vars:
+    name: "unifi"
+  import_tasks: roles/systemd_watcher/tasks/add_watcher.yml
+
+- name: register unifi update notifier
+  vars:
+    name: "unifi"
+    type: "docker"
+    url: "https://github.com/linuxserver/docker-unifi-controller/releases"
+    config: {
+      repository: "linuxserver/unifi-controller",
+      pattern: "^([0-9\\.]+)-ls([0-9]+)$"
+    }
+  import_tasks: roles/update_notifier/tasks/add_notifier.yml
+
+- name: trigger unifi handler
+  vars:
+    notify: "restart unifi"
+    service: "unifi.service"
+  import_tasks: roles/_shared/tasks/service_check.yml

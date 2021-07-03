@@ -26,4 +26,4 @@
 - { import_role: { name: "config/jupiter/roles/zigbee2mqtt" }, tags: [ 'zigbee2mqtt' ] }    # configuration of zigbee2mqtt
 - { import_role: { name: "config/jupiter/roles/recorder" }, tags: [ 'recorder' ] }          # configuration of OwnTracks Recorder
 - { import_role: { name: "config/jupiter/roles/flexisip" }, tags: [ 'flexisip' ] }          
-    
+- { import_role: { name: "config/jupiter/roles/unifi" }, tags: [ 'unifi' ] }              
