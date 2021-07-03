@@ -22,13 +22,14 @@
     name: weather_forecast
     image: "custom_weather_forecast:{{alpine_version}}"
     state: present
-    network_mode: "host"
 #    recreate: true
     env:
       TZ: "{{timezone}}"
     log_driver: journald
     log_options:
       tag: weather_forecast
+    container_default_behavior: "compatibility"
+    network_mode: "host"
     volumes:
       - '{{global_etc}}weather_forecast/:/etc/weather_forecast:ro,z'
   notify: "restart weather_forecast"
@@ -38,27 +39,19 @@
 
 - name: check mysql table
   shell: "docker exec mysql sh -c \"mysql -u root -h 127.0.0.1 -e 'SHOW TABLES FROM shared;'\""
-  register: mysql_data_exists
-  changed_when: "'weather_forecast' not in mysql_data_exists.stdout"
+  register: mysql_table_exists
+  changed_when: "'weather_forecast' not in mysql_table_exists.stdout"
   
 - name: prepare table config
-  fetch:
+  copy:
     src: "roles/weather_forecast/templates/weather_forecast.sql"
-    dest: "/tmp/ansible/weather_forecast/weather_forecast.sql"
-    flat: yes
+    dest: "{{ global_build }}weather_forecast/weather_forecast.sql"
   changed_when: no
-  when: "'weather_forecast' not in mysql_data_exists.stdout"
+  when: "'weather_forecast' not in mysql_table_exists.stdout"
   
 - name: create missing table 'weather_forecast' => does not exists in database
-  shell: "cat /tmp/ansible/weather_forecast/weather_forecast.sql | docker exec -i mysql sh -c \"mysql -u root -h 127.0.0.1 shared\""
-  when: "'weather_forecast' not in mysql_data_exists.stdout"
-  
-- name: clean table config
-  file:
-    path: "/tmp/ansible/weather_forecast/"
-    state: absent
-  changed_when: no
-  when: "'weather_forecast' not in mysql_data_exists.stdout"
+  shell: "cat {{ global_build }}weather_forecast/weather_forecast.sql | docker exec -i mysql sh -c \"mysql -u root -h 127.0.0.1 shared\""
+  when: "'weather_forecast' not in mysql_table_exists.stdout"
   
 - name: copy service
   template:
@@ -90,9 +83,10 @@
 
 - name: register webui
   vars:
-    name: "toolbox"
-    js_file: "templates/webui/toolbox.js"
-    i18n_files: [ { language: "de", file: "templates/webui/toolbox.de.json" } ]
+    name: "weather_forecast"
+    js_file: "templates/webui/weather_forecast.js"
+    i18n_files: [ { language: "de", file: "templates/webui/weather_forecast.de.json" } ]
+    icons: [ 'templates/webui/icons/weather_forecast.svg' ]
   import_tasks: roles/apache_webui/tasks/add_webui.yml
   
 

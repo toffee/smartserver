@@ -117,7 +117,7 @@
                                             _: {
                                                 isEntry: function(){ return true; },
                                                 getId: function(){ return entry['id']; },
-                                                //getOrder: function(){ return entry['order']; },
+                                                getOrder: function(){ return entry['order']; },
                                                 getUserGroups: function(){ return entry['usergroups']; },
                                                 getType: function(){ return entry['type']; },
                                                 getSubGroup: function(){ return subGroup['_']; },
@@ -137,7 +137,7 @@
                                             _: {
                                                 isEntry: function(){ return true; },
                                                 getId: function(){ return entry['id']; },
-                                                //getOrder: function(){ return entry['order']; },
+                                                getOrder: function(){ return entry['order']; },
                                                 getUserGroups: function(){ return entry['usergroups']; },
                                                 getType: function(){ return entry['type']; },
                                                 getSubGroup: function(){ return subGroup['_']; },
@@ -162,6 +162,14 @@
                 var callbacks = [];
 
                 var menuEntries = subGroup.getEntries();
+                var currentIndex = 1;
+                
+                var lastOrder = Math.max.apply(Math, menuEntries.map(function(o) { return o.getOrder(); }));
+
+                var hasGroups = lastOrder && Math.floor(menuEntries[0].getOrder()/100) != Math.floor(lastOrder/100);
+                
+                if( hasGroups ) entries.push('<div class="group">')
+                
                 for(var i = 0; i < menuEntries.length; i++)
                 {
                     var entry = menuEntries[i];
@@ -171,6 +179,14 @@
                         continue;
                     }
 
+                    var index = Math.floor(entry.getOrder()/100);
+                    
+                    if( currentIndex != index )
+                    {
+                        entries.push('</div><div class="group">');
+                        currentIndex = index;
+                    }
+                    
                     if( entry.getType() == 'html' )
                     {
                         entries.push(entry.getHtml());
@@ -178,9 +194,18 @@
                     }
                     else
                     {
-                        entries.push('<div class="service button ' + i + '" onClick="mx.Actions.openEntryById(event,\'' + subGroup.getMainGroup().getId() + '\',\'' + subGroup.getId() + '\',\'' + entry.getId() + '\')"><div>' + entry.getTitle() + '</div><div>' + entry.getInfo() + '</div></div>');
+                        var html = '<div class="service button ' + i + '" onClick="mx.Actions.openEntryById(event,\'' + subGroup.getMainGroup().getId() + '\',\'' + subGroup.getId() + '\',\'' + entry.getId() + '\')">';
+                        html += '<div>';
+                        if( entry.getIconUrl() ) html += '<svg viewBox="0 0 20 20"><use xlink:href="/main/icons/' + entry.getIconUrl() + '#icon" /></svg>';
+                        //if( entry.getIconUrl() ) html += '<img src="/main/icons/' + entry.getIconUrl() + '"/>';
+                        html += '<div>' + entry.getTitle() + '</div>';
+                        html += '</div><div>' + entry.getInfo() + '</div></div>';
+                        
+                        entries.push(html);
                     }
                 }
+                
+                if( hasGroups ) entries.push('</div>')
 
                 callback(entries.join(""),callbacks);
             };
@@ -272,8 +297,9 @@
 
                         var button = buttonTemplate.cloneNode(true);
                         button.setAttribute("id", mainGroup['id'] + '-' + subGroup['id'] );
-                        button.setAttribute("onClick","mx.Actions.openMenuById('" + mainGroup['id'] + "','" + subGroup['id'] + "');");
-                        button.firstChild.innerHTML = subGroup['iconUrl'] ? '<img src="main/icons/' + subGroup['iconUrl'] + '" height="20" width="20" />' : '';
+                        button.setAttribute("onClick","mx.Actions.openMenuById(event,'" + mainGroup['id'] + "','" + subGroup['id'] + "');");
+                        //button.firstChild.innerHTML = subGroup['iconUrl'] ? '<img src="/main/icons/' + subGroup['iconUrl'] + '"/>' : '';
+                        button.firstChild.innerHTML = subGroup['iconUrl'] ? '<svg viewBox="0 0 20 20"><use xlink:href="/main/icons/' + subGroup['iconUrl'] + '#icon" /></svg>' : '';
                         button.lastChild.innerHTML = subGroup['title'];
                         menuDiv.appendChild(button);
 
@@ -283,11 +309,10 @@
             };
 
             ret.addMainGroup('home', -1, 'Home').addSubGroup('home', -1, 'Home');
+            ret.addMainGroup('workspace', 1000, '{i18n_Workspace}');
+            ret.addMainGroup('automation', 2000, '{i18n_Automation}');
 
-            var mainGroup = ret.addMainGroup('automation', 2000, '{i18n_Automation}');
-
-            mainGroup = ret.addMainGroup('other', 3000, '{i18n_Other}');
-            mainGroup.addSubGroup('states', 100, mx.User.memberOf('admin') ? '{i18n_Logs & States}' : '{i18n_States}', 'core_stats.svg');
+            var mainGroup = ret.addMainGroup('admin', 3000, '{i18n_Admin}');
             mainGroup.addSubGroup('tools', 200, '{i18n_Tools}', 'core_tools.svg');
             mainGroup.addSubGroup('devices', 300, '{i18n_Devices}', 'core_devices.svg');
 
@@ -525,23 +550,32 @@
                 setIFrameUrl(url);
             }
 
-            ret.openMenuById = function(mainGroupId,subGroupId)
+            ret.openMenuById = function(event,mainGroupId,subGroupId)
             {
                 menu = mx.Menu.getMainGroup(mainGroupId).getSubGroup(subGroupId);
-                mx.Actions.openMenu(menu);
+                mx.Actions.openMenu(menu,event);
             
             };
-            ret.openMenu = function(subGroup)
+            ret.openMenu = function(subGroup,event)
             {
                 if( mx.History.getActiveNavigation() === subGroup && !isIFrameVisible() ) return;
                 
                 showMenu();
+                
+                if( subGroup.getEntries().length == 1 )
+                {
+                    mx.Actions.openEntryById(event,subGroup.getMainGroup().getId(),subGroup.getId(),subGroup.getEntries()[0].getId())
+                    
+                    if( visualisationType != "desktop" ) menuPanel.close();
+                }
+                else
+                {
+                    mx.Menu.buildMenu( subGroup, setMenuEntries);
 
-                mx.Menu.buildMenu( subGroup, setMenuEntries);
+                    activateMenu(subGroup);
 
-                activateMenu(subGroup);
-
-                mx.History.addMenu(subGroup);
+                    mx.History.addMenu(subGroup);
+                }
             };
 
             ret.openEntryById = function(event,mainGroupId,subGroupId,entryId)

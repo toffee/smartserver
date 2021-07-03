@@ -1,14 +1,14 @@
 - name: set version
   set_fact:
-    onlyoffice_version: "6.2.0.123"
+    onlyoffice_version: "6.3.1.32"
   tags: [ 'update_notifier_configs' ]
   
 - name: prepare needed folder
   file:
     path: "{{item}}"
     state: directory
-    owner: "106" # user id from docker container
-    group: "108" # group id from docker container
+    owner: "109" # user id from docker container
+    group: "112" # group id from docker container
     mode: 0755
   with_items:
     - "{{global_log}}onlyoffice"
@@ -65,13 +65,15 @@
     log_driver: journald
     log_options:
       tag: onlyoffice
-    volumes:
-      - '{{global_log}}onlyoffice:/var/log/onlyoffice:z'
-      - '{{global_lib}}onlyoffice:/var/www/onlyoffice/Data:z'
+    container_default_behavior: "compatibility"
+    network_mode: "default"
     networks:
       - name: "onlyoffice"
         ipv4_address: "{{docker_onlyoffice_ip}}"
     networks_cli_compatible: yes
+    volumes:
+      - '{{global_log}}onlyoffice:/var/log/onlyoffice:z'
+      - '{{global_lib}}onlyoffice:/var/www/onlyoffice/Data:z'
     exposed_ports:
      - "80"  
      - "443"  
@@ -84,29 +86,13 @@
   import_tasks: roles/network/tasks/add_to_hosts.yml
 
 # ***** DATABASE *****
-- name: check mysql service
-  import_tasks: roles/mysql/tasks/wait_until_ready.yml
-  
-- name: check mysql databases
-  shell: "docker exec mysql sh -c \"mysql -u root -h 127.0.0.1 -e 'show databases;'\""
-  register: mysql_data_exists
-  changed_when: "'onlyoffice' not in mysql_data_exists.stdout"
-
-- name: create missing mysql databases => database does not exists
-  shell: "docker exec mysql sh -c \"mysqladmin -u root -h 127.0.0.1 create onlyoffice\""
-  when: "'onlyoffice' not in mysql_data_exists.stdout"
-  
-- name: create missing mysql user => database does not exists
-  shell: "docker exec mysql sh -c \"mysql -u root -h 127.0.0.1 -e \\\"CREATE USER IF NOT EXISTS '{{vault_onlyoffice_mysql_username}}'@'%' IDENTIFIED BY '{{vault_onlyoffice_mysql_password}}';\\\"\""
-  when: "'onlyoffice' not in mysql_data_exists.stdout"
-
-- name: grant permissions to mysql user => database does not exists
-  shell: "docker exec mysql sh -c \"mysql -u root -h 127.0.0.1 -e \\\"GRANT ALL PRIVILEGES ON onlyoffice.* TO '{{vault_onlyoffice_mysql_username}}'@'%';\\\"\""
-  when: "'onlyoffice' not in mysql_data_exists.stdout"
-
-- name: refresh mysql privileges => database does not exists
-  shell: "docker exec mysql sh -c \"mysqladmin -u root -h 127.0.0.1 flush-privileges\""
-  when: "'onlyoffice' not in mysql_data_exists.stdout"
+- name: create database
+  vars:
+    database: "onlyoffice"
+    username: "{{vault_onlyoffice_mysql_username}}"
+    password: "{{vault_onlyoffice_mysql_password}}"
+    backup: no
+  import_tasks: roles/mysql/tasks/add_database.yml
   
 # ***** FINALIZE *****
 #- name: copy fluentd config

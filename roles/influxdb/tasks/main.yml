@@ -1,23 +1,19 @@
 - name: set version
   set_fact:
-    influxdb_version: '1.8.4'
+    influxdb_version: '2.0.7'
   tags: [ 'update_notifier_configs' ]    
 
 - name: prepare needed folder
   file:
-    path: '{{item}}'
+    path: '{{item.path}}'
     state: directory
-    owner: root
-    group: root
+    owner: "{{item.user}}"
+    group: "{{item.group}}"
     mode: 0750
   with_items:
-    - '{{ global_build }}influxdb'
-    - '{{ global_lib }}influxdb'
-    - '{{ global_lib }}influxdb/hh'
-    - '{{ global_lib }}influxdb/meta'
-    - '{{ global_lib }}influxdb/data'
-    - '{{ global_lib }}influxdb/wal'  
-    - '{{backup_path}}influxdb'
+    - { user: "root", group: "root", path: "{{ global_build }}influxdb" }
+    - { user: "1000", group: "1000", path: "{{ global_lib }}influxdb" }
+    - { user: "root", group: "root", path: "{{backup_path}}influxdb" }
 
 - name: check started docker
   systemd:
@@ -32,27 +28,34 @@
 #    recreate: true
     entrypoint: "sh -c \"/entrypoint.sh influxd 2>&1\""
     env:
-      INFLUXDB_OPENTSDB_0_ENABLED: "true"
-      INFLUXDB_LOGGING_FORMAT: "json"
-      INFLUXDB_REPORTING_DISABLED: "true"
-      INFLUXDB_DATA_WAL_FSYNC_DELAY: "1s"
-#      INFLUXDB_DATA_CACHE_SNAPSHOT_MEMORY_SIZE: "128MB"
+      DOCKER_INFLUXDB_INIT_MODE: "setup"
+      DOCKER_INFLUXDB_INIT_USERNAME: "{{vault_influxdb_admin_username}}"
+      DOCKER_INFLUXDB_INIT_PASSWORD: "{{vault_influxdb_admin_password}}"
+      DOCKER_INFLUXDB_INIT_ORG: "default-org"
+      DOCKER_INFLUXDB_INIT_BUCKET: "default-bucket"
+      DOCKER_INFLUXDB_INIT_RETENTION: "1w"
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: "{{vault_influxdb_admin_token}}"
+      INFLUXD_REPORTING_DISABLED: "true"
+#      INFLUXDB_LOGGING_FORMAT: "json"
+#      INFLUXDB_DATA_WAL_FSYNC_DELAY: "1s"
       TZ: "{{timezone}}"
     log_driver: journald
     log_options:
       tag: influxdb
-    volumes:
-      - '{{ global_lib }}influxdb:/var/lib/influxdb:z'
-      - '{{backup_path}}influxdb:/var/lib/influxdb_backup:z'
+    container_default_behavior: "compatibility"
+    network_mode: "default"
     networks:
       - name: "isolated"
         ipv4_address: "{{docker_influxdb_ip}}"
     networks_cli_compatible: yes
+    volumes:
+      - '{{ global_lib }}influxdb:/var/lib/influxdb2:z'
+      - '{{backup_path}}influxdb:/var/lib/influxdb_backup:z'
     exposed_ports:
-     - "8086"  
-     - "4242"  
+     - "8086"
+  register: influxdb_container_result
   notify: "restart influxdb"
-    
+
 - name: add container name
   vars:
     host_name: "influxdb"
@@ -63,11 +66,25 @@
 - name: create cron job
   vars:
     name: "Influxdb Cleanup"
-    cmd: "find {{backup_path}}influxdb/ -type d -mtime +30 -exec rm -rf {} +;"
+    cmd: "find {{backup_path}}influxdb/ -type d -mtime +7 -exec rm -rf {} +;"
     file: "ansible_influxdb"
     hour: "0"
     minute: "45"
   import_tasks: roles/cron/tasks/add_cronjob.yml
+
+- name: register webui
+  vars:
+    name: "influxdb"
+    js_file: "templates/webui/influxdb.js"
+    i18n_files: [ { language: "de", file: "templates/webui/influxdb.de.json" } ]
+    icons: [ 'templates/webui/icons/influxdb_logo.svg' ]
+  import_tasks: roles/apache_webui/tasks/add_webui.yml
+
+- name: copy apache vhost
+  vars:
+    sub_domain: "influxdb"
+    include: "templates/etc/apache2/_.ansible.vhost.d/influxdb.inc"
+  import_tasks: roles/apache/tasks/add_vhost.yml
 
 - name: copy fluentd config
   vars:
@@ -83,7 +100,7 @@
   vars:
     name: "influxdb"
     type: "docker"
-    url: "https://docs.influxdata.com/influxdb/v1.7/about_the_project/releasenotes-changelog/"
+    url: "https://docs.influxdata.com/influxdb/v2.0/reference/release-notes/influxdb/"
     config: {
       repository: "influxdb",
       pattern: "^([0-9\\.]+)-alpine$"
@@ -96,3 +113,18 @@
     service: "influxdb.service"
   import_tasks: roles/_shared/tasks/service_check.yml
 
+# CHECK local cli token => only needed if a new container is created and data folder already exists
+- name: check influxdb service
+  import_tasks: roles/influxdb/tasks/wait_until_ready.yml
+  when: "influxdb_container_result.changed"
+  
+- name: check cli config
+  shell: "docker exec influxdb sh -c \"influx config list\""
+  register: influxdb_config_result
+  changed_when: False
+  when: "influxdb_container_result.changed"
+  
+- name: create cli config token => config does not exists
+  shell: "docker exec influxdb sh -c \"influx config create --config-name default --host-url http://localhost:8086 --org default-org --token {{vault_influxdb_admin_token}} --active\""
+  changed_when: False
+  when: "influxdb_container_result.changed and '\tdefault\t' not in influxdb_config_result.stdout"

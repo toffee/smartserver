@@ -29,6 +29,13 @@
 - assert:
     that: host_ip is defined
     msg: "No valid ip found. Allowed are: production ({{ production_ip if production_ip else 'disabled' }}), staging ({{ staging_ip if staging_ip else 'disabled' }})"
+  tags: always
+
+- name: detect network interface
+  shell: "ip a | grep -P \"inet {{host_ip}}\" | grep -Po \"[a-z0-9]*$\""
+  register: "main_device_result"
+  changed_when: False
+  tags: always
 
 # load vault file
 - name: load vault vars
@@ -38,32 +45,20 @@
 # set environment specific variables [pre]
 - name: set pre state vars
   set_fact:
+    system_users: {}
+    system_groups: {}
     is_suse: "{{ansible_distribution == 'openSUSE Leap'}}"
     is_fedora: "{{ansible_distribution == 'Fedora'}}"
+    is_ubuntu: "{{ansible_distribution == 'Ubuntu'}}"
     is_production: "{{host_ip == production_ip}}"
-    ansible_remote_ip: "{{ ansible_ssh_host if ansible_ssh_host != '127.0.0.1' else host_ip }}"
+    default_gateway: "{{ ansible_default_ipv4['gateway'] }}"
+#    ansible_remote_ip: "{{ ansible_ssh_host if ansible_ssh_host != '127.0.0.1' else host_ip }}"
+    main_network_interface: "{{main_device_result.stdout_lines[0]}}"
   tags: always
   
 # load shared variables
 - name: load shared vars
   include_vars: "config/shared.yml"
   tags: always
-  
-- name: detect main network device
-  shell: "ip a | grep -P \"inet {{server_ip}}\" | grep -Po \"[a-z0-9]*$\""
-  register: "main_device_result"
-  changed_when: False
 
-# set environment specific variables [post]
-- name: set post state vars
-  set_fact:
-    deployment_backup_path: "{{projects_path}}{{ansible_project_name}}/{{config_path}}backup/"
-    main_network_interface: "{{main_device_result.stdout}}"
-  tags: always
-
-- name: register user_id map
-  set_fact:
-    system_users: {}
-    system_groups: {}
-    ssl_certificate: "{{ ssl_certificate | default('selfsigned') }}"    # selfsigned | letsencrypt
   

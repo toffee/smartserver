@@ -30,14 +30,6 @@
       , iotop
       , smem 
 
-#      , libxml2-devel
-
-#      , subversion         # ???
-#      , autoconf           # ???
-#      , automake           # ???
-#      , lm_sensors
-#      , ImageMagick        # ???
-
       , wireguard-tools
       
       , curl
@@ -46,12 +38,10 @@
       , gcc
       , make
       , git
+      , sshpass
       
-      #, python2-setuptools
       , python3-setuptools
-      #, python2-pip
       , python3-pip
-      #, python2-passlib
       , python3-passlib
       
       , python3-libselinux # used by ansible on fedora
@@ -61,6 +51,32 @@
     state: present
   when: is_fedora|bool
 
+- name: install required packages => is_ubuntu
+  apt:
+    name: [
+        mc
+      , htop
+      , sysstat
+      , iotop
+      , smem 
+
+      , wireguard-tools
+      
+      , curl
+      , bzip2
+      , zip
+      , gcc
+      , make
+      , git
+      , sshpass
+      
+      , python3-setuptools
+      , python3-pip
+      , python3-passlib
+    ]
+    state: present
+  when: is_ubuntu|bool
+  
 - name: install required packages => is_suse
   zypper:
     name: [  
@@ -70,16 +86,6 @@
       , iotop
       , smem               # useful tool to debug memory usage (including swap usage)
 
-#      , libxml2-devel
-
-#      , subversion         # ???
-#      , make               # ???
-#      , autoconf           # ???
-#      , automake           # ???
-#      , gcc                # ???
-#      , sensors
-#      , ImageMagick        # ???
-
       , wireguard-tools
 
       , curl               # used to send multi part/formdata => kibana
@@ -88,12 +94,10 @@
       , gcc                # used for ansible gem module => to build native extension
       , make               # used for ansible gem module => to build native extension
       , git                # used for ansible git module
+      , sshpass            # used for ssh accessibility checks (e.g. openhab => wait until ready)
 
-#     , python2-setuptools      # needed by openssl ansible module
       , python3-setuptools
-#      , python2-pip        # used for ansible pip module => python2 is used because it installes python2-setuptools and depends on it. python3-pip still needs python2-setuptools (vagrant suse version is using it)
       , python3-pip
-#      , python2-passlib    # used by ansible htpasswd module (user role) => python2 is used because "/usr/lib/python3.6/site-packages/ansible/modules/web_infrastructure/htpasswd.py" is using python2 (vagrant suse version is using it)
       , python3-passlib    # used by ansible htpasswd module (user role), must be added here as the add web user task is a shared task
       
       , insserv-compat     # used by ansible systemd module
@@ -130,3 +134,20 @@
     url: "https://www.suse.com/support/update/"
   import_tasks: roles/update_notifier/tasks/add_notifier.yml
   when: is_suse|bool
+  
+- name: set sysctl inotify related values
+  lineinfile:
+    path: /etc/sysctl.conf
+    regexp: '^{{item.regex}}\s*='
+    line: '{{item.line}}'
+  with_items:
+    #Each inotify watch uses 540 bytes of kernel memory on 32-bit architectures, and 1080 bytes on 64-bit architectures. Kernel memory is unswappable. So there is a memory cost, certainly.
+    #- { regex: "fs\\.inotify\\.max_user_instances", line: "fs.inotify.max_user_instances = 256" }
+    #- { regex: "fs\\.inotify\\.max_user_watches", line: "fs.inotify.max_user_watches = 65536" }
+    - { regex: "fs\\.inotify\\.max_user_watches", line: "fs.inotify.max_user_watches = 262144" } # => max 270MB
+  register: sysctlchanged
+  
+- name: refresh sysctl to activate sysctl changes => sysctl changed
+  shell: sysctl -p
+  when: sysctlchanged.changed
+

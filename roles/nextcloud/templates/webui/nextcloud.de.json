@@ -1,11 +1,15 @@
 {
-  "nextcloud": {
+  "workspace": {
     "Nextcloud": "Nextcloud"
   },
-  "nextcloud_nextcloud": {
-    "Documents": "Dokumente",
+  "workspace_nextcloud": {
+    "Files": "Alle Dateien",
+    "Documents": "Dokumente & Bilder",
+    "Photos": "Fotos",
+    "Gallery": "Gallerie",
     "News": "News",
-    "Keys": "Keys",
+    "RSSFeeds": "RSS Feeds",
+    "Keys": "Passwörter",
     "Keeweb": "Keeweb"
   }
 }

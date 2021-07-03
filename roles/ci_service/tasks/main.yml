@@ -5,9 +5,19 @@
   when: is_fedora|bool
   notify: "restart virtualbox" 
 
+- name: install required packages => is_ubuntu
+  apt:
+    name: virtualbox
+    state: present
+  when: is_ubuntu|bool
+  notify: "restart virtualbox" 
+
 - name: install required packages => is_suse
   zypper:
-    name: virtualbox
+    name: [
+      virtualbox
+      , libncurses5
+    ]
     state: present
   when: is_suse|bool
   notify: "restart virtualbox" 
@@ -30,7 +40,7 @@
 
 - name: install vagrant binary
   unarchive:
-    src: "https://releases.hashicorp.com/vagrant/2.2.10/vagrant_2.2.10_linux_amd64.zip"
+    src: "https://releases.hashicorp.com/vagrant/2.2.16/vagrant_2.2.16_linux_amd64.zip"
     dest: "/opt/ci_service"
     remote_src: yes
     creates: "/opt/ci_service/vagrant"
@@ -77,6 +87,7 @@
     name: "ci_service"
     js_file: "templates/webui/ci_service.js"
     i18n_files: [ { language: "de", file: "templates/webui/ci_service.de.json" } ]
+    icons: [ 'templates/webui/icons/ci_service_logo.svg' ]
   import_tasks: roles/apache_webui/tasks/add_webui.yml
 
 - name: create check cron job

@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    grafana_version: '7.4.3'
+    grafana_version: '8.0.3'
   tags: [ 'update_notifier_configs' ]    
 
 - name: prepare needed folder
@@ -51,12 +51,12 @@
     mode: 0640
   notify: "restart grafana"
   with_items:
-    - "provisioning/dashboards/provider.yaml"
     - "provisioning/datasources/openhab_influxdb.yaml"
-    - "provisioning/datasources/openhab_mysql.yaml"
     - "provisioning/datasources/opentsdb.yaml"
+    - "provisioning/datasources/openhab_mysql.yaml"
     - "provisioning/datasources/loki.yaml"
-  
+    - "provisioning/dashboards/provider.yaml"
+
 - name: build docker image
   vars:
     name: "grafana"
@@ -98,6 +98,8 @@
     log_driver: journald
     log_options:
       tag: grafana
+    container_default_behavior: "compatibility"
+    network_mode: "default"
     networks:
       - name: "grafana"
         ipv4_address: "{{docker_grafana_ip}}"
@@ -121,6 +123,7 @@
     name: "grafana"
     js_file: "templates/webui/grafana.js"
     i18n_files: [ { language: "de", file: "templates/webui/grafana.de.json" } ]
+    icons: [ 'templates/webui/icons/grafana_logo.svg', 'templates/webui/icons/grafana_logs.svg' ]
   import_tasks: roles/apache_webui/tasks/add_webui.yml
 
 - name: copy apache config

@@ -15,6 +15,8 @@ projects_path:                    "/dataRaid/projects/"
 cloud_path:                       "/dataRaid/cloud/"
 backup_path:                      "/dataRaid/backups/"
 
+deployment_backup_path:           "{{projects_path}}{{ansible_project_name}}/{{config_path}}backup/"
+
 nextcloud_data_path:              "/dataRaid/nextcloud/"
 
 samba_master:                     "{%if is_production%}yes{%else%}no{%endif%}"
@@ -42,9 +44,11 @@ docker_default_network:           "172.17.0.0"
 docker_onlyoffice_ip:             "172.30.1.200"
 docker_php_ip:                    "172.30.2.200"
 docker_grafana_ip:                "172.30.3.200"
-docker_zigbee2mqtt_ip:            "172.30.4.200"
-docker_recorder_ip:               "172.30.5.200"
+docker_telegraf_ip:               "172.30.4.200"
 #docker_openhab_ip:                "172.30.4.200"
+
+docker_zigbee2mqtt_ip:            "172.30.20.200"
+docker_recorder_ip:               "172.30.21.200"
 
 # 0 => production, 1 => production
 netgroup:                         "{{server_ip_r[2]}}"
@@ -72,8 +76,29 @@ vpn_cloud_services:               "{
 {% endif %}
 }"  
 
+macvlan_ips:                      "[
+{% if pihole_ip is defined %}'{{pihole_ip}}',{% endif %}
+{% if dlna_ip is defined %}'{{dlna_ip}}',{% endif %}
+]"
+
+macvlan_range: "{% if macvlan_ips | length > 0 %}{{macvlan_ips | cidr_merge('span')}}{% else %}{% endif %}"
+
+#- name: detect macvlan subnet
+#  debug:
+#    msg: "{{macvlan_range}}"
+
+dlna_volumes:                    "{
+{% for username in userdata %}
+{% if userdata[username].media_dir is defined %}
+{% for media_name in userdata[username].media_dir %}
+  \"{{nextcloud_data_path}}{{username}}/files/{{userdata[username].media_dir[media_name]}}\": \"/media/{{media_name}}\",
+{% endfor %}
+{% endif %}
+{% endfor %}
+}"
+
 pihole_whitelist_domains:          [ "www.googleadservices.com", "clickserve.dartsearch.net", "ad.doubleclick.net" ]
 
 # version of alpine linux used in several container based roles
-alpine_version:                   "3.13.2"
-debian_version:                   "buster-20210208-slim"
+alpine_version:                   "3.14.0"
+debian_version:                   "buster-20210621-slim"

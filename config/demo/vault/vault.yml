@@ -5,9 +5,9 @@ vault_root_mail_host: "smtp.gmail.com"
 vault_root_mail_port: "587"
 
 vault_userpasswords: {
-    testuser1: { samba_password: "test", web_password: "test" },
-    testuser2: { samba_password: "test", web_password: "test" },
-    testuser3: { samba_password: "test", web_password: "test" }
+    testuser1: { samba_password: "test12345", web_password: "test12345" },
+    testuser2: { samba_password: "test12345", web_password: "test12345" },
+    testuser3: { samba_password: "test12345", web_password: "test12345" }
 }
 
 # for details how to configure, check: https://github.com/zmartzone/mod_auth_openidc
@@ -23,6 +23,10 @@ vault_pihole_password: "<password>"
 
 vault_ftp_username: "ftp"
 vault_ftp_password: "default123"
+
+vault_influxdb_admin_username: "admin"
+vault_influxdb_admin_password: "default123"
+vault_influxdb_admin_token: "lkjfdh7123kjas"
 
 vault_shared_mysql_username: "shared"
 vault_shared_mysql_password: "default123"
@@ -44,8 +48,6 @@ vault_onlyoffice_shared_key: "qwe0983yxcxy435"
 vault_onlyoffice_mysql_username: "onlyoffice"
 vault_onlyoffice_mysql_password: "default123"
 
-vault_grafana_influxdb_username: "grafana"
-vault_grafana_influxdb_password: "default123"
 vault_grafana_app_username: "admin"
 vault_grafana_app_password: "admin"
 
@@ -64,8 +66,6 @@ vault_deployment_token_git: ""
 vault_openhab_config_git: "https://github.com/HolgerHees/openhab-config.git"
 vault_openhab_mysql_username: "openhab"
 vault_openhab_mysql_password: "default123"
-vault_openhab_influxdb_username: "openhab"
-vault_openhab_influxdb_password: "default123"
 
 # ****** OPTIONAL VARIABLES ******
 # variables are optional and only necessary if they are referenced in one of the optional roles or configurations
@@ -82,6 +82,8 @@ vault_cloudsync_password: "default123"
 # used in custom external openhab config repository
 vault_fritzbox_username: "openhab"
 vault_fritzbox_password: "default123"
+vault_fritzbox_wan_uuid: "12345"
+vault_fritzbox_lan_uuid: "12345"
 vault_telegram_bots: {
     bot_testuser1: { # for user1
         chat_id: "<chat_id>",
@@ -98,6 +100,7 @@ vault_homecontrol_client_secret: "<vault_homecontrol_client_secret>"
 vault_homecontrol_washer: "<vault_homecontrol_washer>"
 vault_homecontrol_dishwasher: "<vault_homecontrol_dishwasher>"
 vault_homecontrol_coffeemaker: "<vault_homecontrol_coffeemaker>"
+vault_garbage_calendar_url: "<google_ical_url>"
 
 # used in custom external openhab config repository and custom role 'apache_proxy'
 vault_automower_device_username: "automower"

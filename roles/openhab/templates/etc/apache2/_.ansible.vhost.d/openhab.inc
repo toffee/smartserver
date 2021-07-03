@@ -14,6 +14,9 @@ ProtocolsHonorOrder Off
   ProxyPassReverse http://openhab:8080/
   ProxyPreserveHost on
   RequestHeader set X-Forwarded-Proto "https" env=HTTPS
+  
+  Header add Set-Cookie "X-OPENHAB-AUTH-HEADER=true;path=/;Secure"
+  RequestHeader unset Authorization
 </Location>
 
 <Location /basicui/manifest.json>
@@ -31,6 +34,9 @@ ProtocolsHonorOrder Off
 </Location>
 
 <Location /grafana>
+  RewriteCond %{HTTP:Upgrade} =websocket [NC]
+  RewriteRule /api/live/(.*) ws://grafana:3000/api/live/$1 [P,L]
+  
   ProxyPreserveHost On
   ProxyPass http://grafana:3000
   ProxyPassReverse http://grafana:3000

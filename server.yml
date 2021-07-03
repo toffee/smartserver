@@ -16,18 +16,20 @@
         msg: 
           - "mode:       {{inventory_hostname}}"
           - "server:     {{server_ip}}"
-          - "gateway:    {{server_gateway}}"
-          - "network:    {{server_network}}"
+          - "gateway:    {{server_gateway}}{{ ' (' + default_gateway + ')' if server_gateway != default_gateway else ''}}"
+          - "network:    {{server_network}}/24"
+          - "macvlan:    {{macvlan_range if macvlan_range | length > 0 else 'none'}}"
           - "arpha:      {{server_arpa}}"
-          - "os-name:    {{ansible_distribution}}"
+          - "os-name:    {{ansible_distribution}} {{ansible_distribution_version}} ({{ansible_distribution_release}})"
           - "net:        {{main_network_interface}}"
       tags: always
 
+      
     - name: dynamic values from init role
       debug:
         msg: 
           - "production: {{ 'active' if is_production else 'inactive' }}"
-          - "flags:      is_suse: {{is_suse}}, is_fedora: {{is_fedora}}"
+          - "flags:      is_suse: {{is_suse}}, is_fedora: {{is_fedora}}, is_ubuntu: {{is_ubuntu}}"
       tags: always
 
     # needed by all roles which needs to register their own fluentd handler
@@ -58,9 +60,9 @@
 
     - { import_role: { name: alpine }, tags: [ 'alpine' ] }                                      # registers update notifier for alpine based container images
 
-    - { import_role: { name: network }, tags: [ 'network' ] }                                    # basic network tweaks like enabled ipv6
+    - { import_role: { name: network }, tags: [ 'network', 'macvlan' ] }                         # basic network tweaks like enabled ipv6
       
-    - { import_role: { name: firewall }, tags: [ 'firewall' ] }                                  # firewall configuration
+    - { import_role: { name: firewall }, tags: [ 'firewall', 'macvlan' ] }                       # firewall configuration
 
     # ************ FLUSH HANDLER ***********    
     - { meta: flush_handlers }                                                                   # activate network configs (network & firewall). Otherwise docker related iptables rules are sometime lost and prevents to continue
@@ -81,7 +83,7 @@
 
     - { import_role: { name: pihole }, tags: [ 'pihole' ] }                                      # adblock server                                                    [docker,user:root]
 
-    - { import_role: { name: wireguard_mobile }, tags: [ 'wireguard', 'wireguard_mobile', 'alpine' ] } # vpn configuration (mobile access)                           [docker,user:root]
+    - { import_role: { name: wireguard_mobile }, tags: [ 'wireguard', 'wireguard_mobile', 'macvlan', 'alpine' ] } # vpn configuration (mobile access)                [docker,user:root]
 
     - { import_role: { name: postfix }, tags: [ 'postfix', 'alpine' ] }                          # mail server to forward root mails                                 [docker,user:root]
 
@@ -91,7 +93,8 @@
 
     - { import_role: { name: mysql }, tags: [ 'mysql' ] }                                        # mysql db => needed by nextcloud and openhab                       [docker,user:999]
 
-    - { import_role: { name: influxdb }, tags: [ 'influxdb' ] }                                  # influxdb => needed by openhab and netdata                         [docker,user:root]
+    - { import_role: { name: influxdb }, tags: [ 'influxdb' ] }                                  # influxdb => needed by openhab                                     [docker,user:root]
+    - { import_role: { name: telegraf }, tags: [ 'telegraf' ] }                                  # telegraf => needed by netdata                                     [docker,user:root]
     
     - { import_role: { name: loki }, tags: [ 'loki' ] }                                          # grafana logstore                                                  [docker,user:10001|10001]
 
@@ -122,6 +125,8 @@
 
     - { import_role: { name: nextcloud }, tags: [ 'nextcloud' ] }                                # private cloud
     - { import_role: { name: nextcloud_onlyoffice }, tags: [ 'nextcloud_onlyoffice' ] }          # private cloud office editor                                       [docker,user:106|108]
+
+    - { import_role: { name: minidlna }, tags: [ 'minidlna', 'alpine' ], when: "dlna_volumes|length>0" } # dlna media server                                         [docker,user:wwwrun|apache]
      
     - { import_role: { name: openhab }, tags: [ 'openhab' ] }                                    # openhab iot server                                                [docker,user:openhab|openhab]
     - { import_role: { name: openhab_toolbox }, tags: [ 'openhab_toolbox' ] }                    # admin scripts and tools
@@ -130,6 +135,8 @@
     - { import_role: { name: cron_backup_rsync }, tags: [ 'cron_backup_rsync' ] }                # rsync copy of {{data_path}} to {{backup_path}}dataDisk/
 
     - { import_role: { name: deployment }, tags: [ 'deployment' ] }                              # ansible deployment project + backup collector
+
+    - { import_role: { name: update_notifier }, tags: [ 'update_notifier' ] }                    # update check service
 
     # ************ CUSTOM ROLES ************
     - { include_tasks: "{{config_path}}roles.yml", tags: [ 'always' ] }                          # Details can be found inside the demo configuration 'config/demo/roles.yml'
@@ -142,10 +149,14 @@
   post_tasks:
     - { import_role: { name: apache, tasks_from: letsencrypt, handlers_from: empty }, tags: [ 'apache_letsencrypt' ], when: "ssl_certificate == 'letsencrypt'" }   # activate letsencrypt certificate
 
-    - { import_role: { name: dns, tasks_from: enable, handlers_from: empty }, tags: [ 'dns' ] }   # activate local named
+    #- { import_role: { name: dns, tasks_from: enable, handlers_from: empty }, tags: [ 'dns' ] }   # activate local named
 
-    - { import_role: { name: pihole, tasks_from: whitelist, handlers_from: empty }, tags: [ 'pihole' ] }   # activate local named
+    - { import_role: { name: pihole, tasks_from: whitelist, handlers_from: empty }, tags: [ 'pihole' ] }   # add whitelist entries
 
     - { import_role: { name: nextcloud, tasks_from: enable_apps, handlers_from: empty }, tags: [ 'nextcloud', 'nextcloud_apps' ] }   # ENABLE NEXTCLOUD APPS needs a running system (php, database, redis ...)
+
+    - { import_role: { name: influxdb, tasks_from: create_users, handlers_from: empty }, tags: [ 'influxdb', 'influxdb_users' ] }   # create influxdb users
+
+    - { import_role: { name: openhab, tasks_from: create_users, handlers_from: empty }, tags: [ 'openhab', 'openhab_users' ] }   # create openhab users
 
     - { import_role: { name: systemd_watcher, tasks_from: check_services, handlers_from: empty }, tags: [ 'validate' ] } # last check if all registered services are running
