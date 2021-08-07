@@ -1,0 +1,8 @@
+scrape_configs:
+  - job_name: 'openhab'
+    scrape_interval: 1m
+    scheme: https
+    metrics_path: /rest/metrics/prometheus
+    static_configs:
+    - targets:
+      - 'openhab.{{server_domain}}'

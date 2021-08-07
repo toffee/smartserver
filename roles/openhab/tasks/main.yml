@@ -434,7 +434,7 @@
   import_tasks: roles/mysql/tasks/add_database.yml
     
 # ***** INFLUXDB DATABASE ****
-- name: create database
+- name: create values database
   vars:
     database: "openhab"
     retentions:

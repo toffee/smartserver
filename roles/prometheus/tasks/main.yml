@@ -1,0 +1,130 @@
+- name: set version
+  set_fact:
+    prometheus_version: '2.28.1'
+  tags: [ 'update_notifier_configs' ]    
+
+- name: prepare needed folder
+  file:
+    path: '{{item.path}}'
+    state: directory
+    owner: "{{item.user}}"
+    group: "{{item.group}}"
+    mode: 0750
+  with_items:
+    - { user: "nobody", group: "{{ 'nobody' if is_fedora else 'nogroup'}}", path: "{{ global_etc }}prometheus" }
+    - { user: "nobody", group: "{{ 'nobody' if is_fedora else 'nogroup'}}", path: "{{ global_lib }}prometheus" }
+    - { user: "root", group: "root", path: "{{backup_path}}prometheus" }
+
+- name: copy config
+  template:
+    src: "templates/etc/prometheus.yml"
+    dest: "{{ global_etc }}prometheus/prometheus.yml"
+    owner: nobody
+    group: "{{ 'nobody' if is_fedora else 'nogroup'}}"
+    mode: 0640
+  notify: "restart prometheus"
+
+- name: check started docker
+  systemd:
+    name: docker
+    state: started
+
+- name: create docker network
+  docker_network:
+    name: prometheus
+    ipam_config:
+      - subnet: "{{docker_prometheus_ip.split('.')[:3] | join('.')}}.0/24"
+        gateway: "{{docker_prometheus_ip.split('.')[:3] | join('.')}}.1"
+    appends: yes
+  
+- name: create docker container
+  docker_container:
+    name: prometheus
+    image: "prom/prometheus:v{{prometheus_version}}"
+    state: present
+#    recreate: true
+    env:
+      TZ: "{{timezone}}"
+    log_driver: journald
+    log_options:
+      tag: prometheus
+    container_default_behavior: "compatibility"
+    network_mode: "default"
+    networks:
+      - name: "prometheus"
+        ipv4_address: "{{docker_prometheus_ip}}"
+    networks_cli_compatible: yes
+    volumes:
+      - '{{ global_etc }}prometheus:/etc/prometheus:z'
+      - '{{ global_lib }}prometheus:/prometheus:z'
+      - '{{backup_path}}prometheus:/var/lib/prometheus_backup:z'
+    exposed_ports:
+     - "9090"
+  notify: "restart prometheus"
+  
+- name: add container name
+  vars:
+    host_name: "prometheus"
+    host_ip_address: "{{docker_prometheus_ip}}"
+  import_tasks: roles/network/tasks/add_to_hosts.yml
+
+# ***** FINALIZE *****
+- name: allow prometheus service
+  vars:
+    name: "prometheus"
+    rule: "proto tcp dport 443 saddr {{docker_prometheus_ip}}"
+  import_tasks: roles/firewall/tasks/allow_service.yml
+  tags: [ 'firewall_config' ]
+
+- name: create cron job
+  vars:
+    name: "Prometheus Cleanup"
+    cmd: "find {{backup_path}}prometheus/ -mindepth 1 -type d -mtime +7 -exec rm -rf {} +;"
+    file: "ansible_prometheus"
+    hour: "0"
+    minute: "45"
+  import_tasks: roles/cron/tasks/add_cronjob.yml
+
+- name: register webui
+  vars:
+    name: "prometheus"
+    js_file: "templates/webui/prometheus.js"
+    i18n_files: [ { language: "de", file: "templates/webui/prometheus.de.json" } ]
+    icons: [ 'templates/webui/icons/prometheus_logo.svg' ]
+  import_tasks: roles/apache_webui/tasks/add_webui.yml
+
+- name: copy apache vhost
+  vars:
+    sub_domain: "prometheus"
+    include: "templates/etc/apache2/_.ansible.vhost.d/prometheus.inc"
+  import_tasks: roles/apache/tasks/add_vhost.yml
+
+- name: copy fluentd config
+  vars:
+    config_file: "templates/etc/fluent/_.ansible.d/prometheus.conf"
+  import_tasks: roles/fluentd/tasks/add_config.yml
+    
+#nsenter -n -t $(docker inspect --format {{.State.Pid}} prometheus) ip route del default
+#nsenter -n -t $(docker inspect --format {{.State.Pid}} prometheus) ip route add default via 172.16.0.1
+- name: create systemd service
+  vars:
+    container_name: "prometheus"
+#    container_exec_start_post: "nsenter -n -t $(docker inspect --format {{'{{'}}.State.Pid{{'}}'}} prometheus) ip route del default && nsenter -n -t $(docker inspect --format {{'{{'}}.State.Pid{{'}}'}} prometheus) ip route add default via {{docker_base_gateway}}"
+  import_tasks: roles/container/tasks/add_docker_service.yml
+  
+- name: register update notifier
+  vars:
+    name: "prometheus"
+    type: "docker"
+    url: "https://github.com/prometheus/prometheus/releases"
+    config: {
+      repository: "prom/prometheus",
+      pattern: "^v([0-9\\.]+)$"
+    }
+  import_tasks: roles/update_notifier/tasks/add_notifier.yml
+
+- name: trigger prometheus handler
+  vars:
+    notify: "restart prometheus"
+    service: "prometheus.service"
+  import_tasks: roles/_shared/tasks/service_check.yml

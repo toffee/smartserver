@@ -1,9 +1,5 @@
 Alias /weather "{{htdocs_path}}weather"
 
-# forced http1 is needed for openhab app on android. Soemtimes is stucks with http2 enabled
-Protocols http/1.1
-ProtocolsHonorOrder Off
-
 <Location />
   # When Upgrade:websocket header is present, redirect to ws
   # Using NC flag (case-insensitive) as some browsers will pass Websocket
@@ -41,6 +37,8 @@ ProtocolsHonorOrder Off
   ProxyPass http://grafana:3000
   ProxyPassReverse http://grafana:3000
   RequestHeader set Authorization "Basic YWRtaW46YWRtaW4="
+  
+  RequestHeader set Origin "https://{{server_domain}}"
 </Location>
 
 <Location /api/v1/settings/notifications>

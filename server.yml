@@ -9,8 +9,6 @@
     - { import_role: { name: _shared, tasks_from: init }, tags: [ 'always' ] }                                       # detect environment and load configs
     # ************************************   
 
-    - { import_role: { name: _shared, tasks_from: preconditions } }
-  
     - name: loaded values from config files
       debug:
         msg: 
@@ -23,7 +21,6 @@
           - "os-name:    {{ansible_distribution}} {{ansible_distribution_version}} ({{ansible_distribution_release}})"
           - "net:        {{main_network_interface}}"
       tags: always
-
       
     - name: dynamic values from init role
       debug:
@@ -74,6 +71,7 @@
 
     - { import_role: { name: mdadm }, tags: [ 'mdadm' ] }                                        # raid monitor + weekly check cron job
     - { import_role: { name: smartd }, tags: [ 'smartd' ] }                                      # disk monitoring
+    - { import_role: { name: sensors }, tags: [ 'sensors' ] }                                    # sensors monitoring
 
     - { import_role: { name: container }, tags: [ 'container' ] }                                # installs and initializes the container infrastructure (docker & podman)
 
@@ -96,6 +94,8 @@
     - { import_role: { name: influxdb }, tags: [ 'influxdb' ] }                                  # influxdb => needed by openhab                                     [docker,user:root]
     - { import_role: { name: telegraf }, tags: [ 'telegraf' ] }                                  # telegraf => needed by netdata                                     [docker,user:root]
     
+    - { import_role: { name: prometheus }, tags: [ 'prometheus' ] }                              # prometheus => needed by openhab                                   [docker,user:root]
+
     - { import_role: { name: loki }, tags: [ 'loki' ] }                                          # grafana logstore                                                  [docker,user:10001|10001]
 
     - { import_role: { name: redis }, tags: [ 'redis' ] }                                        # redis db => needed by nextcloud                                   [docker,user:999]

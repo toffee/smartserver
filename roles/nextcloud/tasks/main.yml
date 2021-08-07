@@ -1,7 +1,7 @@
 # double check for new versions if "copy patch" is still needed
 - name: set version
   set_fact:
-    nextcloud_version: '21.0.2'
+    nextcloud_version: '22.1.0'
   tags: [ 'update_notifier_configs', 'user' ]
 
 # ***** PREPARE FOLDER *****
@@ -127,7 +127,7 @@
     src: "{{htdocs_path}}nextcloud/config/config.php"
   register: previous_nextcloud_config
   failed_when: no
-  when: "database_added"
+  when: "not database_added"
 
 
 
@@ -242,7 +242,7 @@
 - name: create cron job
   vars:
     name: "Nextcloud Updates"
-    cmd: "/usr/bin/flock -n {{global_tmp}}nextcloud.lock timeout 28m docker exec php sh -c \"php -f {{htdocs_path}}nextcloud/cron.php\""
+    cmd: "/usr/bin/flock -n {{global_tmp}}nextcloud.lock timeout 28m docker exec php sh -c \"php -f {{htdocs_path}}nextcloud/cron.php > /dev/null\""
     file: "ansible_nextcloud"
     minute: "*/15"
   import_tasks: roles/cron/tasks/add_cronjob.yml

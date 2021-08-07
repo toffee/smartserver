@@ -1,3 +1,8 @@
+- name: set version
+  set_fact:
+    nextcloud_news_version: '16.0.1'
+    nextcloud_keeweb_version: '0.6.5'
+  
 # ***** CHECK *****
 - name: check mysql service
   import_tasks: roles/mysql/tasks/wait_until_ready.yml
@@ -26,6 +31,7 @@
   with_items:
     - user_saml # must always be the first one
     - onlyoffice # must always be the second one
+    - jsloader # must always be the third one
     - bookmarks
     - contacts
     - calendar
@@ -64,10 +70,15 @@
   shell: "docker exec mysql sh -c \"mysql -u root -h 127.0.0.1 nextcloud -e \\\"INSERT INTO oc_appconfig (appid, configkey, configvalue) VALUES ('onlyoffice', 'jwt_secret', '{{vault_onlyoffice_shared_key}}') ON DUPLICATE KEY UPDATE configvalue='{{vault_onlyoffice_shared_key}}';\\\"\""
   when: "command_result.results[1].changed"
 
+# ***** CONFIGURE jsloader *****
+- name: set jsloader
+  shell: "docker exec mysql sh -c \"mysql -u root -h 127.0.0.1 nextcloud -e \\\"INSERT INTO oc_appconfig (appid, configkey, configvalue) VALUES ('jsloader', 'snippet', 'document.domain=\\'{{server_domain}}\\'; var script = document.createElement(\\'script\\'); script.src = \\'https://\\' + document.domain + \\'/main/listener/frame.js\\'; document.head.appendChild(script);') ON DUPLICATE KEY UPDATE configvalue='document.domain=\\'{{server_domain}}\\'; var script = document.createElement(\\'script\\'); script.src = \\'https://\\' + document.domain + \\'/main/listener/frame.js\\'; document.head.appendChild(script);';\\\"\""
+  when: "command_result.results[2].changed"
+  
 # ***** INSTALL KEEWEB *****
 - name: install keeweb app => app does not exists
   unarchive:
-    src: "https://github.com/jhass/nextcloud-keeweb/releases/download/v0.6.5/keeweb-0.6.5.tar.gz"
+    src: "https://github.com/jhass/nextcloud-keeweb/releases/download/v{{nextcloud_keeweb_version}}/keeweb-{{nextcloud_keeweb_version}}.tar.gz"
     dest: "{{htdocs_path}}nextcloud/apps/"
     remote_src: yes
     creates: "{{htdocs_path}}nextcloud/apps/keeweb/"
@@ -95,7 +106,7 @@
 # ***** INSTALL NEWS *****
 - name: install news app
   unarchive:
-    src: "https://github.com/nextcloud/news/releases/download/15.3.2/news.tar.gz"
+    src: "https://github.com/nextcloud/news/releases/download/{{nextcloud_news_version}}/news.tar.gz"
     dest: "{{htdocs_path}}nextcloud/apps/"
     remote_src: yes
     creates: "{{htdocs_path}}nextcloud/apps/news/"
@@ -128,7 +139,7 @@
     owner: "{{system_users['www'].name}}"
     group: "{{system_groups['www'].name}}"
     mode: 0640
- 
+    
 # maybe cleanup 
 # UPDATE `oc_jobs` SET `reserved_at` = 0 WHERE `class` = 'OCA\\News\\Cron\\Updater'
   
@@ -139,7 +150,7 @@
   changed_when: no
 
 - name: enable keeweb and news apps
-  shell: "docker exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:enable {{item}}\""
+  shell: "docker exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:enable {{item}} --force\""
   register: command_result
   failed_when: "'enabled' not in command_result.stdout"
   when: "item not in app_status.stdout.split('Disabled')[0]"
@@ -147,4 +158,26 @@
     - keeweb
     - news
 
- 
+- name: register news update notifier
+  vars:
+    name: "nextcloud_news"
+    type: "github"
+    url: "https://github.com/nextcloud/news/releases"
+    config: { 
+      project: "nextcloud/news", 
+      pattern: "^([0-9\\.]+)$",
+      version: "{{nextcloud_news_version}}" 
+    }
+  import_tasks: roles/update_notifier/tasks/add_notifier.yml
+
+- name: register keeweb update notifier
+  vars:
+    name: "nextcloud_keeweb"
+    type: "github"
+    url: "https://github.com/jhass/nextcloud-keeweb/releases"
+    config: { 
+      project: "jhass/nextcloud-keeweb", 
+      pattern: "^v([0-9\\.]+)$",
+      version: "v{{nextcloud_keeweb_version}}" 
+    }
+  import_tasks: roles/update_notifier/tasks/add_notifier.yml

@@ -46,11 +46,16 @@ RUN groupadd -g {{system_groups['www'].id}} {{system_groups['www'].name}} && \
   pecl install redis && \
   docker-php-ext-enable redis && \
   
+# Redis
+#  pecl install inotify && \
+#  docker-php-ext-enable inotify && \
+
 # CLEANUPS
   apt-get autoremove -y && \
   apt-get clean && \
   
   mv "/usr/local/etc/php/php.ini-production" "/usr/local/etc/php/php.ini" && \
+  echo "apc.enable_cli=1\n" >> "/usr/local/etc/php/conf.d/docker-php-ext-apcu.ini" && \
   sed -i 's/memory_limit.*/memory_limit = 1024M/' /usr/local/etc/php/php.ini && \
   sed -i 's/pm.start_servers.*/pm.start_servers = 15/' /usr/local/etc/php-fpm.d/www.conf && \
   sed -i 's/pm.max_children.*/pm.max_children = 100/' /usr/local/etc/php-fpm.d/www.conf && \

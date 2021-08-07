@@ -1,6 +1,7 @@
 - name: set version
   set_fact:
-    grafana_version: '8.0.3'
+    grafana_version: '8.1.0'
+    natel_discrete_plugin_version: "0.1.1"
   tags: [ 'update_notifier_configs' ]    
 
 - name: prepare needed folder
@@ -13,6 +14,7 @@
   with_items:
     - "{{ global_lib }}grafana/"
     - "{{ global_lib }}grafana/dashboards/"
+    - "{{ global_lib }}grafana/plugins/"
     - "{{ global_etc }}grafana/"
     - "{{ global_etc }}grafana/provisioning"
     - "{{ global_etc }}grafana/provisioning/dashboards/"
@@ -29,6 +31,7 @@
     mode: 0640
   notify: "restart grafana"
   with_items:
+    - "templates/dashboards/OpenHAB metrics.json"
     - "templates/dashboards/Server Health.json"
     - "templates/dashboards/Logs.json"
 
@@ -51,11 +54,22 @@
     mode: 0640
   notify: "restart grafana"
   with_items:
+    - "provisioning/datasources/opentsdb_influxdb.yaml"
     - "provisioning/datasources/openhab_influxdb.yaml"
-    - "provisioning/datasources/opentsdb.yaml"
     - "provisioning/datasources/openhab_mysql.yaml"
+    - "provisioning/datasources/prometheus.yaml"
     - "provisioning/datasources/loki.yaml"
     - "provisioning/dashboards/provider.yaml"
+    
+- name: install natel-discrete-panel archive
+  unarchive:
+    src: "https://grafana.com/api/plugins/natel-discrete-panel/versions/{{natel_discrete_plugin_version}}/download"
+    dest: "{{ global_lib }}grafana/plugins/"
+    creates: "{{ global_lib }}grafana/plugins/natel-discrete-panel/"
+    remote_src: yes
+    owner: "root"
+    group: "root"
+  notify: "restart grafana"
 
 - name: build docker image
   vars:
@@ -88,9 +102,9 @@
     user: "root:root"
 #    recreate: true
     env:
-      GF_SERVER_DOMAIN: "{{server_domain}}"
+      GF_SERVER_DOMAIN: "grafana.{{server_domain}}"
 #      GF_SERVER_HTTP_ADDR: "127.0.0.1"
-      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s:/grafana"
+      GF_SERVER_ROOT_URL: "https://%(domain)s/"
 #      GF_LOG_MODE: "syslog"
 #      GF_LOG_SYSLOG_TAG: "grafana"
       GF_SECURITY_ALLOW_EMBEDDING: "true"
@@ -111,6 +125,14 @@
      - "3000"
   notify: "restart grafana"
       
+- name: attach to prometheus docker network
+  docker_network:
+    name: prometheus
+    connected:
+      - grafana
+    appends: yes
+  tags: [ 'prometheus' ]  
+
 - name: add container name
   vars:
     host_name: "grafana"
@@ -126,10 +148,11 @@
     icons: [ 'templates/webui/icons/grafana_logo.svg', 'templates/webui/icons/grafana_logs.svg' ]
   import_tasks: roles/apache_webui/tasks/add_webui.yml
 
-- name: copy apache config
+- name: copy apache vhost
   vars:
-    config_file: "templates/etc/apache2/_.ansible.conf.d/grafana.conf"
-  import_tasks: roles/apache/tasks/add_config.yml
+    sub_domain: "grafana"
+    include: "templates/etc/apache2/_.ansible.vhost.d/grafana.inc"
+  import_tasks: roles/apache/tasks/add_vhost.yml
 
 - name: copy fluentd config
   vars:

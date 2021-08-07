@@ -7,11 +7,33 @@
     <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet"> 
     <link href="main/manifest.json" rel="manifest">
 
-    <link href="ressources?type=css" rel="stylesheet">
+<?php
+function getVersion($path,$suffixes)
+{
+    $files = scandir($path);
+    $time = 0;
+    foreach ($files as $name)
+    {
+        if (in_array($name,array(".","..")))
+        {
+            continue;
+        }
+
+        if( in_array( substr($name,strpos($name,'.')), $suffixes ) )
+        {
+            $_time = filemtime($path.$name);
+            if( $_time > $time ) $time = $_time;
+        }
+    }
+    
+    return $time;
+}
+?>
+    <link href="ressources?type=css&version=<?php echo getVersion(__DIR__.'/main/css/',['.css']); ?>" rel="stylesheet">
     
     <script>var mx = { OnScriptReady: [], OnDocReady: [], Translations: [], User: { 'name': '', 'groups': [], 'memberOf': function(usergroups){ if( typeof usergroups == 'string' ) { usergroups = [usergroups]; }; return usergroups.filter(value => mx.User.groups.includes(value)).length > 0; }  } };</script>
     
-    <script src="ressources?type=js"></script>
+    <script src="ressources?type=js&version=<?php echo getVersion(__DIR__.'/main/js/',['.js']); ?>"></script>
     
     <script>
 <?php
@@ -320,7 +342,7 @@
         })( mx.Menu || {} );
     </script>
 
-    <script src="ressources?type=components"></script>
+    <script src="ressources?type=components&version=<?php echo getVersion(__DIR__.'/main/components/',['.js','*.json']); ?>"></script>
 
     <script>
         var demoMode = document.location.search.indexOf("demo=") !== -1;
@@ -342,64 +364,74 @@
             
             function iFrameLoadHandler(e)
             {
-                var url = null;
                 try
                 {
                     var url = e.target.contentWindow.location.href;
+                    if( url == 'about:blank' && history.state && history.state["entryId"] )
+                    {
+                        console.log(" ADDITIONAL POP");
+                        history.back();
+                    }
                 }
                 catch{}
-                
-                if( !url )
+            }
+            
+            window.addEventListener("message", (event) => {
+                if( 'type' in event.data && [ 'load', 'pushState', 'popState', 'replaceState' ].includes(event.data['type']) )
                 {
-                    url = iframeElement.getAttribute("src");
-                    if( url ) console.log(" FALLBACK URL" );
+                    var url = event.data['url'];
+                    url = url.split(':',2)[1];
+                    if( url.indexOf("//" + window.location.host ) == 0 ) url = url.substr(window.location.host.length+2);
+                    loadHandler(url,event.data['type']);
                 }
-
+                else
+                {
+                    console.err("Wrong message" );
+                }
+            });
+            
+            function loadHandler(url,type)
+            {
+                /*if( type == 'replaceState' )
+                {
+                    console.log("SKIP: " + type + " " + url );
+                    return;
+                }*/
+                
                 console.log(">>>> IFRAME " + history.length + " " + url + " <<<<");
                 console.log(history.state);
 
-                if( url )
+                var entry = mx.History.getEntry(url);
+                if( entry )
                 {
-                    if( url == 'about:blank' )
+                    if( entry !== mx.History.getActiveNavigation() )
                     {
-                        if( history.state && history.state["entryId"] )
+                        if( entry.isEntry() )
                         {
-                            console.log(" ADDITIONAL POP");
-                            history.back();
-                        }
-                        return;
-                    }
-                    else
-                    {
-                        var entry = mx.History.getEntry(url);
-                        if( entry )
-                        {
-                            if( entry !== mx.History.getActiveNavigation() )
-                            {
-                                if( entry.isEntry() )
-                                {
-                                    activateMenu(entry.getSubGroup());
-                                    mx.History.replaceEntry(entry,null);
-                                }
-                                else
-                                {
-                                    console.log("Should not happen " + entry.getId() );
-                                    debugger;
-                                }
-                            }
+                            activateMenu(entry.getSubGroup());
+                            mx.History.replaceEntry(entry,null);
                         }
                         else
                         {
-                            console.err("iFrameLoadHandler: MATCHING HISTORY NOT FOUND");
+                            console.err("Should not happen " + entry.getId() );
                         }
                     }
-                }    
-                
-                if( iframeElement.style.display != "" )
-                {
-                    hideMenu();
-                    showIFrame();
+                    else
+                    {
+                      mx.History.replaceEntry(entry, entry.getUrl() == url ? null : url );
+                    }
+                    
+                    if( iframeElement.style.display != "" )
+                    {
+                        hideMenu();
+                        showIFrame();
+                    }
                 }
+                else
+                {
+                    console.err("iFrameLoadHandler: MATCHING HISTORY NOT FOUND");
+                }
+                
             }
             
             function clearIFrameTimer()
@@ -560,8 +592,6 @@
             {
                 if( mx.History.getActiveNavigation() === subGroup && !isIFrameVisible() ) return;
                 
-                showMenu();
-                
                 if( subGroup.getEntries().length == 1 )
                 {
                     mx.Actions.openEntryById(event,subGroup.getMainGroup().getId(),subGroup.getId(),subGroup.getEntries()[0].getId())
@@ -570,6 +600,8 @@
                 }
                 else
                 {
+                    showMenu();
+                
                     mx.Menu.buildMenu( subGroup, setMenuEntries);
 
                     activateMenu(subGroup);

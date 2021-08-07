@@ -1,3 +1,5 @@
+project_name:                     "smartserver"
+
 global_log:                       "/dataDisk/var/log/"
 global_lib:                       "/dataDisk/var/lib/"
 global_tmp:                       "/dataDisk/tmp/"
@@ -15,7 +17,7 @@ projects_path:                    "/dataRaid/projects/"
 cloud_path:                       "/dataRaid/cloud/"
 backup_path:                      "/dataRaid/backups/"
 
-deployment_backup_path:           "{{projects_path}}{{ansible_project_name}}/{{config_path}}backup/"
+deployment_backup_path:           "{{projects_path}}{{project_name}}/{{config_path}}backup/"
 
 nextcloud_data_path:              "/dataRaid/nextcloud/"
 
@@ -33,7 +35,6 @@ docker_base_network:              "172.16.0.0"
 docker_base_gateway:              "172.16.0.1"
 docker_dns_ip:                    "172.16.0.200"
 docker_postfix_ip:                "172.16.0.201"
-docker_pihole_ip:                 "172.16.0.202"
 docker_influxdb_ip:               "172.16.0.203"
 docker_loki_ip:                   "172.16.0.204"
 docker_mysql_ip:                  "172.16.0.205"
@@ -45,6 +46,7 @@ docker_onlyoffice_ip:             "172.30.1.200"
 docker_php_ip:                    "172.30.2.200"
 docker_grafana_ip:                "172.30.3.200"
 docker_telegraf_ip:               "172.30.4.200"
+docker_prometheus_ip:             "172.30.5.200"
 #docker_openhab_ip:                "172.30.4.200"
 
 docker_zigbee2mqtt_ip:            "172.30.20.200"
@@ -101,4 +103,3 @@ pihole_whitelist_domains:          [ "www.googleadservices.com", "clickserve.dar
 
 # version of alpine linux used in several container based roles
 alpine_version:                   "3.14.0"
-debian_version:                   "buster-20210621-slim"
