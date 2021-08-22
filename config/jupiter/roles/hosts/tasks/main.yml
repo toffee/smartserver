@@ -1,0 +1,36 @@
+ 
+- name: add host cam01 name
+  vars:
+    host_name: "cam01"
+    host_ip_address: "{{camera_01_ip}}"
+  import_tasks: roles/network/tasks/add_to_hosts.yml
+
+- name: add host cam02 name
+  vars:
+    host_name: "cam02"
+    host_ip_address: "{{camera_02_ip}}"
+  import_tasks: roles/network/tasks/add_to_hosts.yml
+
+- name: add host cam03 name
+  vars:
+    host_name: "cam03"
+    host_ip_address: "{{camera_03_ip}}"
+  import_tasks: roles/network/tasks/add_to_hosts.yml
+
+- name: add host cam04 name
+  vars:
+    host_name: "cam04"
+    host_ip_address: "{{camera_04_ip}}"
+  import_tasks: roles/network/tasks/add_to_hosts.yml
+
+- name: add host cam07 name
+  vars:
+    host_name: "cam07"
+    host_ip_address: "{{camera_07_ip}}"
+  import_tasks: roles/network/tasks/add_to_hosts.yml
+  
+- name: add host gate name
+  vars:
+    host_name: "gate"
+    host_ip_address: "{{camera_09_ip}}"
+  import_tasks: roles/network/tasks/add_to_hosts.yml

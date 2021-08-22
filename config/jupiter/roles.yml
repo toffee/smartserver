@@ -21,6 +21,7 @@
 
 - { import_role: { name: update_notifier }, tags: [ 'update_notifier' ] }                # update check for installed software
 
+- { import_role: { name: "config/jupiter/roles/hosts" }, tags: [ 'hosts' ] }                # add local host names/IPs to DNS 
 - { import_role: { name: "config/jupiter/roles/asterisk" }, tags: [ 'asterisk' ] }          # asterisk SIP server
 - { import_role: { name: "config/jupiter/roles/paradox" }, tags: [ 'paradox' ] }            # configuration for alarm system
 - { import_role: { name: "config/jupiter/roles/zigbee2mqtt" }, tags: [ 'zigbee2mqtt' ] }    # configuration of zigbee2mqtt
