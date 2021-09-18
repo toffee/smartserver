@@ -5,4 +5,6 @@ config/*
 !config/jupiter/
 config/jupiter/vault/vault.yml
 config/jupiter/vault/wireguard_mobile/
+config/jupiter/vault/wireguard_cloud/
+config/jupiter/vault/letsencrypt.tgz
 *.retry
