@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    onlyoffice_version: "6.3.2.2"
+    onlyoffice_version: "6.4.0.121"
   tags: [ 'update_notifier_configs' ]
   
 - name: prepare needed folder
@@ -112,6 +112,11 @@
     sub_domain: "onlyoffice"
     include: "templates/etc/apache2/_.ansible.vhost.d/onlyoffice.inc"
   import_tasks: roles/apache/tasks/add_vhost.yml
+
+- name: copy fluentd config
+  vars:
+    config_file: "templates/etc/fluent/_.ansible.d/onlyoffice.conf"
+  import_tasks: roles/fluentd/tasks/add_config.yml
 
 - name: create systemd service
   vars:
