@@ -1,8 +1,8 @@
-- name: restart telegraf
+- name: restart alertmanager
   systemd:
-    name: telegraf
+    name: alertmanager
     state: restarted
     daemon_reload: yes
     enabled: yes
     masked: no
-  listen: "restart telegraf"
+  listen: "restart alertmanager"
