@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    telegraf_version: '1.20.0'
+    telegraf_version: '1.20.2'
   tags: [ 'update_notifier_configs' ]    
 
 - name: prepare needed folder
@@ -30,6 +30,7 @@
 - name: create docker network
   docker_network:
     name: telegraf
+    internal: yes
     ipam_config:
       - subnet: "{{docker_telegraf_ip.split('.')[:3] | join('.')}}.0/24"
         gateway: "{{docker_telegraf_ip.split('.')[:3] | join('.')}}.1"
