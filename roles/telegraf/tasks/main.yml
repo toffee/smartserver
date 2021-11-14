@@ -1,14 +1,14 @@
 - name: set version
   set_fact:
-    telegraf_version: '1.20.2'
+    telegraf_version: '1.20.3'
   tags: [ 'update_notifier_configs' ]    
 
 - name: prepare needed folder
   file:
     path: '{{item}}'
     state: directory
-    owner: root
-    group: root
+    owner: "100"
+    group: "101"
     mode: 0750
   with_items:
     - "{{ global_etc }}telegraf"
@@ -17,8 +17,8 @@
   template:
     src: "templates/etc/telegraf.conf"
     dest: "{{ global_etc }}telegraf/telegraf.conf"
-    owner: root
-    group: root
+    owner: "100"
+    group: "101"
     mode: 0640
   notify: "restart telegraf"
 
