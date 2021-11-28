@@ -94,7 +94,7 @@ class Handler(object):
         
         print("Topic " + msg.topic + ", message:" + str(msg.payload), flush=True)
         # Topic /vcontrol/setTempRaumRedSollM1, message:b'4'
-        vcommand = msg.topic[len("/vcontrol/"):]
+        vcommand = msg.topic[len("vcontrol/"):]
         #print("Write command " + vcommand, flush=True)
         #cmd = "setBetriebsartTo{}".format(int(float(msg.payload.decode("ascii"))))
         cmd = vcommand + " {}".format(msg.payload.decode("ascii"))

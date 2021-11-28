@@ -77,7 +77,7 @@
               "type": "fill"
             }
           ],
-          "measurement": "Heating_Temperature_Outdoor",
+          "measurement": "pGF_Utilityroom_Heating_Temperature_Outdoor",
           "orderByTime": "ASC",
           "policy": "default",
           "refId": "A",
@@ -115,7 +115,7 @@
               "type": "fill"
             }
           ],
-          "measurement": "Heating_Temperature_Outdoor_Subdued",
+          "measurement": "pGF_Utilityroom_Heating_Temperature_Outdoor_Subdued",
           "orderByTime": "ASC",
           "policy": "default",
           "refId": "B",
@@ -585,7 +585,7 @@
               "type": "fill"
             }
           ],
-          "measurement": "Heating_Power",
+          "measurement": "pGF_Utilityroom_Heating_Power",
           "orderByTime": "ASC",
           "policy": "default",
           "refId": "A",
@@ -706,7 +706,7 @@
               "type": "fill"
             }
           ],
-          "measurement": "Heating_Temperature_Outdoor",
+          "measurement": "pGF_Utilityroom_Heating_Temperature_Outdoor",
           "orderByTime": "ASC",
           "policy": "default",
           "refId": "A",
@@ -744,7 +744,7 @@
               "type": "fill"
             }
           ],
-          "measurement": "Heating_Temperature_Outdoor_Subdued",
+          "measurement": "pGF_Utilityroom_Heating_Temperature_Outdoor_Subdued",
           "orderByTime": "ASC",
           "policy": "default",
           "refId": "B",
@@ -782,7 +782,7 @@
               "type": "fill"
             }
           ],
-          "measurement": "Heating_Temperature_Offset_Target",
+          "measurement": "pGF_Utilityroom_Heating_Temperature_Offset_Target",
           "orderByTime": "ASC",
           "policy": "default",
           "refId": "C",
@@ -820,7 +820,7 @@
               "type": "fill"
             }
           ],
-          "measurement": "Heating_Temperature_Offset",
+          "measurement": "pGF_Utilityroom_Heating_Temperature_Offset",
           "orderByTime": "ASC",
           "policy": "default",
           "refId": "D",
@@ -858,7 +858,7 @@
               "type": "fill"
             }
           ],
-          "measurement": "Heating_Temperature_Return",
+          "measurement": "pGF_Utilityroom_Heating_Temperature_Return",
           "orderByTime": "ASC",
           "policy": "default",
           "refId": "E",
@@ -896,7 +896,7 @@
               "type": "fill"
             }
           ],
-          "measurement": "Heating_Temperature_Wather_Storage",
+          "measurement": "pGF_Utilityroom_Heating_Temperature_Wather_Storage",
           "orderByTime": "ASC",
           "policy": "default",
           "refId": "F",
@@ -934,7 +934,7 @@
               "type": "fill"
             }
           ],
-          "measurement": "Heating_Temperature_Pipe_Out",
+          "measurement": "pGF_Utilityroom_Heating_Temperature_Pipe_Out",
           "orderByTime": "ASC",
           "policy": "default",
           "refId": "G",
@@ -972,7 +972,7 @@
               "type": "fill"
             }
           ],
-          "measurement": "Heating_Temperature_Pipe_In",
+          "measurement": "pGF_Utilityroom_Heating_Temperature_Pipe_In",
           "orderByTime": "ASC",
           "policy": "default",
           "refId": "H",
@@ -1092,7 +1092,7 @@
               "type": "fill"
             }
           ],
-          "measurement": "Heating_Circuit_Pump_Speed",
+          "measurement": "pGF_Utilityroom_Heating_Circuit_Pump_Speed",
           "orderByTime": "ASC",
           "policy": "default",
           "refId": "A",
@@ -1130,7 +1130,7 @@
               "type": "fill"
             }
           ],
-          "measurement": "Heating_Circuit_PumpInternal_Speed",
+          "measurement": "pGF_Utilityroom_Heating_Circuit_PumpInternal_Speed",
           "orderByTime": "ASC",
           "policy": "default",
           "refId": "B",
@@ -1253,10 +1253,10 @@
               "type": "fill"
             }
           ],
-          "measurement": "Heating_Burner_Starts_Current_Daily",
+          "measurement": "pGF_Utilityroom_Heating_Burner_Starts_Current_Daily",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT last(\"value\") FROM \"Heating_Burner_Starts_Current_Daily\" WHERE $timeFilter GROUP BY time(1d) fill(none) tz('Europe/Bucharest')",
+          "query": "SELECT last(\"value\") FROM \"pGF_Utilityroom_Heating_Burner_Starts_Current_Daily\" WHERE $timeFilter GROUP BY time(1d) fill(none) tz('Europe/Bucharest')",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series",
@@ -1376,10 +1376,10 @@
               "type": "fill"
             }
           ],
-          "measurement": "Heating_Burner_Starts_Current_Daily",
+          "measurement": "pGF_Utilityroom_Heating_Burner_Starts_Current_Daily",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT last(\"value\") FROM \"Heating_Burner_Starts_Current_Daily\" WHERE $timeFilter GROUP BY time(1d) fill(none) tz('Europe/Bucharest')",
+          "query": "SELECT last(\"value\") FROM \"pGF_Utilityroom_Heating_Burner_Starts_Current_Daily\" WHERE $timeFilter GROUP BY time(1d) fill(none) tz('Europe/Bucharest')",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series",
@@ -1499,10 +1499,10 @@
               "type": "fill"
             }
           ],
-          "measurement": "Heating_Burner_Hours_Current_Daily",
+          "measurement": "pGF_Utilityroom_Heating_Burner_Hours_Current_Daily",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT last(\"value\") FROM \"Heating_Burner_Hours_Current_Daily\" WHERE $timeFilter GROUP BY time(1d) fill(none) tz('Europe/Berlin')",
+          "query": "SELECT last(\"value\") FROM \"pGF_Utilityroom_Heating_Burner_Hours_Current_Daily\" WHERE $timeFilter GROUP BY time(1d) fill(none) tz('Europe/Berlin')",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series",
@@ -1622,10 +1622,10 @@
               "type": "fill"
             }
           ],
-          "measurement": "Heating_Burner_Hours_Current_Daily",
+          "measurement": "pGF_Utilityroom_Heating_Burner_Hours_Current_Daily",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT last(\"value\") FROM \"Heating_Burner_Hours_Current_Daily\" WHERE $timeFilter GROUP BY time(1d) fill(none) tz('Europe/Berlin')",
+          "query": "SELECT last(\"value\") FROM \"pGF_Utilityroom_Heating_Burner_Hours_Current_Daily\" WHERE $timeFilter GROUP BY time(1d) fill(none) tz('Europe/Berlin')",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series",
