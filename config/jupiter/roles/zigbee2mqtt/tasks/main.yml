@@ -1,6 +1,6 @@
 - name: set zigbee2mqtt version
   set_fact:
-    zigbee2mqtt_version: "1.17.1"
+    zigbee2mqtt_version: "1.22.1"
  
 - name: prepare needed folder
   file:
@@ -37,6 +37,7 @@
 - name: create docker network
   docker_network:
     name: zigbee2mqtt
+    #internal: yes
     ipam_config:
       - subnet: "{{docker_zigbee2mqtt_ip.split('.')[:3] | join('.')}}.0/24"
         gateway: "{{docker_zigbee2mqtt_ip.split('.')[:3] | join('.')}}.1"
@@ -56,6 +57,8 @@
     log_driver: journald
     log_options:
       tag: zigbee2mqtt
+    container_default_behavior: "compatibility"
+    network_mode: "default"
     networks:
       - name: "zigbee2mqtt"
         ipv4_address: "{{docker_zigbee2mqtt_ip}}"
@@ -66,7 +69,7 @@
     devices:
       - '/dev/ttyOpenHabZigbee:/dev/ttyOpenHabZigbee:rwm'
     published_ports:
-     - "8084:8084"
+      - "8084:8084"
   notify: "restart zigbee2mqtt"
 
 - name: add container name
@@ -76,16 +79,44 @@
   import_tasks: roles/network/tasks/add_to_hosts.yml
 
   # ***** FINALIZE *****
+- name: register webui
+  vars:
+    name: "zigbee2mqtt"
+    js_file: "templates/webui/zigbee2mqtt.js"
+    icons: [ 'templates/webui/icons/zigbee2mqtt_logo.svg' ]
+  import_tasks: roles/apache_webui/tasks/add_webui.yml
+
+#This does not work - location in default vhost
+#See: https://stackoverflow.com/questions/11468154/tunneling-secure-websocket-connections-with-apache
 - name: copy apache config
   vars:
     config_file: "templates/etc/apache2/_.ansible.conf.d/zigbee2mqtt.conf"
   import_tasks: roles/apache/tasks/add_config.yml
-  
+
+#This works - new virtual host
+- name: copy apache vhost
+  vars:
+    sub_domain: "zigbee2mqtt"
+    include: "templates/etc/apache2/_.ansible.vhost.d/zigbee2mqtt.inc"
+  import_tasks: roles/apache/tasks/add_vhost.yml
+
 - name: create systemd service
   vars:
     container_name: "zigbee2mqtt"
     container_after: [ "mosquitto" ] 
   import_tasks: roles/container/tasks/add_docker_service.yml
+
+- name: register update notifier
+  vars:
+    name: "zigbee2mqtt"
+    type: "github"
+    url: "https://github.com/Koenkk/zigbee2mqtt/releases"
+    config: { 
+      project: "Koenkk/zigbee2mqtt", 
+      pattern: "^([0-9\\.]+)$",
+      version: "{{zigbee2mqtt_version}}" 
+    }
+  import_tasks: roles/update_notifier/tasks/add_notifier.yml  
 
 - name: trigger zigbee2mqtt handler
   vars:

@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    recorder_version: "0.8.6-12"
+    recorder_version: "latest"
   tags: [ 'update_notifier_configs' ]
 
 - name: prepare needed folders

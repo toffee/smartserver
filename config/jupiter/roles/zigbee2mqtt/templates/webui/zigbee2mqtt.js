@@ -1,0 +1,1 @@
+mx.Menu.getMainGroup('admin').getSubGroup('tools').addUrl('zigbee2mqtt_ui', '//zigbee2mqtt.{host}/','admin', 210, '{i18n_Zigbee2mqtt}', '{i18n_Dashboards}', false, 'zigbee2mqtt_logo.svg');
