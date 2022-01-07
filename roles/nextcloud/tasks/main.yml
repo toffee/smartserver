@@ -73,6 +73,7 @@
     username: "{{vault_nextcloud_mysql_username}}"
     password: "{{vault_nextcloud_mysql_password}}"
     backup: yes
+    backup_cleanup: "docker exec mysql sh -c \"mysql -u root -h 127.0.0.1 -e \\\"DELETE FROM nextcloud.oc_filecache WHERE path LIKE 'appdata%';\\\"\""
   import_tasks: roles/mysql/tasks/add_database.yml
   tags: [ 'user' ]
 
@@ -280,7 +281,7 @@
     name: "nextcloud"
     js_file: "templates/webui/nextcloud.js"
     i18n_files: [ { language: "de", file: "templates/webui/nextcloud.de.json" } ]
-    icons: [ 'templates/webui/icons/nextcloud_logo.svg', 'templates/webui/icons/nextcloud_files.svg', 'templates/webui/icons/nextcloud_photos.svg', 'templates/webui/icons/nextcloud_news.svg', 'templates/webui/icons/nextcloud_keeweb.svg' ]
+    icons: [ 'templates/webui/icons/nextcloud_logo.svg', 'templates/webui/icons/nextcloud_files.svg', 'templates/webui/icons/nextcloud_notes.svg', 'templates/webui/icons/nextcloud_photos.svg', 'templates/webui/icons/nextcloud_news.svg', 'templates/webui/icons/nextcloud_keeweb.svg' ]
   import_tasks: roles/apache_webui/tasks/add_webui.yml
 
 - name: copy apache vhost
