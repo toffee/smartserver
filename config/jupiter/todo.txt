@@ -1,0 +1,6 @@
+Install vim syntax hightlighting: https://github.com/cyberkov/openhab-vim
+
+mkdir -p ~/.vim/{ftdetect,syntax} && \
+curl -L -o ~/.vim/syntax/openhab.vim https://github.com/cyberkov/openhab-vim/raw/master/syntax/openhab.vim && \
+curl -L -o ~/.vim/ftdetect/openhab.vim https://github.com/cyberkov/openhab-vim/raw/master/ftdetect/openhab.vim
+
