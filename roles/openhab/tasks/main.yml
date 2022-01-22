@@ -200,6 +200,17 @@
     mode: 0640
   with_items: "{{addons_result.stdout_lines}}"
   
+- name: set symbolic link to jsondb files
+  file:
+    src: "{{projects_path}}openhab_config/userdata/{{item}}"
+    dest: "{{global_lib}}/openhab/{{item}}"
+    state: link
+    follow: no
+    owner: "{{openhab_user}}"
+    group: "{{openhab_group}}"  
+  with_items:
+    - "jsondb/automation_rules.json"
+  
 # SERVICES
 - name: check service folder
   shell: "ls -1 {{projects_path}}openhab_config/templates/services/"
@@ -356,7 +367,7 @@
       EXTRA_SHELL_OPTS: "+x" # disable debug logs in entrypoint bash script
       #EXTRA_SHELL_OPTS: "-x"
       #EXTRA_SHELL_OPTS: "-v"
-      OPENHAB_HTTP_ADDRESS: "127.0.0.1"
+      OPENHAB_HTTP_ADDRESS: "0.0.0.0"
     log_driver: journald
     log_options:
       tag: openhab
