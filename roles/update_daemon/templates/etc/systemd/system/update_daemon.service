@@ -1,0 +1,11 @@
+[Unit]
+Description=update_daemon
+
+[Service]
+TimeoutStartSec=0
+TimeoutStopSec=10
+Restart=always
+ExecStart=/opt/update_daemon/server
+
+[Install]
+WantedBy=multi-user.target

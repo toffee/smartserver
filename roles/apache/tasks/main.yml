@@ -170,14 +170,15 @@
 
 - name: copy domain fallback
   template:
-    src: "templates/htdocs/fallback/domain/{{item}}"
-    dest: "{{htdocs_path}}fallback/domain/{{item}}"
+    src: "templates/htdocs/fallback/{{item}}"
+    dest: "{{htdocs_path}}fallback/{{item}}"
     owner: "{{system_users['www'].name}}"
     group: "{{system_groups['www'].name}}"
     mode: 0644
   with_items:
-    - index.html
-    - style.css
+    - error.php
+    - domain/index.html
+    - domain/style.css
 
 - name: build docker image
   vars:
@@ -283,7 +284,7 @@
       repository: "httpd", 
       pattern: "^([0-9\\.]+)$"
     }
-  import_tasks: roles/update_notifier/tasks/add_notifier.yml
+  import_tasks: roles/update_daemon/tasks/add_software.yml
 
 - name: register openidc update notifier
   vars:
@@ -295,7 +296,7 @@
       pattern: "^v([0-9\\.]+)$",
       version: "v{{openidc_version}}" 
     }
-  import_tasks: roles/update_notifier/tasks/add_notifier.yml
+  import_tasks: roles/update_daemon/tasks/add_software.yml
   
 - name: trigger apache2 handler
   vars:
