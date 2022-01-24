@@ -6,7 +6,7 @@
 
 - name: set unifi version
   set_fact:
-    unifi_version: "6.5.53-ls130"
+    unifi_version: "6.5.55-ls141"
     unifi_uid: "{{system_users['unifi'].id}}"
     unifi_user: "{{system_users['unifi'].name}}"
     unifi_gid: "{{system_groups['unifi'].id}}"
@@ -77,7 +77,7 @@
       repository: "linuxserver/unifi-controller",
       pattern: "^([0-9\\.]+)-ls([0-9]+)$"
     }
-  import_tasks: roles/update_notifier/tasks/add_notifier.yml
+  import_tasks: roles/update_daemon/tasks/add_software.yml
 
 - name: trigger unifi handler
   vars:

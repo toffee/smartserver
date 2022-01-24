@@ -18,11 +18,11 @@ class Handler(object):
 
         #self.cmds = ['getTempAussen', 'getTempAussenGedaempft', 'getTempVorlaufSoll','getTempVorlauf','getTempKesselSoll','getTempKessel','getHeizkreisPumpeDrehzahl','getBrennerStarts','getBrennerStunden','getTempWasserSpeicher','getTempSolarKollektor','getSolarStunden','getTempSolarSpeicher','getSolarLeistung','getSammelstoerung','getLeistungIst','getBetriebsart','getTempRaumSoll','getSolarPumpeStatus','getNachladeunterdrueckungStatus']
         #commands with original vito.xml
-        self.cmds = ['getTempA', 'getTempAtp', 'getTempAged', 'getTempAussen', 'getTempAussenGedaempft', 'getTempVorlaufSoll','getTempVorlauf','getTempKesselSoll','getTempKessel','getHeizkreisPumpeDrehzahl','getBrennerStarts','getBrennerStunden','getTempWasserSpeicher','getSammelstoerung','getLeistungIst', 'getTempRL17A', 'getNeigungM1', 'getNiveauM1', 'getTempRaumNorSollM1', 'getTempRaumRedSollM1', 'getBetriebArt']
+        self.cmds = ['getTempA', 'getTempAtp', 'getTempAged', 'getTempAussen', 'getTempAussenGedaempft', 'getTempVorlaufSoll','getTempVorlauf','getTempKesselSoll','getTempKessel','getHeizkreisPumpeDrehzahl','getBrennerStarts','getBrennerStunden','getTempWasserSpeicher','getSammelstoerung','getLeistungIst', 'getTempRL17A', 'getNeigungM1', 'getNiveauM1', 'getTempRaumNorSollM1', 'getTempRaumRedSollM1', 'getBetriebArt', 'getTempWWist', 'getTempWWsoll']
         #commands with github vito.xml
         #self.cmds = ['getTempAtp', 'getTempAged', 'getTempVLsollM1','getTempVListM1','getTempKsoll','getTempKtp','getPumpeStatusM1','getBrennerStarts','getBrennerStunden1','getTempStp','getStatusStoerung','getLeistungIst','getBetriebArt','getTempRaumNorSollM1','getSolarStatusWW','getTempRL17A']
         
-        self.writeCmds = ['setNeigungM1', 'setNiveauM1', 'setTempRaumNorSollM1', 'setTempRaumRedSollM1', 'setBetriebArt']
+        self.writeCmds = ['setNeigungM1', 'setNiveauM1', 'setTempRaumNorSollM1', 'setTempRaumRedSollM1', 'setBetriebArt', 'setTempWWsoll']
 
     def startDaemon(self):
         print("Start vcontrold ...", end='', flush=True)

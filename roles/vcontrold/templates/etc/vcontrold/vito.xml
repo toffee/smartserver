@@ -84,6 +84,24 @@
              <unit>UT</unit>
              <description>Ermittle die Speichertemperatur in Grad C (Tiefpass)</description>
         </command>
+    <command name="getTempWWist" protocmd="getaddr">
+      <addr>0804</addr>
+      <len>2</len>
+      <unit>UT</unit>
+      <description>Ermittle die Warmwassertemperatur in Grad C</description>
+    </command>
+    <command name="getTempWWsoll" protocmd="getaddr">
+      <addr>6300</addr>
+      <len>1</len>
+      <unit>UTI</unit>
+      <description>Ermittle die Warmwassersolltemperatur in Grad C</description>
+    </command>
+    <command name="setTempWWsoll" protocmd="setaddr">
+      <addr>6300</addr>
+      <len>2</len>
+      <unit>UTI</unit>
+      <description>Setze die Warmwassersolltemperatur in Grad C</description>
+    </command>      
 	<command name='getTempSolarKollektor' protocmd='getaddr'>
              <addr>6564</addr>
              <len>2</len>

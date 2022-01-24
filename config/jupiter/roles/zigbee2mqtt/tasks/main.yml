@@ -1,6 +1,6 @@
 - name: set zigbee2mqtt version
   set_fact:
-    zigbee2mqtt_version: "1.22.1"
+    zigbee2mqtt_version: "1.22.2"
  
 - name: prepare needed folder
   file:
@@ -10,8 +10,8 @@
     group: root
     mode: 0750
   with_items:
-    - "{{ global_etc}}zigbee2mqtt"
-    - "{{ global_log}}zigbee2mqtt"
+    - "{{global_etc}}zigbee2mqtt"
+    - "{{global_log}}zigbee2mqtt"
 
 - name: copy config
   template:
@@ -116,7 +116,7 @@
       pattern: "^([0-9\\.]+)$",
       version: "{{zigbee2mqtt_version}}" 
     }
-  import_tasks: roles/update_notifier/tasks/add_notifier.yml  
+  import_tasks: roles/update_daemon/tasks/add_software.yml  
 
 - name: trigger zigbee2mqtt handler
   vars:
