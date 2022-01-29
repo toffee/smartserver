@@ -1,4 +1,6 @@
 <?php
+require "../shared/libs/logfile.php";
+
 require "inc/job.php";
 require "inc/job_template.php";
 require "config.php";
@@ -12,20 +14,23 @@ $branch = isset($_GET['branch']) ? $_GET['branch'] : "";
 $hash = isset($_GET['hash']) ? $_GET['hash'] : "";
 
 $matches = glob($log_folder . $datetime . '-*-' . $config . '-' . $os . '-' . $branch . '-' . $hash . '*.log' );
+
 if( sizeof($matches) == 1 )
 {
-    $job = new Job($log_folder,basename($matches[0]));
-    $job->initContent($position);
+    $logfile = new LogFile($log_folder,basename($matches[0]));
+    $logfile->init($position);
+
+    $job = new Job(basename($matches[0]));
 ?>
-<div id="currentPosition"><?php echo $job->getBytes(); ?></div>
+<div id="currentPosition"><?php echo $logfile->getBytes(); ?></div>
 <div id="state"><?php echo $job->getState(); ?></div>
 <div id="stateFormatted"><?php echo JobTemplate::getState($job); ?></div>
 <div id="duration"><?php echo $job->getDuration(); ?></div>
-<div id="durationFormatted"><?php echo JobTemplate::formatDuration($job->getDuration()); ?></div>
+<div id="durationFormatted"><?php echo LogFile::formatDuration($job->getDuration()); ?></div>
 <div id="logs"><?php
-    foreach( $job->getLines() as $line )
+    foreach( $logfile->getLines() as $line )
     {
-        echo JobTemplate::getLogLine($line);
+        echo LogFile::getLogLine($line);
     }
 }
 ?></div>
