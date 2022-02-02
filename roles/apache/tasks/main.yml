@@ -96,21 +96,14 @@
     state: directory
     owner: "{{system_users['www'].name}}"
     group: "{{system_groups['www'].name}}"
-    mode: 0755
+    mode: 0750
   with_items:
     - "{{htdocs_path}}letsencrypt"
     - "{{htdocs_path}}letsencrypt/.well-known"
     - "{{htdocs_path}}fallback"
     - "{{htdocs_path}}fallback/domain"
     - "{{global_log}}apache2/"
-
-- name: prepare secret folder
-  file:
-    path: "{{htdocs_path}}secret"
-    state: directory
-    owner: "{{system_users['www'].name}}"
-    group: "{{system_groups['www'].name}}"
-    mode: 0750
+    - "{{global_etc}}apache2/_.ansible.auth/"
 
 - name: check owner and group
   file:
@@ -132,6 +125,7 @@
     mode: 0644
   vars:
     enable_stapeling: "{{ssl_certificate != 'selfsigned'}}"
+    usergroup: "user"
   with_items:
     - _.ansible.conf.d/public.conf
     - _.ansible.conf.d/options.conf
@@ -143,7 +137,7 @@
     - _.ansible.httpd.conf
   notify: "restart apache2"
 
-- name: copy config
+- name: copy auth config
   template:
     src: "templates/etc/apache2/{{item}}"
     dest: "{{global_etc}}apache2/{{item}}"
@@ -153,10 +147,10 @@
   vars:
     enable_stapeling: "{{ssl_certificate != 'selfsigned'}}"
   with_items:
+    - _.ansible.vhost.d/auth_additionals.inc
     - _.ansible.vhost.d/auth_basic.inc
     - _.ansible.vhost.d/auth_form1.inc
     - _.ansible.vhost.d/auth_openidc1.inc
-    - _.ansible.vhost.d/auth_openidc_users.txt
   notify: "restart apache2"
   tags: ['user']
 
@@ -202,6 +196,7 @@
     container_default_behavior: "compatibility"
     network_mode: "host"
     volumes:
+      - '{{global_etc}}apache2/_.ansible.auth:/etc/apache2/_.ansible.auth:z'
       - '{{global_etc}}apache2/_.ansible.conf.d:/etc/apache2/_.ansible.conf.d:z'
       - '{{global_etc}}apache2/_.ansible.vhost.d:/etc/apache2/_.ansible.vhost.d:z'
       - '{{global_etc}}apache2/_.ansible.server.conf:/etc/apache2/_.ansible.server.conf:z'
@@ -228,24 +223,22 @@
   register: service_change
   changed_when: "'1' in service_change.stdout"
 
-- name: prepare .htpasswd file
+- name: prepare auth files
   copy:
     content: ""
-    dest: "{{htdocs_path}}secret/.htpasswd"
+    dest: "{{global_etc}}apache2/_.ansible.auth/{{item}}"
     force: no
     owner: "{{system_users['www'].name}}"
     group: "{{system_groups['www'].name}}"
     mode: 0640
-
-- name: prepare .htdata file
-  copy:
-    content: ""
-    dest: "{{htdocs_path}}secret/.htdata"
-    force: no
-    owner: "{{system_users['www'].name}}"
-    group: "{{system_groups['www'].name}}"
-    mode: 0640
-
+  with_items:
+    - .htpasswd
+    - auth_openidc_users.txt
+    - auth_openidc_user_fullnames.txt
+    - auth_openidc_user_groups.txt
+    - auth_user_fullnames.txt
+    - auth_user_groups.txt
+    
 - name: set logrotate job
   vars:
     logrotate_path: "{{global_log}}apache2/*.log"

@@ -2,9 +2,15 @@ import os
 import subprocess
 import json
 import re
+import sys
 
 from datetime import datetime, timezone
+from dateutil import parser
+from collections import Counter
 
+sys.path.insert(0, "/opt/shared/python")
+
+from smartserver.github import GitHub
 
 class DeploymentUpdate:
     def __init__(self,config):
@@ -18,7 +24,7 @@ class DeploymentUpdate:
                 except JSONDecodeError:
                     pass
       
-    def process(self):
+    def process(self, update_time):
         smartserver_code = None
         smartserver_pull = None
         smartserver_changes = None
@@ -41,29 +47,15 @@ class DeploymentUpdate:
                     commits = result.stdout.decode("utf-8").strip().split("\n")
                     last_git_hash = commits[0].split("\t")[0]
 
-                    repository_owner = self.config.git_remote.replace("https://github.com/","")
-                    repository_owner = repository_owner.replace(".git","")
-                    statusUrl = "https://api.github.com/repos/{}/statuses/{}".format(repository_owner,last_git_hash)
+                    repository_owner = GitHub.getRepositoryOwner(self.config.git_remote)
 
-                    result = subprocess.run([ "/usr/bin/wget", "-qO", "-", statusUrl ], check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=None )
-                    result = result.stdout.decode("utf-8").strip()
+                    result = GitHub.getStates(repository_owner,last_git_hash)
+
+                    states = Counter(result.values())
                     
-                    json_result = json.loads(result)
-
-                    build_pending_states = {}
-                    build_failed_states = {}
-                    build_success_states = {}
-                    for build_state in json_result:
-                        if build_state["state"] == "success":
-                            build_success_states[build_state["context"]] = True 
-                        elif build_state["state"] == "failure":
-                            build_failed_states[build_state["context"]] = False 
-                        elif build_state["state"] == "pending":
-                            build_pending_states[build_state["context"]] = None 
-
-                    if len(build_failed_states) > 0:
+                    if "failed" in states:
                         smartserver_code = "failed"
-                    elif len(build_success_states) < 3:
+                    elif "pending" in states or "success" not in states:
                         smartserver_code = "pending"
                     else:
                         can_pull = True

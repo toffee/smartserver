@@ -1,3 +1,6 @@
+RewriteMap lookupGroup "txt:/etc/apache2/_.ansible.auth/auth_user_groups.txt"
+RewriteMap lookupFullname "txt:/etc/apache2/_.ansible.auth/auth_user_fullnames.txt"
+
 <Location />
     AuthType form
     AuthFormUsername bw_username
@@ -8,7 +11,7 @@
     AuthName "Authentication required"
 
     AuthFormProvider file
-    AuthUserFile    {{htdocs_path}}secret/.htpasswd
+    AuthUserFile    /etc/apache2/_.ansible.auth/.htpasswd
 
     Session On
     SessionCryptoPassphrase {{vault_form_auth_passphrase}}
@@ -16,17 +19,5 @@
     #SessionMaxAge 86400
     SessionMaxAge 0
 
-    <RequireAny>
-        Require user {{vault_nextcloud_admin_username}}
-{% for username in userdata %}{% if 'user' in userdata[username].groups %}
-        Require user {{username}}
-{% endif %}{% endfor %}
-{% if authenticated_ip_addresses is defined and authenticated_ip_addresses | length > 0 %}
-        Require ip {{ authenticated_ip_addresses | join(' ') }}
-{% endif %}
-        Require ip 172.0.0.0/8
-        Require local
-    </RequireAny>
-
-    RewriteRule ^ - [E=REMOTE_USERNAME:%{REMOTE_USER}]
+    RewriteRule ^ - [E=REMOTE_USERNAME:%{REMOTE_USER},E=REMOTE_USERGROUP:${lookupGroup:%{REMOTE_USER}},E=REMOTE_USERFULLNAME:${lookupFullname:%{REMOTE_USER}}]
 </Location>

@@ -4,20 +4,20 @@ import signal
 
 from time import time
 
-from ci import helper
-from ci import job
-from ci import status
-from ci import virtualbox
-from ci import log
+from lib import helper
+from lib import job
+from lib import status
+from lib import virtualbox
+from lib import log
 
 def getPid():
     #vagrantPID = helper.getPid(1,"vagrant")
-    pid = helper.getPid(1,"/usr/bin/python3.*ci_service")
+    pid = helper.getPid(1,"/usr/bin/python3.*ci_job_handler")
     return pid if pid != "" else None
 
 skipped_names = [
     "grep",
-    "ci_service status",
+    "ci_job_handler status",
     "VBoxXPCOMIPCD",
     "VBoxSVC"
 ]
@@ -42,7 +42,7 @@ def showRunningJobs():
     
     processes = []
     
-    ci_result = helper.execCommand("ps -alx | grep ci_service")
+    ci_result = helper.execCommand("ps -alx | grep 'ci_job_handler'")
     ci_lines = ci_result.stdout.decode("utf-8").split(u"\n")
     formatProcesses(ci_lines,processes)
     
@@ -104,7 +104,7 @@ def checkRunningJob(status_file):
         if time() - state_obj["last_modified"] > 14000:
             if state_obj["status"] == "running":
                 status.setState(status_file,u"crashed")
-                log.error(u"Check for commit '{}' is running too long. Marked as 'crashed' now. Maybe it is stucked and you should try to cleanup manually.".format(state_obj["git_hash"]), file=sys.stderr )
+                log.error(u"Check for commit '{}' is running too long. Marked as 'crashed' now. Maybe it is stucked and you should try to cleanup manually.".format(state_obj["git_hash"]))
                 # check for frozen processes
                 exit(1)
             elif state_obj["status"] == "crashed":
@@ -118,7 +118,7 @@ def checkRunningJob(status_file):
                     exit(0)
                 else:
                     status.setState(status_file,u"crashed")
-                    log.error(u"Check for commit '{}' marked as 'running', but pid was not found. Marked as 'crashed' now.".format(state_obj["git_hash"]), file=sys.stderr)
+                    log.error(u"Check for commit '{}' marked as 'running', but pid was not found. Marked as 'crashed' now.".format(state_obj["git_hash"]))
                     exit(1)
 
         return state_obj["git_hash"]

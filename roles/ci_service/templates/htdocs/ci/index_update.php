@@ -1,7 +1,16 @@
 <?php
+require "../shared/libs/logfile.php";
 require "inc/job.php";
 require "inc/job_template.php";
 require "config.php";
+
+require "../shared/libs/http.php";
+require "../shared/libs/auth.php";
+
+if( !Auth::hasGroup("admin") )
+{
+    HttpResponse::throwForbidden();
+}
 
 $entityBody = file_get_contents('php://input');
 
@@ -32,9 +41,9 @@ foreach( $jobs as $job )
     {
         $running_jobs .= '<div id="' . $job->getHash() . '">';
         $running_jobs .= '    <div class="state">' . $job->getState() . '</div>';
-        $running_jobs .= '    <div class="stateFormatted">' . JobTemplate::getState($job) . '</div>';
+        $running_jobs .= '    <div class="stateFormatted">' . LogFile::formatState($job->getState()) . '</div>';
         $running_jobs .= '    <div class="duration">' . $job->getDuration() . '</div>';
-        $running_jobs .= '    <div class="durationFormatted">' . JobTemplate::formatDuration($job->getDuration()) . '</div>';
+        $running_jobs .= '    <div class="durationFormatted">' . Logfile::formatDuration($job->getDuration()) . '</div>';
         $running_jobs .= '</div>';
     }
 }

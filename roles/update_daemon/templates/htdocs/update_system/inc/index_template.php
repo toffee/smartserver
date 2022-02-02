@@ -91,6 +91,7 @@ class IndexTemplate
                   <div></div>
                   <div class=\"grow\">Cmd</div>
                   <div>Username</div>
+                  <div>State</div>
                   <div>Duration</div>
                   <div>Date</div>
                 </div>";
@@ -100,6 +101,7 @@ class IndexTemplate
                 $last_running_jobs_details_msg .= "<div class=\"state " . $job->getState() . "\"></div>";
                 $last_running_jobs_details_msg .= "<div>" . $job->getCmd() . "</div>";
                 $last_running_jobs_details_msg .= "<div>" . $job->getUsername() . "</div>";
+                $last_running_jobs_details_msg .= "<div>" . LogFile::formatState($job->getState()) . "</div>";
                 $last_running_jobs_details_msg .= "<div>" . ( explode(".", LogFile::formatDuration($job->getDuration()))[0] ) . "</div>";
                 $last_running_jobs_details_msg .= "<div class=\"indexLogDate\">" . $job->getDateTime()->format('d.m.Y H:i:s') . "</div>";
                 $last_running_jobs_details_msg .= "</div>";
@@ -230,7 +232,7 @@ class IndexTemplate
             if( $system_update_available ) $types[] = $system_update_available . " system update" . ( $system_update_available > 1 ? 's' : '' );
             if( $deployment_update_available ) $types[] = $deployment_update_available . " smartserver update" . ( $deployment_update_available > 1 ? 's' : '' );
           
-            $msg = "There " . ( count($types) > 1 ? "are" : "is" ) . " " . implode(" and ",$types) . " available";
+            $msg = "There " . ( $system_update_available + $deployment_update_available > 1 ? "are" : "is" ) . " " . implode(" and ",$types) . " available";
             
             $workflow_fallback_msg = "<div class=\"info\">" . $msg . "<div class=\"sub\">Currently disabled because it is only possible max. 5 minutes after a system status refresh</div></div><div class=\"buttons\"><div class=\"form button exclusive disabled blocked green\" onclick=\"mx.UNCore.actionUpdateWorkflow(this)\">Install all</div></div>";
 

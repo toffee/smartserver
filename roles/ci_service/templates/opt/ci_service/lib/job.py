@@ -7,13 +7,15 @@ import os
 import re
 import sys
 
+import glob
+
 from datetime import datetime
 from datetime import timedelta
 
-from ci import helper
-from ci import virtualbox
-from ci import status
-from ci import log
+from lib import helper
+from lib import virtualbox
+from lib import status
+from lib import log
 
 sys.path.insert(0, "/opt/shared/python")
 
@@ -65,11 +67,28 @@ def getLastValidState(log_dir,state_obj,branch):
     files = glob.glob("{}*-{}-{}-{}-*.log".format(log_dir,state_obj['deployment'], branch, state_obj['git_hash']))
     files.sort(key=os.path.getmtime, reverse=True)
     for deployment_log_file in files:
-        if deployment_log_file.find("-success-"):
+        details = getLogFileDetails(os.path.basename(deployment_log_file))
+        if details["state"] == "success":
             return u"success"
-        elif deployment_log_file.find("-failure-"):
+        elif details["state"] == "failure":
             return u"failure"
     return None
+  
+def getLogFileDetails(filename):
+    data = os.path.basename(filename).split("-")
+    
+    return {
+        "state": data[2],
+        "config": data[3],
+        "deployment": data[4],
+        "git_hash": data[6]
+    }
+  
+def getLogFiles(log_folder, config_name, os_name, branch, git_hash):
+    return glob.glob(u"{}*-*-*-{}-{}-{}-{}-*.log".format(log_folder,config_name,os_name,branch,git_hash))
+      
+def getLogFilename(log_folder, time_str, duration, state, config_name, os_name, branch, git_hash, author, subject ):
+    return u"{}{}-{}-{}-{}-{}-{}-{}-{}-{}.log".format(log_folder,time_str,duration, state,config_name,os_name,branch, git_hash,author,subject)
   
 class Job:
   
@@ -139,7 +158,7 @@ class Job:
             self.start_time = datetime.now()
             self.start_time_str = self.start_time.strftime(START_TIME_STR_FORMAT)
 
-            deployment_log_file = u"{}{}-{}-{}-{}-{}-{}-{}-{}-{}.log".format(self.log_dir,self.start_time_str,0,"running",config_name,os_name,self.branch,self.git_hash,author,subject)
+            deployment_log_file = getLogFilename(self.log_dir,self.start_time_str,0,"running",config_name,os_name,self.branch,self.git_hash,author,subject)
             
             vagrant_path = pathlib.Path(__file__).parent.absolute().as_posix() + "/../vagrant"
 
@@ -221,7 +240,7 @@ class Job:
                     lf.write("The command '{}' exited with {} (unsuccessful) after {}.\n".format(cmd,self.deploy_exit_status,timedelta(seconds=duration)))
 
             # Rename logfile
-            finished_log_file = u"{}{}-{}-{}-{}-{}-{}-{}-{}-{}.log".format(self.log_dir,self.start_time_str,duration,status_msg,config_name,os_name,self.branch,self.git_hash,author,subject)
+            finished_log_file = getLogFilename(self.log_dir,self.start_time_str,duration,status_msg,config_name,os_name,self.branch,self.git_hash,author,subject)
             os.rename(deployment_log_file, finished_log_file)
 
             # Cleanup start
