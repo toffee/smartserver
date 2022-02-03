@@ -1,3 +1,12 @@
+- name: "create systemd service"
+  template:
+    src: "templates/etc/systemd/system/screenoff.service"
+    dest: "/etc/systemd/system/screenoff.service"
+    owner: root
+    group: root
+    mode: 0644
+  notify: "restart screenoff"
+
 - name: add host router name
   vars:
     host_name: "router"

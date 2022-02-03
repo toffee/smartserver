@@ -89,17 +89,17 @@
     container_after: [ "mosquitto" ]
   import_tasks: roles/container/tasks/add_docker_service.yml
 
-- name: register update notifier
-  vars:
-    name: "recorder"
-    type: "github"
-    url: "https://github.com/owntracks/recorder/releases"
-    config: { 
-      project: "owntracks/recorder", 
-      pattern: "^([0-9\\.]+)$",
-      version: "{{recorder_version}}" 
-    }
-  import_tasks: roles/update_daemon/tasks/add_software.yml
+#- name: register update notifier
+#  vars:
+#    name: "recorder"
+#    type: "github"
+#    url: "https://github.com/owntracks/recorder/releases"
+#    config: { 
+#      project: "owntracks/recorder", 
+#      pattern: "^([0-9\\.]+)$",
+#      version: "{{recorder_version}}" 
+#    }
+#  import_tasks: roles/update_daemon/tasks/add_software.yml
   
 - name: trigger recorder handler
   vars:

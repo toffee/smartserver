@@ -1,0 +1,8 @@
+- name: restart screenoff
+  systemd:
+    name: screenoff
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    masked: no
+  listen: "restart screenoff"
