@@ -1,0 +1,169 @@
+body.system.inline {
+    padding-right: 0;
+}
+
+body.system #serverNeedsRestart,
+#currentRunningActions {
+  display:none;
+}
+body.system div.info,
+body.system div.header div:first-child {
+  color: var(--light-menu-text);
+}
+@media (hover: hover) {
+  body.system div.action:hover {
+    background-color: var(--light-menu-hover-bg);
+    border-radius: 4px;
+  }
+}
+body.system.dark div.info,
+body.system.dark div.header div:first-child {
+  color: var(--dark-menu-text);
+}
+@media (hover: hover) {
+  body.system.dark div.action:hover {
+    background-color: var(--dark-menu-hover-bg);
+  }
+}
+body.system div.info.green,
+body.system div.header.green {
+  color: var(--color-green);
+}
+body.system div.info.yellow,
+body.system div.header.yellow {
+  color: var(--color-yellow);
+}
+body.system div.info.red,
+body.system div.header.red {
+  color: var(--color-red);
+}
+body.system div.widget {
+  width: 100%;
+  max-width: 800px;
+  margin: auto;
+}
+body.system div.table {
+  font-size: 16px;
+  overflow: auto;
+}
+body.system div.widget div.header {
+  padding-bottom: 5px;
+  display: flex;
+  align-items: center;
+}
+body.system div.widget div.header div:first-child {
+  font-size: 20px;
+  font-weight: bold;
+}
+body.system div.widget div.header div:last-child {
+  color: #AAA;
+  font-size: 15px;
+  font-weight: normal;
+  padding-top: 2px;
+  padding-left: 5px;
+  white-space: nowrap;
+}
+body.system div.action {
+  margin: 5px 0 5px 15px;
+  padding: 5px 5px 5px 5px;
+  font-weight: normal;
+  display: flex;
+  align-items: center;
+  min-height: 45px;
+}
+body.system div.info {
+  flex-grow: 1; 
+  font-size: 16px;
+}
+body.system div.info .sub {
+  color: #AAA;
+  font-size: 13px;
+}
+body.system div.form.button {
+  margin-left: 5px;
+  white-space: nowrap;
+}
+body.system div.buttons {
+  white-space: nowrap;
+}
+body.system .hint.green,
+body.system .info.green {
+    color: var(--color-green);
+}
+body.system .hint.yellow,
+body.system .info.yellow {
+    color: var(--color-yellow);
+}
+body.system .hint.red,
+body.system .info.red {
+    color: var(--color-red);
+}
+body.system div.list.form.table {
+  margin-left: 20px;
+  margin-right: 5px;
+  margin-bottom: 10px;
+  max-height: 0;
+  transition: max-height 0.3s;
+  display: none;
+  overflow-y: hidden;
+}
+body.system div.list.form.table div.row div.grow  {
+  width: 100%;
+  white-space: normal; 
+}
+
+body.system div.dialogLayer .confirmDialog {
+  max-width: 350px;
+}
+
+body.system div.dialogLayer .confirmDialog .table {
+  max-width: 100%;
+}
+body.system div.dialogLayer .confirmDialog .row > div:last-child,
+body.system div.dialogLayer .confirmDialog .row input:not([type='checkbox']) {
+  width: 100%;
+  box-sizing: border-box;
+}
+body.system div.dialogLayer .confirmDialog .row .hint {
+  font-size: 14px;
+  max-height: 0px;
+  overflow-y: hidden;
+  transition: max-height 0.2s;
+}
+body.system div.dialogLayer .confirmDialog input[type='checkbox'] {
+  margin-left: 0;
+  margin-right: 6px;
+}
+body.system div.dialogLayer .confirmDialog .deployConfirmation 
+{
+  position: absolute;
+  margin-top: -35px;
+  padding-left:8px;
+}
+body.system div.dialogLayer .confirmDialog .middle {
+  display: flex;
+  align-items: center;
+}
+body.system div.dialogLayer .important {
+  font-weight: 600;
+}
+body.system div.dialogLayer .spacer {
+  display: block;
+  margin: 5px 0 0 0;
+}
+body.system div.detailView {
+  cursor: pointer;
+  display: inline-block;
+  color: #1976d2;
+}
+@media (hover: hover) {
+  body.system div.detailView:hover {
+    text-decoration: underline;
+  }
+}
+body.system div.form.table > div.row > div.indexLogDate {
+  white-space: nowrap;
+}
+body.system div.form.table.logfileBox {
+  width: auto;
+}

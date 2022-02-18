@@ -5,7 +5,7 @@ import json
 import sys
 from datetime import datetime
 
-from lib.config import GLOBAL_BUILD
+from config import config
 
 DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S %z %Z'
 
@@ -37,7 +37,7 @@ if len(sys.argv) >= 2:
 
 # Collect Images used in Dockerfiles
 build_images = {}
-result = execCommand("grep -RPo \"^FROM [^ ]*\" {}*/Dockerfile".format(GLOBAL_BUILD))
+result = execCommand("grep -RPo \"^FROM [^ ]*\" {}*/Dockerfile".format(config.GLOBAL_BUILD))
 lines = result.stdout.decode("utf-8").split("\n")
 for line in lines[0:-1]:
     columns = line.split()
@@ -69,6 +69,8 @@ for line in lines[0:-1]:
         images[image.name] = []
     images[image.name].append(image)
     
+cleaned = False
+
 for name in sorted(images):
     image_versions = sorted(images[name], reverse=True)
     
@@ -85,6 +87,10 @@ for name in sorted(images):
             continue
 
         print(u"\033[0;91mDELETED\033[0m   : '{}', '{}'".format(image_version.id,container_image))
+        
+        cleaned = True
 
         execCommand("docker image rm {}".format(image_version.id))
       
+if is_quite and not cleaned:
+    print(u"No images deleted")

@@ -1,0 +1,22 @@
+div.form.table > div.row > div.subject {
+  width: auto;
+  min-width:100px;
+}
+div.form.table > div.row > div.subject > div{
+  line-height: 22px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+div.form.table > div.row > div > span.hash {
+  display: flex;
+  justify-content: space-between;
+}
+div.form.table > div.row > div > span.hash {
+   cursor: pointer;
+}
+div.form.table > div.row > div > span.hash {
+  white-space: nowrap;
+}

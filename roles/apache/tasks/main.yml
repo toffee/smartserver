@@ -104,6 +104,7 @@
     - "{{htdocs_path}}fallback/domain"
     - "{{global_log}}apache2/"
     - "{{global_etc}}apache2/_.ansible.auth/"
+    - "{{global_etc}}apache2/_.ansible.vhost.d/auth/"
 
 - name: check owner and group
   file:
@@ -130,8 +131,8 @@
     - _.ansible.conf.d/public.conf
     - _.ansible.conf.d/options.conf
     - _.ansible.conf.d/ssl.conf
-    - _.ansible.vhost.d/auth_form2.inc
-    - _.ansible.vhost.d/auth_openidc2.inc
+    - _.ansible.vhost.d/auth/form2.inc
+    - _.ansible.vhost.d/auth/openidc2.inc
     - _.ansible.vhost.d/default-ssl.conf
     - _.ansible.server.conf
     - _.ansible.httpd.conf
@@ -147,19 +148,25 @@
   vars:
     enable_stapeling: "{{ssl_certificate != 'selfsigned'}}"
   with_items:
-    - _.ansible.vhost.d/auth_additionals.inc
-    - _.ansible.vhost.d/auth_basic.inc
-    - _.ansible.vhost.d/auth_form1.inc
-    - _.ansible.vhost.d/auth_openidc1.inc
+    - _.ansible.vhost.d/auth/additionals.inc
+    - _.ansible.vhost.d/auth/basic.inc
+    - _.ansible.vhost.d/auth/form1.inc
+    - _.ansible.vhost.d/auth/openidc1.inc
   notify: "restart apache2"
   tags: ['user']
 
-- name: copy login form
-  copy:
+- name: synchronize login form
+  synchronize:
     src: "templates/htdocs/auth"
     dest: "{{htdocs_path}}"
-    owner: "{{system_users['www'].name}}"
-    group: "{{system_groups['www'].name}}"
+    archive: no
+    checksum: yes
+    group: yes
+    perms: yes
+    recursive: yes
+    rsync_opts:
+      - "--chown={{system_users['www'].name}}:{{system_groups['www'].name}}"
+      - "--chmod=D755,F644"
 
 - name: copy domain fallback
   template:
@@ -276,7 +283,7 @@
       repository: "httpd", 
       pattern: "^([0-9\\.]+)$"
     }
-  import_tasks: roles/update_daemon/tasks/add_software.yml
+  import_tasks: roles/update_service/tasks/add_software.yml
 
 - name: register openidc update notifier
   vars:
@@ -288,7 +295,7 @@
       pattern: "^v([0-9\\.]+)$",
       version: "v{{openidc_version}}" 
     }
-  import_tasks: roles/update_daemon/tasks/add_software.yml
+  import_tasks: roles/update_service/tasks/add_software.yml
   
 - name: trigger apache2 handler
   vars:

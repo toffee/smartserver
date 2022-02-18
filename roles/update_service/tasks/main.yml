@@ -1,0 +1,148 @@
+- name: install required packages => is_fedora
+  yum:
+    name: [
+      yum-utils # used by needs-restart
+    ]
+    state: present
+  when: "is_fedora|bool and update_service_system_check_enabled"
+  
+- name: prepare needed folder
+  file:
+    path: "{{item.path}}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{item.mode}}"
+  with_items:
+    - { mode: "u=rwx,g=rx,o=", path: "/opt/update_service" }
+    - { mode: "u=rwx,g=rx,o=", path: "/opt/update_service/config" }
+    - { mode: "u=rwx,g=rx,o=rx", path: "{{global_lib}}update_service" }
+    - { mode: "u=rwx,g=rx,o=rx", path: "{{global_lib}}update_service/outdated_roles" }
+    - { mode: "u=rwx,g=rx,o=rx", path: "{{global_log}}update_service/" }
+  when: "update_service_system_check_enabled|bool"
+
+- name: synchronize service
+  synchronize:
+    src: "templates/opt/{{item.path}}"
+    dest: "/opt/update_service/"
+    archive: no
+    checksum: yes
+    group: yes
+    perms: yes
+    recursive: yes
+    rsync_opts:
+      - "--chown=root:root"
+      - "--chmod={{item.chmod}}"
+  with_items:
+    - { "chmod": "D750,F640", "path": "update_service_libs/" }
+    - { "chmod": "D750,F750", "path": "update_service_cmds/" }
+
+- name: copy service config
+  template:
+    src: "templates/config.py"
+    dest: "/opt/update_service/config/config.py"
+    owner: root
+    group: root
+    mode: 0750
+
+- name: synchronize webui
+  synchronize:
+    src: "templates/htdocs/update_service"
+    dest: "{{htdocs_path}}"
+    archive: no
+    checksum: yes
+    group: yes
+    perms: yes
+    recursive: yes
+    rsync_opts:
+      - "--chown={{system_users['www'].name}}:{{system_groups['www'].name}}"
+      - "--chmod=D755,F644"
+  tags: ['apache_webui_page']
+  when: "update_service_system_check_enabled|bool"
+
+- name: copy webui config
+  template:
+    src: "templates/config.php"
+    dest: "{{htdocs_path}}update_service/config.php"
+    owner: "{{system_users['www'].name}}"
+    group: "{{system_groups['www'].name}}"
+    mode: 0750
+  tags: ['apache_webui_page']
+  when: "update_service_software_check_enabled|bool"
+
+- name: register webui
+  vars:
+    name: "update_service"
+    js_file: "templates/webui/update_service.js"
+    i18n_files: [ { language: "de", file: "templates/webui/update_service.de.json" } ]
+    icons: [ 'templates/webui/icons/update_software_logo.svg', 'templates/webui/icons/update_system_logo.svg' ]
+  import_tasks: roles/apache_webui/tasks/add_webui.yml
+  
+- name: deny everything except php service
+  vars:
+    name: "update_service.php"
+    rule: "proto tcp dport 8505 saddr !{{docker_php_ip}}"
+    is_drop: yes
+  import_tasks: roles/firewall/tasks/allow_service.yml
+  tags: [ 'firewall_config' ]
+  
+- name: allow update_service php service
+  vars:
+    name: "update_service.php"
+    rule: "proto tcp dport 8505 saddr {{docker_php_ip}}"
+  import_tasks: roles/firewall/tasks/allow_service.yml
+  tags: [ 'firewall_config' ]
+
+- name: create version check cron job
+  vars:
+    name: "Software Version check"
+    cmd: "/opt/update_service/software_version_check > /dev/null"
+    file: "ansible_update_service"
+    minute: "0"
+    hour: "3"
+  import_tasks: roles/cron/tasks/add_cronjob.yml
+  when: "update_service_software_check_enabled|bool"
+
+- name: create system check cron job
+  vars:
+    name: "System update check"
+    cmd: "/opt/update_service/system_update_check > /dev/null"
+    file: "ansible_update_service"
+    minute: "30"
+    hour: "3"
+  import_tasks: roles/cron/tasks/add_cronjob.yml
+  when: "update_service_system_check_enabled|bool"
+  
+- name: create cleanup cron job
+  vars:
+    name: "System update cleanup"
+    cmd: "ls -1t {{global_log}}update_service/*.log | tail -n +50 | xargs rm -f"
+    file: "ansible_update_service"
+    hour: "0"
+    minute: "40"
+  import_tasks: roles/cron/tasks/add_cronjob.yml
+
+- name: copy fluentd config
+  vars:
+    config_file: "templates/etc/fluent/_.ansible.d/update_service.conf"
+  import_tasks: roles/fluentd/tasks/add_config.yml
+
+- name: "create systemd service"
+  template:
+    src: "templates/etc/systemd/system/update_service.service"
+    dest: "/etc/systemd/system/update_service.service"
+    owner: root
+    group: root
+    mode: 0644
+ 
+- name: register systemd service watcher
+  vars:
+    name: "update_service"
+  import_tasks: roles/systemd_watcher/tasks/add_watcher.yml
+
+- name: trigger update_service handler
+  vars:
+    notify: "restart update_service"
+    service: "update_service.service"
+  import_tasks: roles/_shared/tasks/service_check.yml
+

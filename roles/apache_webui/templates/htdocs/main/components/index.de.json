@@ -21,6 +21,20 @@
     "VPN Offline": "VPN Offline",
     "APP Suspend": "APP angehalten",
     "tap to resume": "klicke zum aktivieren",
-    "Authentication failed. Please try again.": "Anmeldung fehlgeschlagen. Bitte melde dich erneut an."
+    
+    "Authentication failed. Please try again.": "Anmeldung fehlgeschlagen. Bitte melde dich erneut an.",
+
+    "The requested page was not found": "Die gesuchte Seite wurde nicht gefunden",
+    "Page: '{}'": "Seite: '{}'",
+    "Go to startpage": "Startseite öffnen",
+
+    "There was a problem loading the content": "Es gab eine Problem beim Laden der Inhalte",
+    "This can have several reasons": "Dies kann mehrere Gründe haben",
+    "The application to be loaded had a problem.": "Die zu ladende Anwendung hatte ein Problem.",
+    "Click <span class='important' onclick='mx.Actions.showIFrame()'>'Show anyway'</span> to see the problem.": "<span class='important' onclick='mx.Actions.showIFrame()'>'Trotzdem anzeigen'</span> klicken um um das Problem zu sehen.",
+    "The subdomain's SSL certificate was not accepted.": "Das SSL Zertifikat der Subdomain wurde nicht akzeptiert.",
+    "Click <span class='important' onclick='mx.Actions.openFrameInNewWindow()'>'Open in a new window'</span> and confirm the certificate there.": "<span class='important' onclick='mx.Actions.openFrameInNewWindow()'>'Im neuem Fenster öffnen'</span> klicken und dort das Zertifikat bestätigen.",
+    "Show anyway": "Trotzdem anzeigen",
+    "Open in new window": "Im neuem Fenster öffnen"
   }
 }

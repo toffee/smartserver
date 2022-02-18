@@ -4,6 +4,7 @@ config/*
 !config/demo/
 !config/shared.yml
 !config/default.yml
+ansible.cfg
 !config/jupiter/
 config/jupiter/vault/vault.yml
 config/jupiter/vault/wireguard_mobile/

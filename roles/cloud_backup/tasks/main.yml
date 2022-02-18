@@ -27,7 +27,7 @@
     - {name: 'influxdb', src: '{{backup_path}}influxdb'}
     - {name: 'openhab', src: '{{backup_path}}openhab'}
     - {name: 'potd', src: '{{htdocs_path}}img/potd'}
-    - {name: '{{project_name}}', src: '{{projects_path}}{{project_name}}'}
+    - {name: '{{project_name}}', src: '{{deployment_config_path}}'}
 
 - name: set nextcloud backup links
   file:
@@ -115,4 +115,4 @@
       pattern: "^v([0-9\\.]+)$",
       version: "v{{rclone_version}}" 
     }
-  import_tasks: roles/update_daemon/tasks/add_software.yml
+  import_tasks: roles/update_service/tasks/add_software.yml

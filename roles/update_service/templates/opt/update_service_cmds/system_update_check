@@ -1,0 +1,107 @@
+#!/usr/bin/python3
+
+import subprocess
+import os
+import json
+import glob
+
+from datetime import datetime
+import sys 
+import importlib
+
+from config import config
+
+from plugins.deploymentUpdate import DeploymentUpdate
+
+sys.path.insert(0, "/opt/shared/python")
+
+from smartserver.argsparser import ArgsParser
+from smartserver import command
+
+args_cfg = { "limit": None, "notification": not (sys.stdin and sys.stdin.isatty()) }
+args_values = ArgsParser.parse(args_cfg,sys.argv)
+   
+update_time = "{}".format(datetime.now().astimezone().isoformat())
+
+state_template = {"last_system_update": update_time, "system_updates": [], "last_smartserver_update": update_time, "smartserver_code": "", "smartserver_changes": [], "smartserver_pull": None }
+last_states = {}
+if os.path.isfile(config.system_update_state_file):
+    with open(config.system_update_state_file, 'r') as f:
+        last_states = json.load(f)
+last_states = {**state_template, **last_states}
+
+state = last_states
+state = {i:j for i,j in state.items() if i in state_template}
+
+update_message_r = []
+
+# **** SYSTEM CHECK **********************************************
+if args_values["limit"] is None or args_values["limit"] == "system_update":
+    print("System")
+    plugin = importlib.import_module("plugins.os.{}".format(config.os_type))
+    operating_system = plugin.OperatingSystem()
+
+    state["last_system_update"] = update_time
+
+    state["system_updates"] = operating_system.getUpdates()
+    if len(state["system_updates"]) == 0:
+      print( u"  - \033[0;32mis updated\033[0m")
+    else:
+      print( u"  - \033[1;33mhas updates\033[0m")
+
+if len(state["system_updates"]) > 0 and len(last_states["system_updates"]) != len(state["system_updates"]):
+    update_message_r.append(u"system has {} updates".format(len(state["system_updates"])))
+# ****************************************************************
+
+# **** SMARTSERVER ***********************************************
+if args_values["limit"] is None or args_values["limit"] == "deployment_update":
+    print("Smartserver")
+
+    state["last_smartserver_update"] = update_time
+
+    deploymentUpdate = DeploymentUpdate(config)
+    
+    (smartserver_code, smartserver_pull, smartserver_changes) = deploymentUpdate.process(update_time)
+    
+    state["smartserver_code"] = smartserver_code
+    
+    if smartserver_code == "missing":
+        print( u"  - \033[1;31mgit check not possible (please run a full deployment first)\033[0m")
+    elif smartserver_code == "failed":
+        print( u"  - \033[1;31mskipped git pull (broken remote ci tests)\033[0m")
+    elif smartserver_code == "pending":
+        print( u"  - \033[1;33mskipped git pull (some remote ci pending)\033[0m")
+    elif smartserver_code == "uncommitted":
+        print( u"  - \033[1;31mskipped git pull (has uncommitted changes)\033[0m")
+    elif smartserver_code == "pulled_ci":
+        print( u"  - \033[0;32mgit pulled (all remote ci succeeded)\033[0m")
+    elif smartserver_code == "pulled":
+        print( u"  - \033[0;32mgit pulled\033[0m")
+                        
+    if smartserver_pull is not None:
+        state["smartserver_pull"] = smartserver_pull
+
+    if smartserver_changes is not None:
+        state["smartserver_changes"] = smartserver_changes
+        if len(state["smartserver_changes"]) == 0:
+          print( u"  - \033[0;32mis deployed\033[0m")
+        else:
+          print( u"  - \033[1;33mhas not deployed changes\033[0m")
+
+        if len(last_states["smartserver_changes"]) != len(state["smartserver_changes"]):
+            update_message_r.append(u"smartserver has {} updates".format(len(state["smartserver_changes"])))
+# ****************************************************************
+
+if args_values["limit"] is None and args_values["notification"] and config.update_check_email and len(update_message_r) > 0:
+    message_r = []
+    message_r.append(u"There are new updates")
+    for message in update_message_r:
+        message_r.append("  - {}".format(message))
+    message_r.append(u"\n\nCheck https://{}/?ref=admin|system|update_system for details".format(config.server_host))
+   
+    print(u"Send notification mail")
+
+    command.sendEmail(config.update_check_email, "New system updates available", "\n".join(message_r) )
+  
+with open(config.system_update_state_file, 'w') as f:
+    json.dump(state, f)

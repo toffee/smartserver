@@ -31,11 +31,13 @@
       , sysstat
       , iotop
       , smem 
-
+      
       , wireguard-tools
       
       , curl
       , bzip2
+      , lsof
+
       , zip
       , unzip
       , gcc
@@ -70,6 +72,9 @@
       
       , curl
       , bzip2
+      , lsof
+
+      , rsync              
       , zip
       , unzip
       , gcc
@@ -99,8 +104,10 @@
       , wireguard-tools
 
       , curl               # used to fetch e.g. picture of the day
-      
       , bzip2              # used to import databases with bzcat
+      , lsof               # used by container visualizer cli & shared_libs (processlist??)
+
+      , rsync              # used for ansible synchronize
       , zip                # used for ansible unarchive mobule
       , unzip              # used for ansible unarchive mobule
       , gcc                # used for ansible gem module => to build native extension
@@ -108,8 +115,8 @@
       , git                # used for ansible git module
       , sshpass            # used for ssh accessibility checks (e.g. openhab => wait until ready)
 
-      , python3-Flask      # used for daemon services like update_daemon and ci_service
-      , python3-pyinotify  # used for daemon services like update_daemon and ci_service
+      , python3-Flask      # used for daemon services like update_service and ci_service
+      , python3-pyinotify  # used for daemon services like update_service and ci_service
       
       , python3-setuptools
       , python3-pip

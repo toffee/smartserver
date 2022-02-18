@@ -52,7 +52,7 @@
     name: [
         docker-ce
         , docker-ce-cli 
-        , containerd.io-1.4.6 # 1.4.8 does not work
+        , containerd.io #-1.4.6 # 1.4.8 does not work
 #        docker
         , python3-docker  # used by ansible docker module
 #        , golang-github-docker-libnetwork-devel # needed to make docker running together with firewalld
@@ -110,8 +110,8 @@
   zypper:
     name: [
         docker
-#        , python2-docker  # used by ansible docker module => python2 is used because "/usr/lib/python3.6/site-packages/ansible/modules/cloud/docker_container.py" is using python2 (vagrant suse version is using it)
-        , python3-docker  # used by ansible docker module
+#        , python2-docker   # used by ansible docker module => python2 is used because "/usr/lib/python3.6/site-packages/ansible/modules/cloud/docker_container.py" is using python2 (vagrant suse version is using it)
+        , python3-docker    # used by ansible docker module
         , podman
 #        , cni
 #        , podman>=1.6.2
@@ -132,7 +132,7 @@
   with_items:
     - { mode: "u=rwx,g=rx,o=", path: "/etc/docker/" }
     - { mode: "u=rwx,g=rx,o=", path: "/opt/docker" }
-    - { mode: "u=rwx,g=rx,o=", path: "/opt/docker/lib" }
+    - { mode: "u=rwx,g=rx,o=", path: "/opt/docker/config" }
     - { mode: "u=rwx,g=x,o=", path: "{{global_lib}}docker" }
 
 - name: set docker selinux configuration => is_fedora
@@ -164,21 +164,23 @@
     config_file: "templates/etc/fluent/_.ansible.d/docker.conf"
   import_tasks: roles/fluentd/tasks/add_config.yml
 
-- name: copy docker tools
-  copy:
-    src: "templates/opt/docker/{{item}}"
-    dest: "/opt/docker/{{item}}"
-    owner: root
-    group: root
-    mode: 0700
-  with_items:
-    - visualizer
-    - cleanup
+- name: synchronize docker tools
+  synchronize:
+    src: "templates/opt/docker"
+    dest: "/opt/"
+    archive: no
+    checksum: yes
+    group: yes
+    perms: yes
+    recursive: yes
+    rsync_opts:
+      - "--chown=root:root"
+      - "--chmod=D750,F750"
 
 - name: copy docker tools config
   template:
-    src: "templates/opt/docker/lib/config.py"
-    dest: "/opt/docker/lib/config.py"
+    src: "templates/config.py"
+    dest: "/opt/docker/config/config.py"
     owner: root
     group: root
     mode: 0700

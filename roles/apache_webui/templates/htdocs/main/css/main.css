@@ -1,3 +1,8 @@
+#app {
+    height: 100%;
+    box-sizing: border-box;
+    user-select: none;
+}
 #page {
     display: flex;
     flex-direction: row;
@@ -13,6 +18,15 @@
     max-width: 80%;
     box-sizing: border-box;
     background-color: var(--light-bg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+#menu .main {
+    flex-grow: 1;
+    overflow: auto;
+    /* for Firefox */
+    min-height: 0;
 }
 body.dark #menu {
     background-color: var(--dark-bg);
@@ -94,31 +108,52 @@ body.dark #side.iframe #header {
   background-color: var(--dark-panel-header-bg);
 
 }
-.burger.button svg {
+#app .button svg {
+    color: white;
+}
+body.dark #menu .button svg {
+    color: #CCC;
+}
+#menu .group.header .logout.button {
+    align-items: center;
+    display: none;
+}
+#menu .group.header .logout.button svg {
+    height: 40px;
+    width: 40px;
+    margin-left: 15px;
+}
+body.phone #menu .group.header .logout.button {
+    display: flex;
+}
+#app .burger.button svg {
     height: 56px;
     width: 56px;
 }
-.burger.button {
+#app .burger.button {
     transition: transform 400ms ease-out;
+    display: flex;
+    align-items: center;
 }
-.burger.button.open {
+#app .burger.button.open {
     transform: rotate(180deg);
 }
-.alarm.button {
+#app .alarm.button {
     display: flex;
     flex-direction: row;
     justify-content: flex-end;
+    align-items: center;
     padding: 16px;
 }
-.alarm.button svg {
+#app .alarm.button svg {
     height: 21px;
     width: 21px;
     color: var(--alarm-button-default);
 }
-.alarm.button.disabled svg {
+#app .alarm.button.disabled svg {
     color: var(--alarm-button-disabled);
 }
-.alarm.button .badge {
+#app .alarm.button .badge {
     margin-left: 4px;
     height: 20px;
     width: 20px;
@@ -129,13 +164,13 @@ body.dark #side.iframe #header {
     text-align: center;
     color: var(--alarm-button-default);
 }
-.alarm.button.warn span.badge {
+#app .alarm.button.warn span.badge {
     background-color: var(--alarm-button-warn);
 }
-.alarm.button.error span.badge {
+#app .alarm.button.error span.badge {
     background-color: var(--alarm-button-error);
 }
-.button {
+#app .button {
     cursor: pointer;
 }
 #side #content {
@@ -167,8 +202,51 @@ body.dark #side.iframe #header {
 body.dark #side #content #embedProgress svg {
     color: var(--dark-embed-progress);
 }
+#side #content #embedError {
+    height: 100%;
+    width: 100%;
+}
+#side #content #embedError > div {
+    max-width: 600px;
+    margin: auto;
+    margin-top: 10%;
+}
+#side #content #embedError .head {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 20px;
+}
+#side #content #embedError .info {
+    font-size: 15px;
+    margin-bottom: 10px;
+}
+
+#side #content #embedError .reason {
+    font-size: 15px;
+    display: flex;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+#side #content #embedError .reason .important {
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+#side #content #embedError .actions {
+    margin-top: 25px;
+    display: flex;
+    justify-content: space-between;
+}
+
+#side #content #embedError #notfoundError .actions,
+#side #content #embedError #notfoundError .head,
+#side #content #embedError #notfoundError .info {
+    display: block;
+    text-align: center;
+}
+
 #menu #logo {
-    margin: 6px 6px 6px 2px;
+    margin: 4px;
     background-image:url(/main/img/marvinRightSmall.png);
     background-size: 44px 44px;
     height: 44px;
@@ -189,24 +267,28 @@ body.phone #menu #logo {
 #menu .group {
     margin-bottom: 5px;
 }
-#menu .group:first-child {
+#menu > .group:first-child {
     height: 56px;
     background-color: var(--light-panel-header-bg);
     display: flex;
+    padding-left: 0;
     margin-right: 0;
     margin-bottom: 15px;
     justify-content: space-between;
 }
-body.dark #menu .group:first-child {
+body.dark #menu > .group:first-child {
     background-color: var(--dark-panel-header-bg);
 }
-#menu .logout {
-    position: absolute;
+#menu .logout.form.button {
+    /*position: absolute;
     bottom: 0;
     left: 0;
-    right: 0;
+    right: 0;*/
     margin: 16px;
 } 
+body.phone #menu .logout.form.button {
+    display: none;
+}
 #menu .header {
     width: 100%;
     text-align: left;
@@ -232,10 +314,16 @@ body.phone #menu .header {
     padding: 10px 0px;
     margin: 5px 10px 0 0px;
     box-sizing: border-box;
+    align-items: center;
 }
 #menu .service div:first-child {
-    width: 20px;
-    padding: 1px 20px 2px 25px;
+    width: 16px;
+    height: 16px;
+    padding: 0 20px 2px 25px;
+}
+#menu .group .submenu .service div:first-child {
+    /*padding-left: 43px;*/
+    padding-left: 62px;
 }
 /*#menu .service div:first-child img {
     filter: invert(28%);
@@ -292,6 +380,12 @@ body.dark #menu .service.button:active {
 }
 body.dark #menu .service.button.active {
     background-color: var(--dark-menu-active-bg);
+}
+#menu .group .submenu {
+    max-height: 0;
+    transition: max-height 0.3s;
+    display: none;
+    overflow-y: hidden;
 }
 #background {
     background-repeat: no-repeat;

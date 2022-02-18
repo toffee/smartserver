@@ -1,13 +1,14 @@
 [Unit]
 Description=ci_service
-Requires=php.service
-After=php.service
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 TimeoutStartSec=0
 TimeoutStopSec=10
 Restart=always
-ExecStart=/opt/ci_service/server
+ExecStart=/opt/ci_service/ci_service
+SyslogIdentifier=ci_service
 
 [Install]
 WantedBy=multi-user.target
