@@ -210,6 +210,8 @@
     group: "{{openhab_group}}"  
   with_items:
     - "jsondb/automation_rules.json"
+    - "jsondb/uicomponents_ui_page.json"
+    - "jsondb/uicomponents_ui_widget.json"
   
 # SERVICES
 - name: check service folder
