@@ -33,7 +33,7 @@ def formatProcesses(lines,processes):
             continue
         processes.append(u"  {}".format(line))
   
-def showRunningJobs():
+def showRunningJobs(lib_dir):
     pid = getPid()
     if pid != None:
         log.info(u"Main process is running with pid '{}'.".format(pid))
@@ -56,17 +56,20 @@ def showRunningJobs():
     else:
         log.info(u"No sub processes are running.")
 
-    virtualbox.checkMachines(True)
+    virtualbox.checkMachines(lib_dir, True)
       
-def cleanRunningJobs(vid):
+def cleanRunningJobs(vid,lib_dir):
     if vid == "all":
         machines = virtualbox.getRegisteredMachines()
         for vid in machines.keys():
             virtualbox.destroyMachine(vid)
+        leftovers = virtualbox.getMachineLeftovers(lib_dir,machines)
+        for leftover in leftovers:
+            virtualbox.destroyMachineLeftover(leftover,lib_dir,machines)
     else:
         virtualbox.destroyMachine(vid)
 
-def stopRunningJob(status_file,log_dir,branch):
+def stopRunningJob(status_file,log_dir,lib_dir,branch):
     state_obj = status.getState(status_file)
 
     cleaned = False
@@ -86,7 +89,7 @@ def stopRunningJob(status_file,log_dir,branch):
             log.info(u"Cleaning status file.")
         status.setVID(status_file,None)
         
-    virtualbox.checkMachines(False)
+    virtualbox.checkMachines(lib_dir, False)
 
     if cleaned:
         if state_obj != None:
