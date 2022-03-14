@@ -42,8 +42,6 @@ class CmdExecuter(watcher.Watcher):
         self.logger = logger
         self.handler = handler
         
-        self.last_jobs_modified = self.getStartupTimestamp()
-        
         self.killed_job = False
         self.killed_logfile = None
         
@@ -52,8 +50,16 @@ class CmdExecuter(watcher.Watcher):
         self.current_logfile = None
         self.current_child = None
         
-    def getJobs(self):
-        jobs = []
+        self.last_jobs_modified = 0
+        self.jobs = []
+        self.initJobs()
+        
+    def isInterruptableJob(self,cmd_type):
+        return cmd_type in [ "system_reboot", "daemon_restart" ]
+    
+    def initJobs(self):
+        _jobs = []
+        _last_jobs_modified = 0
         
         files = glob.glob(u"{}*.log".format(config.job_log_folder))
         files.sort(key=os.path.getmtime, reverse=True)
@@ -69,9 +75,17 @@ class CmdExecuter(watcher.Watcher):
             job["type"] = data[3];
             job["user"] = data[4].split(".")[0]
             
-            jobs.append(job)
+            job_timestamp = round(os.path.getmtime(name),3)
+            if job_timestamp > _last_jobs_modified:
+                _last_jobs_modified = job_timestamp
+            
+            _jobs.append(job)
+            
+        self.jobs = _jobs;
+        self.last_jobs_modified = _last_jobs_modified
 
-        return jobs
+    def getJobs(self):
+        return self.jobs
         
     def getLastJobsModifiedAsTimestamp(self):
         return self.last_jobs_modified
@@ -120,7 +134,7 @@ class CmdExecuter(watcher.Watcher):
             return True
 
     def unlock(self, exit_code):
-        self.last_jobs_modified = self.getNowAsTimestamp()
+        self.initJobs()
 
         self.current_cmd_type = None
         self.current_started = None
@@ -190,19 +204,27 @@ class CmdExecuter(watcher.Watcher):
 
         self.current_child.close()
         exit_status = self.current_child.exitstatus
+
         delta = datetime.now() - start_time
         delta = delta - timedelta(microseconds = delta.microseconds)
         duration = str(delta)
-        lf.getFile().write("\n")
-        if exit_status == 0:
-            lf.write("The command exited successful after {}\n".format(duration))
+
+        if self.isInterruptableJob(cmd_type):
+            if exit_status is None: # can happen if service process get killed as part of interruptable job
+                exit_status = 0
         else:
+            lf.getFile().write("\n")
+            if exit_status == 0:
+                lf.write("The command exited successful after {}\n".format(duration))
+
+        if exit_status != 0:
             lf.write("The command exited with {} (unsuccessful) after {}\n".format(exit_status,duration))
             
         return exit_status
 
-    def finishInterruptedCmd(self, lf, cmd_type):
-        lf.write("'{}' was successful\n".format(cmd_type))
+    def logInterruptedCmd(self, lf, msg ):
+        # no need for a newline for interruptable commands
+        lf.write(msg)
         
     def processCmdBlock(self,cmd_block,lf):
         exit_status = 1

@@ -104,9 +104,9 @@ mx.UpdateServiceHelper = (function( ret ) {
     {
         if( btnElement != null ) 
         {
-            let text = detailElement.style.maxHeight ? mx.I18N.get("Hide") : mx.I18N.get("Show");
-            if( btnElement.childNodes.length > 0 ) btnElement.childNodes[0].nodeValue = text;
-            else btnElement.innerText = text;
+            let icon = detailElement.style.maxHeight ? "icon-play open" : "icon-play";
+            if( btnElement.childNodes.length > 0 ) btnElement.childNodes[0].className = icon;
+            else btnElement.innerHTML = "<span class=\"" + icon + "\"></span>";
         }
     }
 
@@ -158,21 +158,50 @@ mx.UpdateServiceHelper = (function( ret ) {
         }
     }
 
+    ret.setElementContent = function(content, id)
+    {
+        var element = mx.$("#" + id);
+        if( element.dataset.content != content )
+        {
+            element.dataset.content = content;
+            element.innerHTML = content;
+            element.style.display = content ? "" : "None";
+        }
+    }
+    
     ret.setTableContent = function(tableContent, tableId, headerContent, headerId)
     {
         var headerElement = mx.$("#" + headerId);
         var tableElement = mx.$("#" + tableId);
         if( !headerContent )
         {
-            headerElement.style.display = "none";
-            tableElement.style.display = "none";
+            if( headerElement.style.display != "none" )
+            {
+                headerElement.dataset.content = "";
+                headerElement.innerHTML = "";
+                headerElement.style.display = "none";
+            }
+            if( tableElement.style.display != "none" )
+            {
+                tableElement.dataset.content = "";
+                tableElement.innerHTML = "";
+                tableElement.style.display = "none";
+            }
         }
         else
         {
-            headerElement.innerHTML = headerContent;
-            headerElement.style.display = "";
-            tableElement.innerHTML = tableContent
-            tableElement.style.display = "";
+            if( headerElement.dataset.content != headerContent )
+            {
+                headerElement.dataset.content = headerContent;
+                headerElement.innerHTML = headerContent;
+                headerElement.style.display = "";
+            }
+            if( tableElement.dataset.content != tableContent )
+            {
+                tableElement.dataset.content = tableContent;
+                tableElement.innerHTML = tableContent
+                tableElement.style.display = "";
+            }
             
             mx.UpdateServiceHelper.setToogle(mx.$("#" + headerId + " .form.button.toggle"),tableElement);
             fixScrollHeight(tableElement);
@@ -213,6 +242,6 @@ mx.UpdateServiceHelper = (function( ret ) {
             return [ null, null ];
         }
     }
-        
+    
     return ret;
 })( mx.UpdateServiceHelper || {} ); 

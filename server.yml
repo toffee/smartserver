@@ -73,11 +73,11 @@
 
     - { import_role: { name: container }, tags: [ 'container' ] }                                # installs and initializes the container infrastructure (docker & podman)
 
-    - { import_role: { name: ssh }, tags: [ 'ssh' ] }                                            # settup allowed ssh user
+    - { import_role: { name: ssh }, tags: [ 'ssh' ] }                                            # setup allowed ssh user
 
     - { import_role: { name: dns }, tags: [ 'dns', 'alpine' ] }                                  # dns server                                                        [docker,user:root]
 
-    - { import_role: { name: pihole }, tags: [ 'pihole' ], when: "pihole_ip != 'None'" }           # adblock server                                                    [docker,user:root]
+    - { import_role: { name: pihole }, tags: [ 'pihole' ], when: "pihole_ip != 'None'" }         # adblock server                                                    [docker,user:root]
 
     - { import_role: { name: wireguard_mobile }, tags: [ 'wireguard', 'wireguard_mobile', 'macvlan', 'alpine' ] } # vpn configuration (mobile access)                [docker,user:root]
 
@@ -85,7 +85,7 @@
 
     - { import_role: { name: samba }, tags: [ 'samba', 'alpine' ] }                              # smb file server                                                   [docker,user:root]
 
-    - { import_role: { name: ftp }, tags: [ 'ftp', 'alpine' ], when: "vault_ftp_username != 'None'" } # ftp file server for camera picture upload and cleanup          [docker,user:ftp]
+    - { import_role: { name: ftp }, tags: [ 'ftp', 'alpine' ], when: "vault_ftp_username != 'None'" } # ftp file server for camera picture upload and cleanup        [docker,user:ftp]
 
     - { import_role: { name: mysql }, tags: [ 'mysql' ] }                                        # mysql db => needed by nextcloud and openhab                       [docker,user:999]
 
@@ -93,7 +93,7 @@
     - { import_role: { name: telegraf }, tags: [ 'telegraf' ] }                                  # telegraf => needed by netdata                                     [docker,user:root]
     
     - { import_role: { name: prometheus }, tags: [ 'prometheus' ] }                              # prometheus => needed by openhab                                   [docker,user:root]
-    - { import_role: { name: alertmanager }, tags: [ 'alertmanager' ] }                          # alertmanager => needed by loki alerts                                   [docker,user:root]
+    - { import_role: { name: alertmanager }, tags: [ 'alertmanager' ] }                          # alertmanager => needed by loki alerts                             [docker,user:root]
 
     - { import_role: { name: loki }, tags: [ 'loki' ] }                                          # grafana logstore                                                  [docker,user:10001|10001]
 
@@ -101,21 +101,22 @@
     
     - { import_role: { name: mosquitto }, tags: [ 'mosquitto' ] }                                # mqtt message broker                                               [docker,user:1883]
 
-    - { import_role: { name: shared_libs }, tags: [ 'shared_libs' ] }                            # php & python libs                                                           
-    
     - { import_role: { name: php }, tags: [ 'php' ] }                                            # php cli                                                           [docker,user:wwwrun|apache]
     
     - { import_role: { name: apache }, tags: [ 'apache' ] }                                      # apache web server & php runtime                                   [docker,user:wwwrun|apache]
 
-    - { import_role: { name: fluentd }, tags: [ 'fluentd' ] }                                    # log collector !!! MUST BE LAST ONE !!!
+    - { import_role: { name: fluentd }, tags: [ 'fluentd' ] }                                    # log collector !!! MUST BE LAST ONE !!!                            [docker,user:root|root]
                                                                                                  # => previous roles are triggering fluentd handler
     # ************ FLUSH HANDLER ***********    
     - { meta: flush_handlers }                                                                   # Previous roles are independent from upcoming roles, But lot of upcoming roles are depending from previous roles
     # **************************************
 
+    - { import_role: { name: shared_libs }, tags: [ 'shared_libs' ] }                            # php & python libs                                                           
+    
     - { import_role: { name: user }, tags: [ 'user' ] }                                          # default users and permissions (linux, samba, web ...)
     
     - { import_role: { name: netdata }, tags: [ 'netdata' ] }                                    # server monitoring
+#    - { import_role: { name: netdata, tasks_from: main_container, handlers_from: empty }, tags: [ 'netdata_container' ] }
 
     - { import_role: { name: grafana }, tags: [ 'grafana' ] }                                    # graphical dashboards                                              [docker,user:root]
 
@@ -127,17 +128,17 @@
     - { import_role: { name: nextcloud }, tags: [ 'nextcloud' ] }                                # private cloud
     - { import_role: { name: onlyoffice }, tags: [ 'onlyoffice' ] }                              # office editor                                                     [docker,user:106|108]
 
-    - { import_role: { name: minidlna }, tags: [ 'minidlna', 'alpine' ], when: "dlna_ip != 'None' and ( dlna_volumes | length ) > 0" } # dlna media server             [docker,user:wwwrun|apache]
+    - { import_role: { name: minidlna }, tags: [ 'minidlna', 'alpine' ], when: "dlna_ip != 'None' and ( dlna_volumes | length ) > 0" } # dlna media server           [docker,user:wwwrun|apache]
      
     - { import_role: { name: openhab }, tags: [ 'openhab' ] }                                    # openhab iot server                                                [docker,user:openhab|openhab]
     - { import_role: { name: openhab_toolbox }, tags: [ 'openhab_toolbox' ] }                    # admin scripts and tools
     - { import_role: { name: device_ping }, tags: [ 'device_ping' ] }                            # ping mobile device service
 
-    - { import_role: { name: cron_backup_rsync }, tags: [ 'cron_backup_rsync' ] }                # rsync copy of {{data_path}} to {{backup_path}}dataDisk/
+    - { import_role: { name: rsync_backup }, tags: [ 'rsync_backup' ] }                          # rsync copy of {{data_path}} to {{backup_path}}dataDisk/
 
     - { import_role: { name: deployment }, tags: [ 'deployment' ] }                              # ansible deployment project + backup collector
 
-    - { import_role: { name: update_service }, tags: [ 'update_service' ], when: "update_service_software_check_enabled or update_service_system_check_enabled" }      # update check & handler
+    - { import_role: { name: update_service }, tags: [ 'update_service' ], when: "update_service_software_check_enabled or update_service_system_check_enabled" }    # update check & handler
 
     # ************ CUSTOM ROLES ************
     - { include_tasks: "{{config_path}}roles.yml", tags: [ 'always' ] }                          # Details can be found inside the demo configuration 'config/demo/roles.yml'
@@ -162,3 +163,4 @@
     - { import_role: { name: update_service, tasks_from: confirm_roles, handlers_from: empty }, tags: [ 'always' ], when: "update_service_system_check_enabled" } # removes outdated role state files
 
     - { import_role: { name: systemd_watcher, tasks_from: check_services, handlers_from: empty }, tags: [ 'validate' ] } # last check if all registered services are running
+ 

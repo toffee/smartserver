@@ -126,14 +126,7 @@ mx.Logfile = (function( ret ) {
                 }
                 else 
                 {
-                    try 
-                    {
-                        window.top.mx.State.handleRequestError(this.status,url,updateDetails);
-                    }
-                    catch
-                    {
-                        updateTimer = window.setTimeout(updateDetails,5000);
-                    }
+                    updateTimer = mx.Page.handleRequestError(this.status,url,updateDetails,5000);
                 }
             };
             xhr.send();
@@ -176,7 +169,7 @@ mx.Logfile = (function( ret ) {
                 updateDetails(true);
             }
             
-            location.hash = '#autoscroll';
+            //location.hash = '#autoscroll';
         }
         else
         {
@@ -184,7 +177,7 @@ mx.Logfile = (function( ret ) {
         
             disableBottomScroll();
 
-            location.hash = location.hash.replace('#autoscroll','_');
+            //location.hash = location.hash.replace('#autoscroll','_');
         }
     }
 
@@ -240,10 +233,10 @@ mx.Logfile = (function( ret ) {
         
     ret.startUpdateProcess = function(position)
     {
-        if( location.hash == '#autoscroll' )
+        /*if( location.hash == '#autoscroll' )
         {
             enableBottomScroll();
-        }
+        }*/
         
         currentPosition = position;
         updateDetails(true);

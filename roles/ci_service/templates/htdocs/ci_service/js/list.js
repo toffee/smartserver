@@ -10,7 +10,8 @@ mx.CIList = (function( ret ) {
     var duration = 0;
     
     var currentInterval = 0;
-
+    var updateTimer = null;
+    
     function refreshDuration(runtimeElement)
     {
         for( key in elementRunningDuration )
@@ -143,14 +144,7 @@ mx.CIList = (function( ret ) {
                 }
                 else 
                 {
-                    try 
-                    {
-                        window.top.mx.State.handleRequestError(this.status,url,updateList);
-                    }
-                    catch
-                    {
-                        updateTimer = window.setTimeout(updateList, 10000);
-                    }
+                    updateTimer = mx.Page.handleRequestError(this.status,url,updateList,10000);
                 }
             };
             

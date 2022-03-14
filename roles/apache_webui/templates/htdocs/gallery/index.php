@@ -1,3 +1,6 @@
+<?php
+require "../shared/libs/ressources.php";
+?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -5,16 +8,16 @@
       width=device-width, initial-scale=1.0, 
       minimum-scale=1.0, maximum-scale=1.0, 
       user-scalable=no, target-densitydpi=device-dpi">
-    <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet"> 
-    <link rel="stylesheet" href="/main/fonts/css/animation.css">
-    <link rel="stylesheet" href="/main/fonts/css/fontello.css">
-    <link href="css/main.css" rel="stylesheet"> 
+    <link href="<?php echo Ressources::getCSSPath('/shared/'); ?>" rel="stylesheet">
+    <link href="<?php echo Ressources::getCSSPath('/gallery/'); ?>" rel="stylesheet">
 
     <script>var mx = { OnScriptReady: [], OnDocReady: [] };</script>
-    <script src="/ressources?type=js"></script>
-    <script src="js/gallery.js"></script>
+    
+    <script src="<?php echo Ressources::getJSPath('/shared/'); ?>"></script>
+    <script src="<?php echo Ressources::getJSPath('/gallery/'); ?>"></script>
 </head>
 <body>
+<script>mx.OnScriptReady.push( function(){ mx.Page.initFrame(null, "Gallery"); } );</script>
 <?php
     include "inc/Image.php";
     include "inc/Folder.php";
@@ -41,7 +44,6 @@
         mx.Gallery.init(<?php echo $height; ?>,<?php echo $width; ?>,'<?php echo $sub_folder; ?>')
     });
 </script>
-<div class="tooltip"><span class="text"></span><span class="arrow"></span></div>
 <div class="slots"><?php echo Template::getSlots($starttime,$endtime,$images); ?></div>
 <div id="gallery">
   <div class="layer"></div>

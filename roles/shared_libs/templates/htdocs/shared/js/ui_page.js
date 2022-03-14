@@ -1,4 +1,6 @@
 mx.Page = (function( ret ) {
+    let visualisationType = "phone";
+    
     function createRipple(event) {
         const button = event.currentTarget;
         
@@ -25,32 +27,86 @@ mx.Page = (function( ret ) {
         window.setTimeout(function(){ circle.remove() },800); // => animation is 600ms
     }
     
-    ret.initBody = function()
+    function initRipple(elements)
     {
-        var theme = document.cookie.split( ';' ).map( function( x ) { return x.trim().split( '=' ); } ).reduce( function( a, b ) { a[ b[ 0 ] ] = b[ 1 ]; return a; }, {} )[ "theme" ];
-        if( theme ) document.body.classList.add(theme);
-    };
-
-    ret.refreshUI = function(rootElement)
-    {
-        const buttons = rootElement ? mx._$$(".form.button",rootElement) : mx.$$(".form.button");
-        for (const button of buttons) 
+        for (const element of elements) 
         {
-            if( button.dataset.ripple ) continue;
+            if( element.dataset.ripple ) continue;
 
-            button.dataset.ripple = 1
-            button.addEventListener("click", createRipple);
+            element.dataset.ripple = 1
+            element.addEventListener("click", createRipple);
         }
     }
-    
-    ret.init = function(title)
+
+    function deviceListener(callback)
     {
-        if( title && window.parent != window && window.parent == window.top && window.top.document.domain == document.domain ) 
+        if( window.innerWidth <= 600 ) visualisationType = "phone";
+        else if( window.innerWidth < 1024 ) visualisationType = "tablet";
+        else visualisationType = "desktop";
+        
+        let body = mx.$('body');
+        
+        if( visualisationType === "phone" )
         {
-            window.top.postMessage({ type: "title", url: document.location.href, title: "" + title },'https://' + window.top.document.location.host); 
+            body.classList.add('phone');
+            body.classList.remove('desktop');
         }
-        ret.refreshUI(document);
+        else
+        {
+            body.classList.remove('phone');
+            body.classList.add('desktop');
+        }
+        
+        if( callback ) callback(visualisationType);
+    }
+
+    function initDeviceListener(callback)
+    {
+        var phoneMql = window.matchMedia('(max-width: 600px)');
+        phoneMql.addListener(function(){ deviceListener(callback); });
+        var desktopMql = window.matchMedia('(min-width: 1024px)');
+        desktopMql.addListener(function(){ deviceListener(callback); });
+
+        deviceListener(callback);
+    }
+    
+    ret.handleRequestError = function(status,url,callback,timeout)
+    {
+        try 
+        {
+            return window.top.mx.State.handleRequestError(status,url,callback, timeout);
+        }
+        catch
+        {
+            return window.setTimeout(callback, timeout);
+        }
+    }
+        
+    ret.refreshUI = function(rootElement)
+    {
+        initRipple(rootElement ? mx._$$(".form.button",rootElement) : mx.$$(".form.button"));
+        initRipple(rootElement ? mx._$$(".form.button .buttonSelectionSelector",rootElement) : mx.$$(".form.button .buttonSelectionSelector"));
+    }
+    
+    ret.initFrame = function(spacer_cls, title)
+    {
+        let body = mx.$('body');
+        body.classList.add("inline");
+        if( spacer_cls ) body.classList.add(spacer_cls);
+        
+        var theme = document.cookie.split( ';' ).map( function( x ) { return x.trim().split( '=' ); } ).reduce( function( a, b ) { a[ b[ 0 ] ] = b[ 1 ]; return a; }, {} )[ "theme" ];
+        if( theme ) document.body.classList.add(theme);
+
+        initDeviceListener();
+
+        //console.log("init frame");
+        if( title ) document.title = title;
     };
+    
+    ret.initMain = function(callback)
+    {
+        initDeviceListener(callback);
+    }
     
     return ret;
 })( mx.Page || {} );

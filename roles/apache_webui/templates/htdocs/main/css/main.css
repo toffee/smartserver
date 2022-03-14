@@ -1,3 +1,110 @@
+:root {
+  --light-header-bg: #5576d24D;
+  --dark-header-bg: #1976d24D;
+  
+  --light-fullsize-header-bg: #000000B3;
+  --dark-fullsize-header-bg: #000000B3;
+  
+  --light-panel-header-bg: #1976D2;
+  --dark-panel-header-bg: #1976d24D;
+
+  --light-menu-header-button-svg: white;
+  --dark-menu-header-button-svg: #CCC;
+
+  --light-menu-headline-color: #1976D2;
+  --light-menu-border-color: #1976D2;
+  --light-menu-separator: #11111145;
+  --dark-menu-headline-color: #e7e9ec;
+  --dark-menu-border-color: #54565c;
+  --dark-menu-separator: #ffffff90;
+
+  --light-embed-progress: #555;
+  --dark-embed-progress: #777;
+  
+  --light-content-nobackground-text: #111;
+  --light-content-background-text: white;
+  --light-content-hover-bg: var(--bgBasedHoverColor);
+  --light-content-active-bg: var(--bgBasedActiveColor);
+  --dark-content-nobackground-text: #bbb;
+  --dark-content-background-text: #fff;
+  --dark-content-hover-bg: var(--bgBasedHoverColor);
+  --dark-content-active-bg: var(--bgBasedActiveColor);
+
+  --light-submenu-text-color: white;
+  --dark-submenu-text-color: white;
+
+  --submenu-icon-color: white;
+  --submenu-shadow-color: var(--bgBasedShadowColor);
+  --submenu-shadow-home-main: 1px 1px 2px var(--submenu-shadow-color);
+  --submenu-shadow-home-info: 1px 1px 2px var(--submenu-shadow-color);
+  --submenu-shadow-service-button: 1px 1px 2px var(--submenu-shadow-color);
+  --submenu-shadow-service-icon: 1px 1px 2px var(--submenu-shadow-color);
+  --submenu-shadow-service-info: 1px 1px 2px var(--submenu-shadow-color);
+
+  --alarm-button-default: white;
+  --alarm-button-warn: #fe7d37;
+  --alarm-button-error: #db4437;
+  --alarm-button-disabled: #db4437;
+  
+  --image-watcher-text: yellow;
+  --image-watcher-bg: black;
+
+  --menu-panel-layer: black;
+  
+  --info-panel-layer: black;
+  --info-panel-text: white;  
+  --info-panel-shadow: 0 1px 2px #00000099;
+  
+  --app-header-button-svg: white;
+}
+
+:root body {
+  --header-bg: var(--light-header-bg);
+  
+  --fullsize-header-bg: var(--light-fullsize-header-bg);
+  
+  --panel-header-bg: var(--light-panel-header-bg);
+
+  --menu-header-button-svg: var(--light-menu-header-button-svg);
+  --menu-headline-color: var(--light-menu-headline-color);
+  --menu-border-color: var(--light-menu-border-color);
+  --menu-separator-color: var(--light-menu-separator);
+
+  --embed-progress: var(--light-embed-progress);
+  
+  --content-nobackground-text: var(--light-content-nobackground-text);
+  --content-background-text: var(--light-content-background-text);
+  --content-hover-bg: var(--light-content-hover-bg);
+  --content-active-bg: var(--light-content-active-bg);
+
+  --submenu-text-color: var(--light-submenu-text-color);
+
+  --menu-text: var(--content-text);
+}
+:root body.dark {
+  --header-bg: var(--dark-header-bg);
+  
+  --fullsize-header-bg: var(--dark-fullsize-header-bg);
+  
+  --panel-header-bg: var(--dark-panel-header-bg);
+
+  --menu-header-button-svg: var(--dark-menu-header-button-svg);
+  --menu-headline-color: var(--dark-menu-headline-color);
+  --menu-border-color: var(--dark-menu-border-color);
+  --menu-separator-color: var(--dark-menu-separator);
+
+  --embed-progress: var(--dark-embed-progress);
+  
+  --content-nobackground-text: var(--dark-content-nobackground-text);
+  --content-background-text: var(--dark-content-background-text);
+  --content-nobackground-info: var(--dark-content-nobackground-info);
+  --content-background-info: var(--dark-content-background-info);
+  --content-hover-bg: var(--dark-content-hover-bg);
+  --content-active-bg: var(--dark-content-active-bg);
+
+  --submenu-text-color: var(--dark-submenu-text-color);
+}
+
 #app {
     height: 100%;
     box-sizing: border-box;
@@ -17,7 +124,7 @@
     padding: 0;
     max-width: 80%;
     box-sizing: border-box;
-    background-color: var(--light-bg);
+    background-color: var(--bg);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -27,9 +134,6 @@
     overflow: auto;
     /* for Firefox */
     min-height: 0;
-}
-body.dark #menu {
-    background-color: var(--dark-bg);
 }
 #layer {
     background-color: var(--menu-panel-layer);
@@ -58,8 +162,8 @@ body.dark #menu {
 #info > div > span {
     display: block;
     text-align: center;
-    color: var(--info-panel-text);
-    text-shadow: 0 1px 5px rgba(0,0,0,.6);
+    color: var(--info-panel-text); 
+    text-shadow: var(--info-panel-shadow);
 }
 
 #info > div > span.info {
@@ -92,27 +196,20 @@ body.dark #menu {
     align-content: stretch; /* Extra space in Cross Axis */
 }
 #side #header {
-    background-color: var(--light-header-bg);
+    background-color: var(--header-bg);
     display: flex;
     flex-direction:row;   
     justify-content: space-between;
 }
-body.dark #side #header {
-    background-color: var(--dark-header-bg);
-}
 #side.iframe #header {
-  background-color: var(--light-panel-header-bg);
+  background-color: var(--panel-header-bg);
 
 }
-body.dark #side.iframe #header {
-  background-color: var(--dark-panel-header-bg);
-
+#side #header .button svg {
+    color: var(--app-header-button-svg);
 }
-#app .button svg {
-    color: white;
-}
-body.dark #menu .button svg {
-    color: #CCC;
+#menu .group.header .button svg {
+    color: var(--menu-header-button-svg);
 }
 #menu .group.header .logout.button {
     align-items: center;
@@ -197,10 +294,7 @@ body.phone #menu .group.header .logout.button {
     height: 80px;
     width: 80px;
     margin: auto;
-    color: var(--light-embed-progress);
-}
-body.dark #side #content #embedProgress svg {
-    color: var(--dark-embed-progress);
+    color: var(--embed-progress);
 }
 #side #content #embedError {
     height: 100%;
@@ -251,7 +345,6 @@ body.dark #side #content #embedProgress svg {
     background-size: 44px 44px;
     height: 44px;
     width: 44px;
-    -webkit-tap-highlight-color: transparent;
 }
 body.phone #menu #logo {
     margin-left: 14px;
@@ -269,15 +362,12 @@ body.phone #menu #logo {
 }
 #menu > .group:first-child {
     height: 56px;
-    background-color: var(--light-panel-header-bg);
+    background-color: var(--panel-header-bg);
     display: flex;
     padding-left: 0;
     margin-right: 0;
     margin-bottom: 15px;
     justify-content: space-between;
-}
-body.dark #menu > .group:first-child {
-    background-color: var(--dark-panel-header-bg);
 }
 #menu .logout.form.button {
     /*position: absolute;
@@ -289,19 +379,15 @@ body.dark #menu > .group:first-child {
 body.phone #menu .logout.form.button {
     display: none;
 }
-#menu .header {
+#menu .main .header {
     width: 100%;
     text-align: left;
     font-size: 18px;
     margin: 0 0 0 0;
     padding: 2px 2px 2px 25px;
     box-sizing: border-box;
-    border-bottom: 1px solid var(--light-menu-headline-color);
-    color: var(--light-menu-border-color);
-}
-body.dark #menu .header {
-    color: var(--dark-menu-headline-color);
-    border-bottom: 1px solid var(--dark-menu-border-color);
+    border-bottom: 1px solid var(--menu-border-color);
+    color: var(--menu-headline-color);
 }
 body.phone #menu .header {
     font-size: 14px;
@@ -330,22 +416,13 @@ body.phone #menu .header {
     width: 100%;
 }*/
 #menu .service div:first-child svg {
-    fill: var(--light-menu-text);
+    fill: var(--menu-text);
     height: 100%;
     width: 100%;
 }
-/*body.dark #menu .service div:first-child img {
-    filter: invert(100%);
-}*/
-body.dark #menu .service div:first-child svg {
-    fill: var(--dark-menu-text);
-}
 #menu .service div:last-child {
-    color: var(--light-menu-text);
+    color: var(--menu-text);
     font-size: 16px;
-}
-body.dark #menu .service div:last-child {
-    color: var(--dark-menu-text);
 }
 #menu .service, #submenu .service {
     transition: background-color 200ms ease-out; 
@@ -361,25 +438,22 @@ body.dark #menu .service div:last-child {
 }
 @media (hover: hover) {
   #menu .service.button:hover {
-      background-color: var(--light-menu-hover-bg);
+      background-color: var(--menu-hover-bg);
   }
-  body.dark #menu .service.button:hover {
-      background-color: var(--dark-menu-hover-bg);
-  }
+}
+#menu .separator {
+    height: 1px;
+    border-bottom: 2px dotted var(--menu-separator-color);
+    width: 16px;
+    margin-top: 5px;
+    margin-left: 62px;
 }
 #menu .service.button:active {
-    background-color: var(--light-menu-active-bg);
-    -webkit-tap-highlight-color: transparent;
-}
-body.dark #menu .service.button:active {
-    background-color: var(--dark-menu-active-bg);
+    background-color: var(--menu-active-bg);
 }
 #menu .service.button.active {
-    background-color: var(--light-menu-active-bg);
+    background-color: var(--menu-active-bg);
     color: #1976D2;
-}
-body.dark #menu .service.button.active {
-    background-color: var(--dark-menu-active-bg);
 }
 #menu .group .submenu {
     max-height: 0;
@@ -416,16 +490,29 @@ body.dark #background {
 #submenu .service.home:active {
     background-color: transparent;
 }
-#submenu .service.home .time, #submenu .slogan, #submenu .service.home .imageTitle {
+#submenu .service.home .time, #submenu .slogan {
     margin-left: auto;
     margin-right: auto;
-    font-weight: 500;
-    text-shadow: 0 1px 5px rgba(0,0,0,.1);
+    text-shadow: var(--submenu-shadow-home-main);
+}
+#submenu .service.home .image {
+    text-shadow: var(--submenu-shadow-home-info);
+    text-align: center;
+    font-size: 106.25%;
+    padding-top: 30px;
+    padding-bottom: 30px;
+}
+#submenu .service.home .image .imageCopyright {
+    opacity: 0;
+    transition: opacity 300ms linear;
+    padding-bottom: 10px;
+}
+#submenu .service.home .image:hover .imageCopyright {
+    opacity: 1;
 }
 #submenu .service.home .time {
     cursor: default;
     font-size: 1050%;
-    font-weight: 500;
     text-align:bottom;
     text-align:center;
 }
@@ -440,26 +527,18 @@ body.phone #submenu .service.home .time {
     text-align:center;
     line-height: 1;
 }
-#submenu .service.home .imageTitle {
+#submenu .service.home .bottom {
     flex-grow: 1;
     display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    font-size: 106.25%;
-    line-height: 60px;
-    color: var(--light-content-image-text);
-}
-body.dark #submenu .service.home .imageTitle {
-    color: var(--dark-content-image-text);
+    flex-direction: column;
+    align-items: center;
+    justify-content: end;
 }
 body.nobackground #submenu {
-    color: var(--light-content-nobackground-text);
-}
-body.dark.nobackground #submenu {
-    color: var(--dark-content-nobackground-text);
+    color: var(--content-nobackground-text);
 }
 #submenu {
-    color: var(--light-content-background-text);
+    color: var(--submenu-text-color);
     height: 100%;
     width: 100%;
     flex-grow: 1;
@@ -467,9 +546,6 @@ body.dark.nobackground #submenu {
     flex-direction: column;
     padding-top: 5vh;
     box-sizing: border-box;
-}
-body.dark #submenu {
-    color: var(--dark-content-background-text);
 }
 #submenu .group {
   position: relative;
@@ -488,7 +564,7 @@ body.dark #submenu {
     width: 80%;
     max-width: 400px;
     height: 1px;
-    border-bottom: 2px dashed var(--light-content-background-text);
+    border-bottom: 2px dashed var(--content-background-text);
     opacity: 0.4;
 }
 #submenu .group:last-child:after {
@@ -515,16 +591,17 @@ body.dark #submenu {
     margin-right: 10px;
 }*/
 #submenu .service.button > div:first-child svg {
-    fill: #FFF;
+    fill: var(--submenu-icon-color);
     height: 30px;
     margin-right: 10px;
+    filter: drop-shadow(var(--submenu-shadow-service-icon))
 }
 #submenu .service.button > div:first-child div {
     margin-top: -10px;
 }
 #submenu .service.button > div:first-child {
     font-size: 10vw;
-    text-shadow: 0 1px 5px rgba(0,0,0,.6);
+    text-shadow: var(--submenu-shadow-service-button);
 }
 @media screen and (min-width: 601px) {
     #submenu .service.button > div:first-child {
@@ -532,37 +609,21 @@ body.dark #submenu {
     }
 }
 body.nobackground #submenu .service.button div:last-child {
-    color: var(--light-content-nobackground-info);
-}
-body.dark.nobackground #submenu .service.button div:last-child {
-    color: var(--dark-content-nobackground-info);
+    color: var(--content-nobackground-text);
 }
 #submenu .service.button > div:last-child {
-    color: var(--light-content-background-info);
-    font-size: 112.5%;
-    font-weight: 300;
-    text-shadow: 0 1px 2px rgba(0,0,0,.6);
+    font-size: 106.25%;
+    text-shadow: var(--submenu-shadow-service-info);
     padding-left: 40px;
-}
-body.dark #submenu .service.button > div:last-child {
-    color: var(--dark-content-background-info);
 }
 @media (hover: hover) {
   #submenu .service.button:hover {
-      background-color: var(--light-content-hover-bg);
-  }
-  body.dark #submenu .service.button:hover {
-      background-color: var(--dark-content-hover-bg);
+      background-color: var(--content-hover-bg);
   }
 }
 #submenu .service.button:active {
-    color: var(--light-content-active-text);
-    background-color: var(--light-content-active-bg);
-    -webkit-tap-highlight-color: transparent;
-}
-body.dark #submenu .service.button:active {
-    color: var(--dark-content-active-text);
-    background-color: var(--dark-content-active-bg);
+    filter: brightness(90%);
+    background-color: var(--content-active-bg);
 }
 #submenu .service.imageWatcher {
     display:flex;
@@ -636,12 +697,9 @@ body.desktop #side #header {
 body.desktop #side.fullsize #header {
     display:inline-block;
     width: 56px;
-    background-color: var(--light-fullsize-header-bg);
+    background-color: var(--fullsize-header-bg);
     position: absolute;
     z-index: 1000;
-}
-body.dark.desktop #side.fullsize #header {
-    background-color: var(--dark-fullsize-header-bg);
 }
 body.desktop #side.fullsize .alarm.button {
     padding: 16px 6px;

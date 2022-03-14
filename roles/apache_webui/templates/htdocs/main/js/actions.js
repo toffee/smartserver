@@ -13,8 +13,11 @@ mx.Actions = (function( ret ) {
     var menuPanel = null;
     var visualisationType = null;
     
-    var titleUrl = null;
-                          
+    function setTitle(title)
+    {
+        document.title = title;
+    }
+    
     function loadHandler(url,type)
     {
         /*if( type == 'replaceState' )
@@ -33,7 +36,7 @@ mx.Actions = (function( ret ) {
             {
                 if( entry.getType() == "entry" )
                 {
-                    mx.Menu.activateMenu(entry.getSubGroup());
+                    mx.Menu.activateMenu(entry);
                     mx.History.replaceEntry(entry,null);
                 }
                 else
@@ -63,28 +66,19 @@ mx.Actions = (function( ret ) {
         
     }
     
-    function iFrameListenerHandler(event)
+    function iFrameMessageEventHandler(event)
     {
         if( 'type' in event.data && [ 'load', 'title', 'pushState', 'popState', 'replaceState' ].includes(event.data['type']) )
         {
-            if( event.data['type'] == "title" )
-            {
-                document.title = event.data["title"];
-            }
-            else
+            setTitle(event.data["title"]);
+
+            if( event.data['type'] != "title" )
             {
                 var url = event.data['url'];
                 url = url.split(':',2)[1];
                 if( url.indexOf("//" + window.location.host ) == 0 ) url = url.substr(window.location.host.length+2);
                 loadHandler(url,event.data['type']);
-
-                if( titleUrl != event.data['url'] )
-                {
-                    document.title = event.data["title"];
-                }
             }
-
-            titleUrl = event.data['url'];
         }
         else
         {
@@ -93,7 +87,7 @@ mx.Actions = (function( ret ) {
         //console.log("iFrameListenerHandler");
     }
     
-    function iFrameLoadHandler(e)
+    function iFrameLoadEventHandler(e)
     {
         try
         {
@@ -119,42 +113,85 @@ mx.Actions = (function( ret ) {
         }
     }
     
-    function setIFrameUrl(url)
+    function setIFrameUrl(url, title)
     {
-        if( iframeElement.getAttribute("src") != url )
-        {
-            hideIFrame(true);
-            hideError();
-            showProgress();
-            
-            iframeElement.setAttribute('src', url );
+        setTitle( title ? title : "");
 
-            // is needed to show iframe content in case of a loading error.
-            // happens e.g. on firefox and not accepted self signed certificates for subdomains in the demo instance
-            iframeLoadingTimer = setTimeout(function(){ 
-              try
-              {
-                  let url = iframeElement.contentWindow.location.href;
-                  loadHandler(url,"fallback");
-              }
-              catch {
-                  showError("loading"); 
-              }
-            },10000);
-            
-            hideMenu();
-        }
+        //if( iframeElement.getAttribute("src") != url )
+        //{
+        hideIFrame(true);
+        hideError();
+        showProgress();
+        
+        // is needed to show iframe content in case of a loading error.
+        // happens e.g. on firefox and not accepted self signed certificates for subdomains in the demo instance
+        iframeLoadingTimer = setTimeout(function(){ 
+            try
+            {
+                let url = iframeElement.contentWindow.location.href;
+                if( url != "about:blank" )
+                {
+                    loadHandler(url,"fallback");
+                    return;
+                }
+            }
+            catch (e) {
+                //console.log(e);
+            }
+
+            showError("loading"); 
+        },10000);
+        
+        iframeElement.setAttribute('src', url );
+
+        hideMenuContent();
+        //}
     }
 
     function removeIFrameUrl()
     {
         iframeElement.removeAttribute('src');
     }
+       
+    function showIFrame()
+    {
+        hideError();
+        hideMenuContent();
+        hideProgress();
+
+        clearIFrameTimer();
+
+        if( iframeElement.style.display != "" )
+        {
+            //console.log("showIFrame");
+          
+            iframeElement.style.display = "";
+            window.setTimeout(function(){ iframeElement.style.opacity = 1; }, 0);
+        }
+    }
+    
+    function hideIFrame(immediately)
+    {
+        clearIFrameTimer();
+            
+        if( iframeElement.style.display == "" )
+        {
+            //console.log("hideIFrame");
+          
+            if( immediately ) iframeElement.style.display = "none";
+            else mx.Core.waitForTransitionEnd(iframeElement,function(){ iframeElement.style.display = "none"; },"hideIFrame");
+            iframeElement.style.opacity = "";
+        }
+        
+        //hideProgress();
+    }
     
     function showError(errorType, parameter)
     {
+        setTitle(mx.I18N.get("Error"));
+
         hideIFrame();
-        hideMenu();
+        hideMenuContent();
         hideProgress();
 
         if( errorElement.style.display != "" || activeErrorType != errorType )
@@ -186,40 +223,7 @@ mx.Actions = (function( ret ) {
             errorElement.style.display = "none";
         }
     }
-    
-    function showIFrame()
-    {
-        hideError();
-        hideMenu();
-        hideProgress();
 
-        if( iframeElement.style.display != "" )
-        {
-            //console.log("showIFrame");
-          
-            clearIFrameTimer();
-
-            iframeElement.style.display = "";
-            window.setTimeout(function(){ iframeElement.style.opacity = 1; }, 0);
-        }
-    }
-    
-    function hideIFrame(immediately)
-    {
-        clearIFrameTimer();
-            
-        if( iframeElement.style.display == "" )
-        {
-            //console.log("hideIFrame");
-          
-            if( immediately ) iframeElement.style.display = "none";
-            else mx.Core.waitForTransitionEnd(iframeElement,function(){ iframeElement.style.display = "none"; },"hideIFrame");
-            iframeElement.style.opacity = "";
-        }
-        
-        //hideProgress();
-    }
-    
     function showProgress()
     {
         if( progressElement.style.display != "" )
@@ -245,13 +249,13 @@ mx.Actions = (function( ret ) {
         return iframeElement.style.display == "";
     }
     
-    function hideMenu()
+    function hideMenuContent()
     {
         mx.Timer.clean();
 
         if( inlineElement.style.display == "" )
         {
-            //console.log("hideMenu");
+            //console.log("hideMenuContent");
 
             //mx.$$(".service.active").forEach(function(element){ element.classList.remove("active"); });
             inlineElement.style.display = "none";
@@ -260,31 +264,10 @@ mx.Actions = (function( ret ) {
         }
     }
 
-    function showMenu()
-    {
-        mx.Timer.clean();
-
-        if( inlineElement.style.display != "" )
-        {
-            //console.log("showMenu");
-            
-            inlineElement.style.display = "";
-            sideElement.classList.add("inline");
-            sideElement.classList.remove("iframe");
-
-        }
-
-        removeIFrameUrl();
-        hideIFrame();
-        hideError();
-        hideProgress();
-    }
-    
-    function fadeInMenu(submenu,callbacks)
+    function _fadeInMenu(submenu, callbacks)
     {
         submenu.style.transition = "opacity 200ms linear";
-        window.setTimeout( function()
-        {
+        window.setTimeout( function(){
             mx.Core.waitForTransitionEnd(submenu,function()
             {
                 if( callbacks.length > 0 ) 
@@ -299,15 +282,34 @@ mx.Actions = (function( ret ) {
         },0);
     }
 
-    function setMenuEntries(data,callbacks)
+    function showMenuContent(content, callbacks, title)
     {
+        setTitle(title);
+        
+        mx.Timer.clean();
+
+        if( inlineElement.style.display != "" )
+        {
+            //console.log("showMenuContent");
+            
+            inlineElement.style.display = "";
+            sideElement.classList.add("inline");
+            sideElement.classList.remove("iframe");
+
+        }
+
+        removeIFrameUrl();
+        hideIFrame();
+        hideError();
+        hideProgress();
+
         var submenu = mx.$('#content #submenu');
 
         if( mx.History.getActiveNavigation() == null || mx.History.getActiveNavigation().getType() == "entry" )
         {
             submenu.style.opacity = "0";
-            submenu.innerHTML = data;
-            fadeInMenu(submenu,callbacks);
+            submenu.innerHTML = content;
+            _fadeInMenu(submenu, callbacks);
         }
         else
         {
@@ -316,14 +318,14 @@ mx.Actions = (function( ret ) {
             {
                 mx.Core.waitForTransitionEnd(submenu,function()
                 {
-                    submenu.innerHTML = data;
-                    fadeInMenu(submenu,callbacks);
+                    submenu.innerHTML = content;
+                    _fadeInMenu(submenu, callbacks);
                     
                 },"setSubMenu1");
                 submenu.style.opacity = "0";
             }, 100);
         }
-    }        
+    }
     
     ret.showError = function(errorType, parameter)
     {
@@ -345,40 +347,6 @@ mx.Actions = (function( ret ) {
     {
         setIFrameUrl(url);
     }
-
-    ret.openMenuById = function(event,subGroupUId)
-    {
-        [mainGroupId,subGroupId] = subGroupUId.split("-");
-        menu = mx.Menu.getMainGroup(mainGroupId).getSubGroup(subGroupId);
-        mx.Actions.openMenu(menu,event);
-    
-    };
-    ret.openMenu = function(subGroup,event)
-    {       
-        let entries = subGroup.getEntries();
-        if( entries.length == 1 && entries[0].getContentType() == "url" )
-        {
-            mx.Actions.openEntryById(event,subGroup.getEntries()[0].getUId())
-            
-            if( visualisationType != "desktop" ) menuPanel.close();
-        }
-        else
-        {
-            if( mx.History.getActiveNavigation() !== subGroup || isIFrameVisible() )
-            {
-                showMenu();
-            
-                mx.Menu.buildContentSubMenu( subGroup, setMenuEntries);
-                
-                mx.History.addMenu(subGroup);
-            }
-
-            mx.Menu.activateMenu(subGroup);
-            
-            if( visualisationType != "desktop" && subGroup.getMenuEntries().length == 0 ) menuPanel.close();
-        }
-
-    };
 
     ret.openEntryById = function(event,entryUId)
     {
@@ -406,9 +374,44 @@ mx.Actions = (function( ret ) {
         
         //showIFrame();
         
-        setIFrameUrl(new_url);
+        setIFrameUrl(new_url, entry.getTitle());
 
         if( visualisationType != "desktop" ) menuPanel.close();
+    };
+
+    ret.openMenuById = function(event,subGroupUId)
+    {
+        [mainGroupId,subGroupId] = subGroupUId.split("-");
+        menu = mx.Menu.getMainGroup(mainGroupId).getSubGroup(subGroupId);
+        mx.Actions.openMenu(menu,event);
+    
+    };
+    ret.openMenu = function(subGroup,event)
+    {       
+        let entries = subGroup.getEntries();
+        if( entries.length == 1 && entries[0].getContentType() == "url" )
+        {
+            mx.Actions.openEntryById(event,subGroup.getEntries()[0].getUId())
+            
+            if( visualisationType != "desktop" ) menuPanel.close();
+        }
+        else
+        {
+            if( mx.History.getActiveNavigation() !== subGroup || isIFrameVisible() )
+            {
+                let data = mx.Menu.buildContentSubMenu( subGroup); // prepare menu content
+                
+                showMenuContent(data['content'], data['callbacks'], subGroup.getTitle());
+            
+                mx.History.addMenu(subGroup);
+            }
+
+            // should always be called to expand/collapse submenu
+            mx.Menu.activateMenu(subGroup);
+            
+            if( visualisationType != "desktop" && subGroup.getMenuEntries().length == 0 ) menuPanel.close();
+        }
+
     };
 
     ret.openHome = function(event)
@@ -417,15 +420,6 @@ mx.Actions = (function( ret ) {
         
         var isActive = ( mx.History.getActiveNavigation() === subGroup );
         
-        if( !isActive )
-        {
-            mx.Menu.activateMenu(null);
-            
-            showMenu();
-            
-            mx.History.addMenu(subGroup);
-        }
-
         var datetime = new Date();
         var h = datetime.getHours();
         var m = datetime.getMinutes();
@@ -440,21 +434,31 @@ mx.Actions = (function( ret ) {
         else if(h >  12) prefix = mx.I18N.get('Good Afternoon');
         else prefix = mx.I18N.get('Good Morning');
 
-        message = '<div class="service home">';
-        message += '<div class="time">' + time + '</div>';
-        message += '<div class="slogan">' + prefix + ', ' + mx.User.name + '.</div>';
-        message += '<div class="imageTitle">' + mx.MainImage.getTitle() + '</div>';
-        message += '</div>';
+        content = '<div class="service home">';
+        content += '<div class="time">' + time + '</div>';
+        content += '<div class="slogan">' + prefix + ', ' + mx.User.name + '.</div>';
+        content += '<div class="bottom"><div class="image"><div class="imageCopyright">' + mx.MainImage.getCopyright() + '</div><div class="imageTitle">' + mx.MainImage.getTitle() + '</div></div></div>';
+        content += '</div>';
+
+        if( !isActive || isIFrameVisible() )
+        {
+            showMenuContent( content, [], subGroup.getTitle());
+            
+            mx.History.addMenu(subGroup);
+
+            mx.Menu.activateMenu(null); // collapse open submenu
+        }
+        else
+        {
+            mx.$('#content #submenu').innerHTML = content;
+        }
 
         if( !isActive ) 
-        {
-            setMenuEntries(message,[]);
-            
+        {           
             if( visualisationType != "desktop" ) menuPanel.close();
         }
         else 
         {
-            mx.$('#content #submenu').innerHTML = message;
             if( typeof event != "undefined" && visualisationType != "desktop" ) menuPanel.close();
         }
 
@@ -477,9 +481,9 @@ mx.Actions = (function( ret ) {
         progressElement = mx.$("#content #embedProgress");
 
         iframeElement = mx.$("#content #embed");
-        iframeElement.addEventListener('load', iFrameLoadHandler);                
+        iframeElement.addEventListener('load', iFrameLoadEventHandler);                
         
-        window.addEventListener("message", iFrameListenerHandler);
+        window.addEventListener("message", iFrameMessageEventHandler);
     }
 
     return ret;

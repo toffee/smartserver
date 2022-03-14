@@ -13,12 +13,13 @@ if( !Auth::hasGroup("admin") )
     HttpResponse::throwForbidden();
 }
 
+$datetime = isset($_GET['datetime']) ? $_GET['datetime'] : "";
 $config = isset($_GET['config']) ? $_GET['config'] : "";
 $os = isset($_GET['os']) ? $_GET['os'] : "";
 $branch = isset($_GET['branch']) ? $_GET['branch'] : "";
 $hash = isset($_GET['hash']) ? $_GET['hash'] : "";
 
-$matches = glob($log_folder . '*-*-' . $config . '-' . $os . '-' . $branch . '-' . $hash . '*.log' );
+$matches = glob($log_folder . $datetime . '-*-' . $config . '-' . $os . '-' . $branch . '-' . $hash . '*.log' );
 
 if( sizeof($matches) == 1 )
 {
@@ -42,8 +43,6 @@ else
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/main/fonts/css/animation.css">
-<link rel="stylesheet" href="/main/fonts/css/fontello.css">
 <link href="<?php echo Ressources::getCSSPath('/shared/'); ?>" rel="stylesheet">
 <link rel="stylesheet" href="/shared/css/logfile/logfile.css">
 <link rel="stylesheet" href="/shared/css/logfile/logfile_box.css">
@@ -77,15 +76,13 @@ function initPage()
     });
     mx.Logfile.checkScrollPosition(null,body,goToControl,false);
 
-    mx.Page.init("CI Test <?php echo $config . '-' . $os . '-' . $branch; ?>");
+    mx.Page.refreshUI();
 }
 mx.OnDocReady.push( initPage );
 </script>
 </head>
-<body class="inline">
-<script>
-    mx.OnScriptReady.push( mx.Page.initBody );
-</script>
+<body>
+<script>mx.OnScriptReady.push( function(){ mx.Page.initFrame(null, "CI Test - <?php echo $config . '-' . $os . '-' . $branch; ?>"); } );</script>
 <?php
     echo '<div class ="header form table logfileBox">' . JobTemplate::getDetails($job,false) . '</div><div class="scrollControl" onClick="mx.Logfile.toggleBottomScroll()"></div><div class="goToControl"><div></div></div><div class="log">';
     

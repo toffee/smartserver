@@ -7,13 +7,12 @@
     "Service is currently not available": "Service ist aktuell nicht verfügbar",
     "Service is restarting": "Service wir neu gestartet",
 
-    "Updates": "Aktualisierungen",
+    "Update": "Aktualisierung",
     "Job details": "Job details",
     "Software": "Software",
     
     "Status": "Status",
     "Details": "Details",
-
     
     "Daemon was updated and needs to restart": "Daemon wurde aktualisiert und muss neu gestartet werden",
     "Restart daemon": "Daemon neu starten",
@@ -30,6 +29,11 @@
     "Please press 'Refresh' to check for updates for the first time": "Bitte drücke 'Aktualisieren' um das erste mal nach Updates zu suchen",
 
     "No update process is running": "Aktuell läuft kein Update Prozess",
+    "Last process was killed": "Der letzter Prozess wurde beendet",
+    "Last process was stopped": "Der letzter Prozess wurde angehalten",
+    "Last process was stopped, because of new system and smartserver updates": "Der letzte Prozess wurde angehalten weil es neue System und Smartserver Updates gab",
+    "Last process was stopped, because of new system updates": "Der letzte Prozess wurde angehalten weil es neue System Updates gab",
+    "Last process was stopped, because of new smartserver updates": "Der letzte Prozess wurde angehalten weil es neue Smartserver Updates gab",
 
     "A manually started system reboot is running": "Es läuft ein manuell gestarteter Server Neustart",
     "A manually started daemon restart is running": "Es läuft ein manuell gestarteter Daemon Neustart",
@@ -88,7 +92,21 @@
     "all outdated roles": "alle veralteten Rollen",
     "You want to <span class='important'>redeploy '{}'</span>?": "Du möchtest '{}' neu deployen?",
     "You want to <span class='important'>deploy smartserver updates</span>?": "Du möchtest <span class='important'>Smartserver Updates deployen</span>?",
-    "You want to <span class='important'>update everything</span>?<span class='spacer'></span>This includes <span class='important'>a system restart</span>, if necessary.": "Du möchtest <span class='important'>alles aktualisieren</span>?<span class='spacer'></span>Dies beinhaltet einen <span class='important'>System Neustart</span>, falls erforderlich.",
+
+    "You want to <span class='important'>update everything</span>? This includes the following steps:": "Du möchtest <span class='important'>alles aktualisieren</span>? Dabei werden folgende Schritte ausgeführt:",
+    "Check for updates again": "Erneute Suche nach Updates",
+    "Installation of system updates": "Installation von System Updates",
+    "Reboot if necessary": "Reboot, falls erforderlich",
+    "Restart services if necessary": "Neustart von Diensten, falls erforderlich",
+    "Installation of smart server updates": "Installation von Smartserver Updates",
+    
+    "Installation stopped!": "Installation angehalten!",
+    "There are new system and smartserver update available!": "Es sind neue System und Smartserver Updates aufgetaucht!",
+    "There are new system update available!": "Es sind neue System Updates aufgetaucht!",
+    "There are new smartserver update available!": "Es sind neue Smartserver Updates aufgetaucht!",
+    "Please check whether you want to install these updates and restart the installation process if necessary.": "Bitte überprüfe ob du diese Updates installieren möchtest und starte gegebenenfalls den Installations Prozess erneut.",
+    "Ok": "Ok",
+    
     "Password": "Password",
     "Remember": "merken",
     "Please enter a password": "Bitte gib ein Passwort ein",
@@ -144,33 +162,24 @@
     "Everything up to date": "Alles auf dem neuesten Stand",
 
     "Install": "Installieren",
-
-    "Name": "Name",
-    "Current": "Aktuell",
-    "Update": "Update",
-    "Arch": "Arch",
-    
-    "Flag": "Flag",
-    "File": "Datei",    
-    
+  
     "system": "System",
     "smartserver": "Smartserver",
     "Install all": "Alles installieren",
-    "Disabled because the last update search was more than 5 minutes ago": "Deaktiviert da die letzte Update Suche mehr als 5 Minuten her ist",
     
-    "Reboot necessary": "Reboot notwendig",
-    "Is necessary because of {1} and {2}": "Ist wegen {1} und {2} notwendig",
-    "Is necessary because of {}": "Ist wegen {} notwendig",
-    "installed system updates": "installierter System updates",
+    "Reboot necessary because of {1} and {2}": "Reboot wegen {1} und {2} notwendig",
+    "Reboot necessary because of {}": "Reboot wegen {} notwendig",
+    "system updates": "System Updates",
     "outdated processes": "veralteter Prozesse",
     "Reboot system": "System Neustart",
     
     "Last git pull: {}": "Letzter git pull: {}",
-    "Git pull skipped due to faulty CI tests": "Git pull übersprungen aufgrund fehlerhafter CI Tests",
-    "Git pull skipped due to ongoing CI testing": "Git pull übersprungen aufgrund laufender CI Tests",
+    "Git pull skipped due to missing CI tests": "Git pull aufgrund fehlender CI Tests übersprungen",
+    "Git pull skipped due to ongoing CI testing": "Git pull aufgrund laufender CI Tests übersprungen",
+    "Git pull skipped due to faulty CI tests": "Git pull aufgrund fehlerhafter CI Tests übersprungen",
     "Git pulled and all CI tests successful": "Git pull und alle CI Tests erfolgreich",
     "Git pulled": "Git pulled",
-    "Git pull skipped due to uncommitted changes": "Git pull übersprungen aufgrund nicht committeter Änderungen",
+    "Git pull skipped due to uncommitted changes": "Git pull aufgrund nicht committeter Änderungen übersprungen",
     "Git pull skipped because deployment status is unknown": "Git pull übersprungen weil der Deployment Status unbekannt ist",
     
     
@@ -178,5 +187,14 @@
     "Start initial run": "Starte initiale Überprüfung",
     "Software check": "Versions Überprüfung",
     "{1} is running since {2} {3}": "{1} läuft seit {2} {3}"
+  },
+  "table": {
+    "Name": "Name",
+    "Current": "Aktuell",
+    "Update": "Update",
+    "Arch": "Arch",
+    
+    "Flag": "Flag",
+    "File": "Datei"    
   }
 }

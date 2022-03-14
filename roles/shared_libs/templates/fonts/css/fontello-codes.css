@@ -15,6 +15,9 @@
 .icon-right:before { content: '\e80d'; } /* '' */
 .icon-play:before { content: '\e80e'; } /* '' */
 .icon-stop:before { content: '\e80f'; } /* '' */
+.icon-attention:before { content: '\e810'; } /* '' */
+.icon-info-circled:before { content: '\e811'; } /* '' */
+.icon-help-circled:before { content: '\e812'; } /* '' */
 .icon-spin2:before { content: '\e831'; } /* '' */
 .icon-desktop:before { content: '\f108'; } /* '' */
 .icon-calendar-empty:before { content: '\f133'; } /* '' */

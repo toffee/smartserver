@@ -7,7 +7,6 @@ require "./shared/libs/ressources.php";
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#ffffff">
     <link rel="icon" type="image/png" href="/main/img/res/mipmap-mdpi/ic_launcher.png" />
-    <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet"> 
     <link href="main/manifest.json" rel="manifest">
 
     <link href="<?php echo Ressources::getCSSPath('/shared/'); ?>" rel="stylesheet">
@@ -42,6 +41,65 @@ require "./shared/libs/ressources.php";
             {
                 mx.$("#background").style.backgroundImage = "url(" + mx.MainImage.getUrl() + ")";
                 mx.$("#background").style.opacity = mx.darkLayout ? "0.7" : "1";
+                
+                let mainHover = "#337ab7";
+                let minHoverLevel = 0;
+                let minActiveLevel = 0;
+                
+                if( !document.body.classList.contains("dark") )
+                {
+                    minHoverLevel = parseInt("1F",16);
+                    minActiveLevel = parseInt("38",16);
+                }
+                else
+                {
+                    minHoverLevel = parseInt("33",16);
+                    minActiveLevel = parseInt("4D",16);
+                }
+
+                let maxHoverLevel = minHoverLevel + 80;
+                let activeLevelDiff = minActiveLevel - minHoverLevel;
+                
+                let bgLuminance = mx.MainImage.getLuminance();
+                if( bgLuminance < 1 ) bgLuminance = 1;
+                let hvLuminance = mx.MainImage.getLuminance(mainHover);
+                if( hvLuminance < 1 ) hvLuminance = 1;
+                
+                let contrast = Math.abs(bgLuminance - hvLuminance);
+                if( contrast < 10 ) 
+                {
+                    mainHover = mx.MainImage.getComplementaryGray();
+                    let hvLuminance = mx.MainImage.getLuminance(mainHover);
+                    if( hvLuminance < 1 ) hvLuminance = 1;
+                }
+
+                if( contrast > 150 ) contrast = 150;
+                
+                //150 => minHoverLevel
+                //0 => maxHoverLevel
+                //
+                //150 => -diff
+                //contrast => x
+                let diff = Math.abs( minHoverLevel - maxHoverLevel );
+                let hoverLevel = Math.round( ( (contrast * ( diff * -1 ) ) / 150 ) + diff ) + minHoverLevel;
+                let activeLevel = hoverLevel + activeLevelDiff;
+                
+                //console.log(bgLuminance);
+                //console.log(hvLuminance);
+                //console.log(contrast);
+                //console.log(hoverLevel);
+
+                let style = document.createElement('style');
+                let css = ":root {";
+                css += " --bgBasedShadowColor: " + mx.MainImage.getComplementaryGray() + ";"
+                css += " --bgBasedHoverColor: " + mainHover + mx.MainImage.padZero(hoverLevel.toString(16)) + ";"
+                css += " --bgBasedActiveColor: " + mainHover + mx.MainImage.padZero(activeLevel.toString(16)) + ";"
+                css += " }"
+                
+                style.appendChild(document.createTextNode(css));
+
+                let head = document.getElementsByTagName('head')[0];
+                head.appendChild(style);
             }
             else
             {
@@ -80,36 +138,33 @@ require "./shared/libs/ressources.php";
 
             mx.$('#page').style.opacity = "1";
         }
-
-        function checkVisualisationType()
+        
+        function deviceChanged(_visualisationType)
         {
-            if( window.innerWidth <= 600 ) visualisationType = "phone";
-            else if( window.innerWidth < 1024 ) visualisationType = "tablet";
-            else visualisationType = "desktop";
+            mx.App.initTheme();
             
-            mx.Actions.setVisualisationType(visualisationType);
+            mx.Actions.setVisualisationType(_visualisationType);
             
-            menuPanel.enableBackgroundLayer(visualisationType !== "desktop");
+            menuPanel.enableBackgroundLayer(_visualisationType !== "desktop");
 
-            if( visualisationType !== "desktop" )
+            if( _visualisationType === "desktop" ) 
             {
-                mx.$("#side").classList.add("fullsize");
-            }
-            
-            if( visualisationType === "phone" )
-            {
-                mx.$('body').classList.add('phone');
-                mx.$('body').classList.remove('desktop');
+                mx.$("#side").classList.remove("fullsize");
+                menuPanel.open();
             }
             else
             {
-                mx.$('body').classList.remove('phone');
-                mx.$('body').classList.add('desktop');
+                mx.$("#side").classList.add("fullsize");
+
+                if( visualisationType === "desktop" )
+                {
+                    menuPanel.close();
+                }
             }
-            
-            mx.App.initTheme();
-        }       
-        
+
+            visualisationType = _visualisationType;
+        }
+
         function initPage()
         {
             mx.App.initInfoLayer();
@@ -138,30 +193,7 @@ require "./shared/libs/ressources.php";
                 menuPanel.close();
             });
 
-            function isPhoneListener(mql){ 
-                checkVisualisationType(); 
-            }
-            var phoneMql = window.matchMedia('(max-width: 600px)');
-            phoneMql.addListener(isPhoneListener);
-            //isPhoneListener(phoneMql);
-
-            var desktopMql = window.matchMedia('(min-width: 1024px)');
-            function checkMenu(mql)
-            {
-                checkVisualisationType();
-
-                if( visualisationType === "desktop" ) 
-                {
-                    mx.$("#side").classList.remove("fullsize");
-                    menuPanel.open();
-                }
-                else 
-                {
-                    menuPanel.close();
-                }
-            }
-            desktopMql.addListener(checkMenu);
-            checkMenu(desktopMql);
+            mx.Page.initMain(deviceChanged);
 
             pageReady = true;
         
@@ -179,7 +211,7 @@ require "./shared/libs/ressources.php";
             
             mx.$(".spacer").innerHTML = document.location.hostname;
 
-            mx.Page.init();
+            mx.Page.refreshUI();
         }
         
         mx.OnScriptReady.push( function(){

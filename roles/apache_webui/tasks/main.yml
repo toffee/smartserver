@@ -17,6 +17,7 @@
     archive: no
     checksum: yes
     group: yes
+    owner: yes
     perms: yes
     recursive: yes
     rsync_opts:
@@ -42,19 +43,26 @@
 # POTD FETCHER
 - name: install required packages for fetchPOTD => is_fedora
   yum:
-    name: ImageMagick
+    name: 
+      - ImageMagick
+      - perl-Image-ExifTool
     state: present
   when: is_fedora|bool
 
 - name: install required packages for fetchPOTD => is_ubuntu
   apt:
-    name: imagemagick
+    name: 
+      - imagemagick
+      - libimage-exiftool-perl
     state: present
   when: is_ubuntu|bool
 
 - name: install required packages for fetchPOTD => is_suse
   zypper:
-    name: ImageMagick
+    name: 
+      - ImageMagick
+      #- perl-Image-ExifTool
+      - exiftool
     state: present
   when: is_suse|bool
   

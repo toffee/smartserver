@@ -17,8 +17,6 @@ if( !Auth::hasGroup("admin") )
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/main/fonts/css/animation.css">
-<link rel="stylesheet" href="/main/fonts/css/fontello.css">
 <link href="<?php echo Ressources::getCSSPath('/shared/'); ?>" rel="stylesheet">
 <link rel="stylesheet" href="/shared/css/logfile/logfile_box.css">
 <link rel="stylesheet" href="./css/core.css">
@@ -32,16 +30,13 @@ function initPage()
 {
     mx.CIList.init(mx.$$('div.row'),mx.$("div.table"), 'div.state', 'span.state','span.runtime');
     mx.CIList.startUpdateProcess();
-    
-    mx.Page.init("CI Tests");
+    mx.Page.refreshUI();
 }
 mx.OnDocReady.push( initPage );
 </script>
 </head>
-<body class="inline spacer-800">
-<script>
-    mx.OnScriptReady.push( mx.Page.initBody );
-</script>
+<body>
+<script>mx.OnScriptReady.push( function(){ mx.Page.initFrame("spacer-800", "CI Service"); } );</script>
 <div class="form table logfileBox">
 <?php
 $jobs = Job::getJobs($log_folder);

@@ -44,8 +44,6 @@ else
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/main/fonts/css/animation.css">
-<link rel="stylesheet" href="/main/fonts/css/fontello.css">
 <link href="<?php echo Ressources::getCSSPath('/shared/'); ?>" rel="stylesheet">
 <link rel="stylesheet" href="/shared/css/logfile/logfile.css">
 <link rel="stylesheet" href="/shared/css/logfile/logfile_box.css">
@@ -86,15 +84,13 @@ function initPage()
     });
     mx.Logfile.checkScrollPosition(null,body,goToControl,false);
        
-    mx.Page.init(mx.I18N.get("Job details"));
+    mx.Page.refreshUI();
 }
 mx.OnDocReady.push( initPage );
 </script>
 </head>
-<body class="inline">
-<script>
-    mx.OnScriptReady.push( mx.Page.initBody );
-</script>
+<body>
+<script>mx.OnScriptReady.push( function(){ mx.Page.initFrame(null, mx.I18N.get("Job details - <?php echo $cmd; ?>")); } );</script>
 <?php
     echo '<div class ="header form table logfileBox">' . JobTemplate::getDetails($job,false) . '</div><div class="scrollControl" onClick="mx.Logfile.toggleBottomScroll()"></div><div class="goToControl"><div></div></div>';
 

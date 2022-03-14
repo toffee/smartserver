@@ -181,6 +181,7 @@
     archive: no
     checksum: yes
     group: yes
+    owner: yes
     perms: yes
     recursive: yes
     rsync_opts:
@@ -232,6 +233,7 @@
     archive: no
     checksum: yes
     group: yes
+    owner: yes
     perms: yes
     recursive: yes
   changed_when: no
@@ -271,6 +273,7 @@
     archive: no
     checksum: yes
     group: yes
+    owner: yes
     perms: yes
     recursive: yes
   changed_when: no
@@ -310,6 +313,7 @@
     archive: no
     checksum: yes
     group: yes
+    owner: yes
     perms: yes
     recursive: yes
   changed_when: no

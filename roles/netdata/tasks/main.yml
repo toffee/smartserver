@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    netdata_version: "1.32.1"
+    netdata_version: "1.33.1"
   tags: [ 'update_notifier_configs' ]
 
 #- name: install docker repository => is_fedora
@@ -118,6 +118,7 @@
     archive: no
     checksum: yes
     group: yes
+    owner: yes
     perms: yes
     recursive: yes
     rsync_opts:
@@ -125,6 +126,8 @@
       - "--chmod=D750,F640"
       
 - name: copy config
+  vars:
+    netdata_container: no
   template:
     src: "templates/{{item}}"
     dest: "/etc/netdata/{{item}}"
@@ -166,9 +169,9 @@
     database: "opentsdb"
     retentions: 
       - { retention: "14d" }
-      - { retention: "60d", name: "060d", interval: "10s", every: "6h" }
-      - { retention: "360d", name: "360d", interval: "1m", every: "12h" }
-      - { retention: "0", name: "999d", interval: "5m", every: "1d" }
+      - { retention: "90d", name: "090d", interval: "5m", every: "6h" }
+      - { retention: "360d", name: "360d", interval: "15m", every: "12h" }
+      - { retention: "0", name: "999d", interval: "1h", every: "1d" }
     backup: yes
   import_tasks: roles/influxdb/tasks/add_bucket.yml
   

@@ -17,8 +17,6 @@ if( !Auth::hasGroup("admin") )
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/main/fonts/css/animation.css">
-<link rel="stylesheet" href="/main/fonts/css/fontello.css">
 <link href="<?php echo Ressources::getCSSPath('/shared/'); ?>" rel="stylesheet">
 <link href="<?php echo Ressources::getCSSPath('/update_service/'); ?>" rel="stylesheet">
 <link rel="stylesheet" href="/shared/css/logfile/logfile_box.css">
@@ -27,32 +25,28 @@ if( !Auth::hasGroup("admin") )
 <script src="<?php echo Ressources::getComponentPath('/update_service/'); ?>"></script>
 <script src="<?php echo Ressources::getJSPath('/update_service/'); ?>"></script>
 <script src="/shared/js/logfile/logfile.js"></script>
-</head>
-<body class="inline spacer system">
 <script>
-    mx.OnScriptReady.push( mx.Page.initBody );
-
     mx.UNCore = (function( ret ) {
         var job_is_running = null;
         var job_running_type = null;
         var job_cmd_type = null;
         var job_started = null;
         
+        var updateJobStarted = false;
+        
         var systemUpdatesCount = 0;
-        var smartserverChangeCount = 0;
+        var smartserverChangesCount = 0;
+        var systemUpdatesHash = "";
+        var smartserverChangesHash = "";
         
+        var last_data_modified = null;
         var hasEncryptedVault = false;
-        
+        var deploymentTags = [];
+
         var refreshDaemonStateTimer = 0;
         
-        var deploymentTags = [];
-        
-        var workflowTimer = 0;
-        
-        var dialog = null;
-        
         var daemonApiUrl = mx.Host.getBase() + '../api.php'; 
-       
+
         function processData(last_data_modified, changed_data)
         {
             if( changed_data.hasOwnProperty("has_encrypted_vault") ) hasEncryptedVault = changed_data["has_encrypted_vault"];
@@ -84,16 +78,13 @@ if( !Auth::hasGroup("admin") )
             if( changed_data.hasOwnProperty("is_reboot_needed") )
             {
                 const rebootNeededDetails = mx.UpdateServiceTemplates.getSystemStateDetails(last_data_modified, changed_data)
-                
-                let rebootNeededElement = mx.$("#systemRebootState");
-                rebootNeededElement.innerHTML = rebootNeededDetails;
-                rebootNeededElement.style.display = rebootNeededDetails ? "" : "None";
+                mx.UpdateServiceHelper.setElementContent(rebootNeededDetails,"systemRebootState");
             }
 
             if( changed_data.hasOwnProperty("system_updates") )
             {
-                const [ _systemUpdateCount, systemUpdateDetails, systemUpdateHeader ] = mx.UpdateServiceTemplates.getSystemUpdateDetails(last_data_modified, changed_data, lastUpdateDate);
-                systemUpdatesCount = _systemUpdateCount
+                const [ _systemUpdatesCount, systemUpdateDetails, systemUpdateHeader ] = mx.UpdateServiceTemplates.getSystemUpdateDetails(last_data_modified, changed_data, lastUpdateDate);
+                systemUpdatesCount = _systemUpdatesCount;
                 updateBehaviorChanged = true;
                 
                 mx.UpdateServiceHelper.setTableContent(systemUpdateDetails,"systemUpdateDetails",systemUpdateHeader,"systemUpdateHeader")
@@ -101,8 +92,8 @@ if( !Auth::hasGroup("admin") )
             
             if( changed_data.hasOwnProperty("smartserver_changes") )
             {
-                const [ _smartserverChangeCount, smartserverChangeDetails, smartserverChangeHeader ] = mx.UpdateServiceTemplates.getSmartserverChangeDetails(last_data_modified, changed_data, lastUpdateDate);
-                smartserverChangeCount = _smartserverChangeCount
+                const [ _smartserverChangesCount, smartserverChangeDetails, smartserverChangeHeader ] = mx.UpdateServiceTemplates.getSmartserverChangeDetails(last_data_modified, changed_data, lastUpdateDate);
+                smartserverChangesCount = _smartserverChangesCount;
                 updateBehaviorChanged = true;
 
                 mx.UpdateServiceHelper.setTableContent(smartserverChangeDetails,"smartserverChangeDetails",smartserverChangeHeader,"smartserverChangeHeader")
@@ -111,9 +102,7 @@ if( !Auth::hasGroup("admin") )
             if( changed_data.hasOwnProperty("smartserver_code") )
             {
                 const smartserverChangeState = mx.UpdateServiceTemplates.getSmartserverChangeState(last_data_modified, changed_data);
-                let smartserverChangeStateElement = mx.$("#smartserverChangeState");
-                smartserverChangeStateElement.style.display = smartserverChangeState ? "" : "None";
-                smartserverChangeStateElement.innerHTML = smartserverChangeState;
+                mx.UpdateServiceHelper.setElementContent(smartserverChangeState,"smartserverChangeState");
             }
             
             if( changed_data.hasOwnProperty("jobs") )
@@ -124,23 +113,52 @@ if( !Auth::hasGroup("admin") )
 
             if( updateBehaviorChanged )
             {
-                function setWorkflowMessage()
+                let updateWorkflowContent = mx.UpdateServiceTemplates.getWorkflow(systemUpdatesCount, smartserverChangesCount, lastUpdateDate);
+                  
+                mx.UpdateServiceHelper.setElementContent(updateWorkflowContent,"updateWorkflow");
+            }
+            
+            let systemUpdatesHashChanged = false;
+            let smartserverChangesHashChanged = false;
+            let updateHashRefreshed = false;
+            if( changed_data.hasOwnProperty("system_updates_hash") )
+            {
+                updateHashRefreshed = true;
+                if( systemUpdatesHash != changed_data["system_updates_hash"] ) systemUpdatesHashChanged = true;
+                systemUpdatesHash = changed_data["system_updates_hash"];
+            }
+            if( changed_data.hasOwnProperty("smartserver_changes_hash") )
+            {
+                updateHashRefreshed = true;
+                if( smartserverChangesHash != changed_data["smartserver_changes_hash"] ) smartserverChangesHashChanged = true;
+                smartserverChangesHash = changed_data["smartserver_changes_hash"];
+            }
+            
+            //console.log(changed_data );
+            //console.log(updateJobStarted + " " + updateHashRefreshed + " " + updateHashChanged );
+            
+            if( updateJobStarted && updateHashRefreshed )
+            {
+                updateJobStarted = false;
+                if( systemUpdatesHashChanged || smartserverChangesHashChanged )
                 {
-                    window.clearTimeout(workflowTimer);
-
-                    const [updateWorkflowContent, timeout ] = mx.UpdateServiceTemplates.getWorkflow(systemUpdatesCount, smartserverChangeCount, lastUpdateDate);
-                    
-                    var updateWorkflowElement = mx.$("#updateWorkflow");
-                    updateWorkflowElement.innerHTML = updateWorkflowContent;
-                    updateWorkflowElement.style.display = updateWorkflowContent ? "" : "None";
-                    
-                    return timeout;
-                }
-                
-                let timeout = setWorkflowMessage();
-                if( timeout >= 0 )
-                {
-                    workflowTimer = window.setTimeout(setWorkflowMessage,timeout);
+                    let body = ""; 
+                    if( systemUpdatesHashChanged && smartserverChangesHashChanged ) body += mx.I18N.get("There are new system and smartserver update available!");  
+                    else if( systemUpdatesHashChanged ) body += mx.I18N.get("There are new system update available!");  
+                    else if( smartserverChangesHashChanged ) body += mx.I18N.get("There are new smartserver update available!");  
+            
+                    let infoDialog = mx.Dialog.init({
+                        id: "stoppedUpdate",
+                        title: mx.I18N.get("Installation stopped!"),
+                        body: body + "<span class='spacer'></span>" + mx.I18N.get("Please check whether you want to install these updates and restart the installation process if necessary."),
+                        buttons: [
+                            { "text": mx.I18N.get("Ok") },
+                        ],
+                        class: "confirmDialog",
+                        destroy: true
+                    });
+                    infoDialog.open();
+                    mx.Page.refreshUI(infoDialog.getRootElement());
                 }
             }
             
@@ -160,9 +178,12 @@ if( !Auth::hasGroup("admin") )
             job_cmd_type = state["job_cmd_type"];
             job_started = state["job_started"];
             
+            last_data_modified = state["last_data_modified"];
+            
             var msg = "";
             var currentRunningStateElement = mx.$("#currentRunningState");
             var currentRunningActionsElement = mx.$("#currentRunningActions");
+            
             if( job_is_running )
             {
                 var logfile = state["job_logfile"];
@@ -171,8 +192,8 @@ if( !Auth::hasGroup("admin") )
                     var logfile_name = logfile.substring(0,logfile.length - 4);
                     var data = logfile_name.split("-");
 
-                    action_msg_1 = "<div class=\"detailView\" onClick=\"mx.UNCore.openDetails(this,'" + data[0] + "','" + data[3] + "','" + data[4] + "')\">";
-                    action_msg_2 = "</div>";
+                    action_msg_1 = "<span class=\"detailView\" onClick=\"mx.UpdateServiceActions.openDetails(this,'" + data[0] + "','" + data[3] + "','" + data[4] + "')\">";
+                    action_msg_2 = "</span>";
                 
                     var runtime = Math.round( ( (new Date()).getTime() - Date.parse(job_started) ) / 1000 );
                     
@@ -190,11 +211,9 @@ if( !Auth::hasGroup("admin") )
                 }
                 else
                 {
-                    msg = mx.UpdateServiceTemplates.getActiveManuellJobName(job_cmd_type);
+                    msg = "<span class=\"icon-attention yellow\"></span> " + mx.UpdateServiceTemplates.getActiveManuellJobName(job_cmd_type);
                     currentRunningActionsElement.style.display= ""
                 }
-                
-                currentRunningStateElement.innerHTML = msg;
                 
                 refreshDaemonStateTimer = window.setTimeout(function(){ refreshDaemonState(state["last_data_modified"], null) }, 1000);
             }
@@ -203,26 +222,63 @@ if( !Auth::hasGroup("admin") )
                 currentRunningActionsElement.style.display="";
                 currentRunningActionsElement.querySelector(".button").classList.remove("disabled");
 
-                currentRunningStateElement.innerHTML = mx.I18N.get("No update process is running");
+                if( state["workflow_state"] )
+                {
+                    switch (state["workflow_state"]) {
+                        case 'killed':
+                            msg = mx.I18N.get("Last process was killed")
+                            break;
+                        case 'stopped':
+                            msg = mx.I18N.get("Last process was stopped")
+                            break;
+                        default:
+                            let reasons = state["workflow_state"].split(",");
+                            if( reasons.indexOf("wrong_system_update_hash") != -1 && reasons.indexOf("wrong_smartserver_update_hash") != -1 ) 
+                            {
+                                msg = mx.I18N.get("Last process was stopped, because of new system and smartserver updates");
+                            }
+                            else if( reasons.indexOf("wrong_system_update_hash") != -1 )
+                            {
+                                msg = mx.I18N.get("Last process was stopped, because of new system updates");
+                            }
+                            else if( reasons.indexOf("wrong_smartserver_update_hash") != -1 )
+                            {
+                                msg = mx.I18N.get("Last process was stopped, because of new smartserver updates");
+                            }
+                            break;
+                    }
+
+                    msg = "<span class=\"icon-attention red\"></span> " + msg;
+                }
+                else
+                {
+                    msg = mx.I18N.get("No update process is running");
+                }
 
                 refreshDaemonStateTimer = window.setTimeout(function(){ refreshDaemonState(state["last_data_modified"], null) }, 5000);
             }
            
+            if( currentRunningStateElement.innerHTML != msg )  currentRunningStateElement.innerHTML = msg;
+
             if( Object.keys(state["changed_data"]).length > 0 ) processData(state["last_data_modified"], state["changed_data"]);
                  
-            if( dialog != null && dialog.getId() != "killProcess" ) 
-            { 
-                if( job_is_running )
-                {
-                    let msg = mx.I18N.get("'{}' disabled, because of a running job");
-                    msg = msg.fill(dialog.getElement(".continue").innerHTML);
-                    dialog.setInfo(msg);
-                    dialog.setActionDisabled(".continue",true);
-                }
-                else
-                {
-                    dialog.setInfo("");
-                    dialog.setActionDisabled(".continue",false);
+            if( mx.UpdateServiceActions.getDialog() != null )
+            {
+                let dialog = mx.UpdateServiceActions.getDialog();
+                if( dialog.getId() != "killProcess" ) 
+                { 
+                    if( job_is_running )
+                    {
+                        let msg = mx.I18N.get("'{}' disabled, because of a running job");
+                        msg = msg.fill(dialog.getElement(".continue").innerHTML);
+                        dialog.setInfo(msg);
+                        dialog.setActionDisabled(".continue",true);
+                    }
+                    else
+                    {
+                        dialog.setInfo("");
+                        dialog.setActionDisabled(".continue",false);
+                    }
                 }
             }
             
@@ -267,388 +323,43 @@ if( !Auth::hasGroup("admin") )
                         mx.UpdateServiceHelper.handleServerError(response["message"])
                     }
                 }
-                else if( this.status == 503 ) 
-                {
-                    mx.UpdateServiceHelper.handleServerNotAvailable();
-                    refreshDaemonStateTimer = window.setTimeout(function(){ refreshDaemonState(last_data_modified, callback) }, mx.UpdateServiceHelper.isRestarting() ? 1000 : 15000 );
-                }
                 else
                 {
-                    if( this.status != 0 && this.status != 401 ) mx.UpdateServiceHelper.handleRequestError(this.status, this.statusText, this.response);
-                    refreshDaemonStateTimer = window.setTimeout(function(){ refreshDaemonState(last_data_modified, callback) }, 15000);
+                    let timeout = 15000;
+                    if( this.status == 503 ) 
+                    {
+                        mx.UpdateServiceHelper.handleServerNotAvailable();
+                        timeout = mx.UpdateServiceHelper.isRestarting() ? 1000 : 15000;
+                    }
+                    else
+                    {
+                        if( this.status != 0 && this.status != 401 ) mx.UpdateServiceHelper.handleRequestError(this.status, this.statusText, this.response);
+                    }
+                    
+                    refreshDaemonStateTimer = mx.Page.handleRequestError(this.status,daemonApiUrl,function(){ refreshDaemonState(last_data_modified, callback) }, timeout);
                 }
             };
             
             xhr.send(JSON.stringify({"action": "state", "parameter": { "type": "update", "last_data_modified": last_data_modified }}));
         }
         
-        function runAction(btn, action, parameter, response_callback)
-        {
-            // needs to be asynchrone to allow ripple effect
-            window.setTimeout(function() { btn.classList.add("disabled"); },0);
-            
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", daemonApiUrl );
-            xhr.withCredentials = true;
-            xhr.onreadystatechange = function() {
-                if (this.readyState != 4) return;
-                
-                if( response_callback )
-                {
-                    response_callback(this);
-                }
-                else
-                {
-                    if( this.status == 200 ) 
-                    {
-                        var response = JSON.parse(this.response);
-                        if( response["status"] == "0" )
-                        {
-                            mx.UpdateServiceHelper.confirmSuccess();
-
-                            handleDaemonState(response);
-                        }
-                        else
-                        {
-                            mx.UpdateServiceHelper.handleServerError(response["message"]);
-                        }
-                    }
-                    else if( this.status == 503 ) 
-                    {
-                        mx.UpdateServiceHelper.handleServerNotAvailable();
-                    }
-                    else
-                    {
-                        mx.UpdateServiceHelper.handleRequestError(this.status, this.statusText, this.response);
-                    }
-                }
-            };
-            xhr.send(JSON.stringify({"action": action, "parameter": parameter }));
-        }
+        ret.setUpdateJobStarted = function( _updateJobStarted ){ updateJobStarted = _updateJobStarted; }
         
-        function dialogClose()
-        {
-            dialog.close(); 
-            dialog = null;
-        }
+        ret.hasEncryptedVault = function(){ return hasEncryptedVault; }
         
-        function confirmAction(btn, action, parameter, confirm, button_color, response_callback, confirmed_callback )
-        {
-            if( btn.classList.contains("disabled") ) 
-            {
-                return;
-            }
-            
-            if( confirm )
-            {
-                let cls = [ "continue" ];
-                if( button_color ) cls.push(button_color);
-                dialog = mx.Dialog.init({
-                    id: action,
-                    title: mx.I18N.get("Are you sure?"),
-                    body: confirm,
-                    buttons: [
-                        { "text": mx.I18N.get("Continue"), "class": cls, "callback": function(){ dialogClose(); if( confirmed_callback ){ confirmed_callback(); } runAction(btn, action, parameter, response_callback); } },
-                        { "text": mx.I18N.get("Cancel"), "callback": dialogClose },
-                    ],
-                    class: "confirmDialog",
-                    destroy: true
-                });
-                dialog.open();
-                mx.Page.refreshUI(dialog.getRootElement());
-            }
-            else
-            {
-                runAction(btn, action, parameter);
-            }
-        }
+        ret.getDeploymentTags = function(){ return deploymentTags; }
 
-        ret.openDetails = function(event,datetime,cmd,username)
-        {
-            document.location = '../details/?datetime=' + datetime + '&cmd=' + cmd + '&username=' + username;
-        }
+        ret.getLastDataModified = function(){ return last_data_modified; }
+    
+        ret.getSystemUpdatesCount = function(){ return systemUpdatesCount; }
 
-        function updateDialog(type, btn, args, callback )
-        {
-            if( btn.classList.contains("disabled") ) 
-            {
-                return;
-            }
-            
-            var has_tags = args != null && args.hasOwnProperty("tags");
-            
-            var passwordField = null;
-            var passwordRemember = null;
-            var passwordHint = null;
-            var tagHint= null;
-            var confirmField = null;
+        ret.getSmartserverChangesCount = function(){ return smartserverChangesCount; }
 
-            var body = "";
-            if( type == "deployment" )
-            {
-                if( has_tags )
-                {
-                    var msg = args["tags"].indexOf(',') != -1 ? mx.I18N.get('all outdated roles') : args["tags"];
-                    body += mx.I18N.get("You want to <span class='important'>redeploy '{}'</span>?").fill(msg);            
-                }
-                else
-                {
-                    body += mx.I18N.get("You want to <span class='important'>deploy smartserver updates</span>?");            
-                }
-            }
-            else
-            {
-                body += mx.I18N.get("You want to <span class='important'>update everything</span>?<span class='spacer'></span>This includes <span class='important'>a system restart</span>, if necessary.");            
-            }
-            
-            let hasPasswordField = hasEncryptedVault;
-            let hasTagField = type == "deployment" && !has_tags;
-            
-            if( hasPasswordField || hasTagField )
-            {
-                body += "<br><br><div class=\"form table\">";
-                
-                if( hasEncryptedVault )
-                {
-                    var lastDeploymentPassword = sessionStorage.getItem("lastDeploymentPassword");
-                    
-                    body += "<div class=\"row\">";
-                    body += "  <div>" + mx.I18N.get("Password") + ":</div>";
-                    body += "  <div>";
-                    body += "    <input name=\"password\" type=\"password\" autocomplete=\"on\"";
-                    if( lastDeploymentPassword ) body += " value=\"" + lastDeploymentPassword + "\"";
-                    body += "    >";
-                    body += "    <div class=\"middle\"><input type=\"checkbox\" id=\"remember\" name=\"remember\"";
-                    if( lastDeploymentPassword ) body += " checked";
-                    body += ">";
-                    body += "    <label for=\"remember\">" + mx.I18N.get("Remember") + "</label>";
-                    body += "   </div>";
-                    body += "   <div class=\"password hint red\">" + mx.I18N.get("Please enter a password") + "</div>";
-                    body += "  </div>";
-                    body += "</div>";
-                }
-                
-                if( hasTagField )
-                {
-                    body += "<div class=\"row\">";
-                    body += "  <div>" + mx.I18N.get("Tags") + ":</div>";
-                    body += "  <div>";
-                    body += "    <input name=\"tag\" autocomplete=\"off\"><div class=\"tag hint red\">" + mx.I18N.get("Please select a tag. e.g 'all'") + "</div>";
-                    body += "  </div>";
-                    body += "</div>";
-                    body += "<div class=\"row\">";
-                    body += "  <div>&nbsp;</div>";
-                    body += "  <div>&nbsp;</div>";
-                    body += "</div>";
-                    
-                    body += "</div>"; // => table close
-                    
-                    body += "<div class=\"deployConfirmation middle\">";
-                    body += "  <input type=\"checkbox\" id=\"confirm\" name=\"confirm\" checked><label for=\"confirm\">" + mx.I18N.get("Mark all changes as deployed") + "</label>";
-                    body += "</div>";
-                }
-                else
-                {
-                    body += "</div>"; // => table close
-                }
-            }
-                
-            var autocomplete = null;
-            dialog = mx.Dialog.init({
-                title: mx.I18N.get("Are you sure?"),
-                body: body,
-                buttons: [
-                    { "text": mx.I18N.get("Continue"), "class": [ "continue", "green" ], "callback": function(){ 
-                        let hasErrors = false;
-                        
-                        parameter = {};
-                        if( hasPasswordField )
-                        {
-                            if( !passwordField.value )
-                            {
-                                passwordHint.style.maxHeight = passwordHint.scrollHeight + 'px';
-                                hasErrors = true;
-                            }
-                            else
-                            {
-                                passwordHint.style.maxHeight = "";
-                                parameter["password"] = passwordField.value;
-                                if( passwordRemember.checked ) sessionStorage.setItem("lastDeploymentPassword", passwordField.value);
-                                else sessionStorage.removeItem("lastDeploymentPassword");
-                            }
-                        }
-                        
-                        if( type == "deployment" )
-                        {
-                            if( hasTagField )
-                            {
-                                var selectedTags = autocomplete.getSelectedValues();
-                                autocomplete.setTopValues(selectedTags);
-                                var selectedTagsAsString = selectedTags.join(",");
-                                
-                                if( selectedTags.length == 0 && !confirmField.checked)
-                                {
-                                    tagHint.style.maxHeight = tagHint.scrollHeight + 'px';
-                                    hasErrors = true;
-                                }
-                                else
-                                {
-                                    tagHint.style.maxHeight = "";
-                                    localStorage.setItem("lastSelectedDeploymentTags", selectedTagsAsString);
-                                    parameter["tags"] = selectedTagsAsString;
-                                    parameter["confirm"] = confirmField.checked;
-                                }
-                            }
-                            else
-                            {
-                                parameter["tags"] = args["tags"]
-                                parameter["confirm"] = false;
-                            }
-                        }
+        ret.getLastDataModified = function(){ return last_data_modified; }
 
-                        if( !hasErrors )
-                        {
-                            dialog.close(); 
-                            
-                            callback(parameter);
-                        }
-                    } },
-                    { "text": mx.I18N.get("Cancel"), "callback": dialogClose },
-                ],
-                class: "confirmDialog",
-                destroy: true
-            });
-            dialog.open();
-            mx.Page.refreshUI(dialog.getRootElement());
-            
-            if( hasPasswordField )
-            {
-                passwordField = dialog.getElement("input[name=\"password\"]");
-                passwordRemember = dialog.getElement("input[name=\"remember\"]");
-                passwordHint = dialog.getElement(".password.hint");
-            }
-            
-            if( hasTagField )
-            {
-                tagHint = dialog.getElement(".tag.hint");
-                confirmField = dialog.getElement("input[name=\"confirm\"]");    
-
-                var lastSelectedTags = localStorage.getItem("lastSelectedDeploymentTags");
-                
-                autocomplete = mx.Autocomplete.init({
-                    values: deploymentTags,
-                    top_values: lastSelectedTags ? lastSelectedTags.split(",") : [],
-                    selected_values: [ "all" ],
-                    selectors: {
-                        input: "input[name=\"tag\"]"
-                    }
-                });
-                dialog.addEventListener("destroy",autocomplete.destroy);
-                
-                confirmField.disabled = true;
-                
-                let lastIncludesAll = true;
-                function selectionHandler(event)
-                {
-                    let values = autocomplete.getSelectedValues();
-                    values = [...values];
-                    
-                    if( values.includes("all") )
-                    {
-                        if( values.length > 1 )
-                        {
-                            if( event["detail"]["added"] && event["detail"]["value"] == "all" )
-                            {
-                                for( let i = 0; i < values.length; i++ )
-                                {
-                                    let value = values[i];
-                                    if( value != "all" )
-                                    {
-                                        autocomplete.removeValueFromSelection(value);
-                                        console.log(value);
-                                    }
-                                }
-                                confirmField.checked = true;
-                                confirmField.disabled = true;
-                            }
-                            else
-                            {
-                                autocomplete.removeValueFromSelection("all");
-                                confirmField.checked = false;
-                                confirmField.disabled = false;
-                            }
-                        }
-                        else
-                        {
-                            confirmField.checked = true;
-                            confirmField.disabled = true;
-                        }
-                    }
-                    else
-                    {
-                        confirmField.disabled = false;
-                    }
-                    //if( autocomplete.getSelectedValues().length>0 ) confirmField.checked = false;
-                    //else confirmField.checked = true;
-                 
-                }
-                autocomplete.getRootLayer().addEventListener("selectionChanged",selectionHandler);
-            }
-        }
+        ret.getUpdateHashes = function(){ return { "system_updates_hash": systemUpdatesHash, "smartserver_changes_hash": smartserverChangesHash }; }
         
-        ret.actionDeployUpdates = function(btn)
-        {
-            var tag = btn.dataset.tag;
-            parameter = tag ? { "tags": tag } : null;
-            updateDialog("deployment",btn,parameter,function(parameter){
-                runAction(btn, 'deploySmartserverUpdates', parameter); 
-            });
-        }
-        
-        ret.actionUpdateWorkflow = function(btn)
-        {
-            updateDialog("all",btn,null,function(parameter){
-                runAction(btn, 'updateWorkflow', parameter); 
-            });
-        }
-        
-        ret.actionRebootSystem = function(btn)
-        {
-            confirmAction(btn,'systemReboot',null,mx.I18N.get("You want to <span class='important'>reboot your system</span>?"),"red");          
-        }
-        
-        ret.actionRestartServices = function(btn)
-        {
-            var service = btn.dataset.service;
-            var msg = service.indexOf(',') != -1 ? mx.I18N.get("all outdated services") : service;
-            confirmAction(btn,'restartService',{'service': service}, mx.I18N.get("You want to <span class='important'>restart '{}'</span>?").fill(msg),"yellow");
-        }
-        
-        ret.actionInstallUpdates = function(btn)
-        { 
-            confirmAction(btn,'installSystemUpdates',null,mx.I18N.get("You want to <span class='important'>install system updates</span>?"),"green");          
-        }
-        
-        ret.actionRefreshUpdateState = function(btn,type)
-        { 
-            confirmAction(btn,'refreshSystemUpdateCheck', { "type": type });
-        }
-
-        ret.actionKillProcess = function(btn)
-        {
-            confirmAction(btn,'killProcess',null,mx.I18N.get("You want to kill current running job?"),"red");
-        }
-
-        ret.actionRestartDaemon = function(btn)
-        {
-            confirmAction(btn,'restartDaemon',null,mx.I18N.get("You want to <span class='important'>restart update daemon</span>?"),"red",null, mx.UpdateServiceHelper.announceRestart );
-            /*, function(response){
-            window.clearTimeout(refreshDaemonStateTimer);
-            confirmAction(btn,'restartDaemon',null,mx.I18N.get("You want to <span class='important'>restart update daemon</span>?"),"red", function(response){
-                mx.UpdateServiceHelper.setExclusiveButtonsState(false,null)
-                window.setTimeout(function(){ refreshDaemonState(null); },2000);
-            });*/
-        }
+        ret.handleDaemonState = function(state){ handleDaemonState(state); }
         
         ret.toggle = function(btn,id)
         {
@@ -656,7 +367,8 @@ if( !Auth::hasGroup("admin") )
             if( element.style.maxHeight )
             {
                 element.style.maxHeight = "";
-                window.setTimeout(function(){ element.style.display=""; mx.UpdateServiceHelper.setToogle(btn,element); },300);
+                mx.UpdateServiceHelper.setToogle(btn,element);
+                window.setTimeout(function(){ element.style.display=""; },300);
             }
             else
             {
@@ -671,12 +383,13 @@ if( !Auth::hasGroup("admin") )
         ret.init = function()
         { 
             mx.I18N.process(document);
+            mx.UpdateServiceActions.init(daemonApiUrl);
             
             mx.Selectbutton.init({
                 values: [
-                    { "text": mx.I18N.get("Only smartserver updates"), "onclick": function(){ mx.UNCore.actionRefreshUpdateState(this,'deployment_update') } },
-                    { "text": mx.I18N.get("Only system updates"), "onclick": function(){ mx.UNCore.actionRefreshUpdateState(this,'system_update') } },
-                    { "text": mx.I18N.get("Only outdated processes"), "onclick": function(){ mx.UNCore.actionRefreshUpdateState(this,'process_update') } }
+                    { "text": mx.I18N.get("Only smartserver updates"), "onclick": function(){ mx.UpdateServiceActions.actionRefreshUpdateState(this,'deployment_update') } },
+                    { "text": mx.I18N.get("Only system updates"), "onclick": function(){ mx.UpdateServiceActions.actionRefreshUpdateState(this,'system_update') } },
+                    { "text": mx.I18N.get("Only outdated processes"), "onclick": function(){ mx.UpdateServiceActions.actionRefreshUpdateState(this,'process_update') } }
                 ],
                 selectors: {
                     button: "#searchUpdates"
@@ -693,23 +406,26 @@ if( !Auth::hasGroup("admin") )
                 },100);
             });
 
-            mx.Page.init(mx.I18N.get("Updates"));            
+            mx.Page.refreshUI();            
         }
         return ret;
     })( mx.UNCore || {} );
     
     mx.OnDocReady.push( mx.UNCore.init );
 </script>
+</head>
+<body class="system">
+<script>mx.OnScriptReady.push( function(){ mx.Page.initFrame("spacer", mx.I18N.get("Update")); } );</script>
 <div class="widget summery">
     <div class="action" id="updateWorkflow"></div>
-    <div class="action"><div class="info" id="lastUpdateDateFormatted"></div><div class="buttons"><div class="form button exclusive" id="searchUpdates" onclick="mx.UNCore.actionRefreshUpdateState(this)" data-i18n="Check for updates"></div></div></div>
+    <div class="action"><div class="info" id="lastUpdateDateFormatted"></div><div class="buttons"><div class="form button exclusive" id="searchUpdates" onclick="mx.UpdateServiceActions.actionRefreshUpdateState(this)" data-i18n="Check for updates"></div></div></div>
 </div>
 <div class="widget">
     <div class="header"><div data-i18n="Status"></div></div>
 
-    <div class="action" id="serverNeedsRestart"><div class="info red" data-i18n="Daemon was updated and needs to restart"></div><div class="buttons"><div class="form button restart red exclusive" onclick="mx.UNCore.actionRestartDaemon(this)" data-i18n="Restart daemon"></div></div></div>
+    <div class="action" id="serverNeedsRestart"><div class="info"><span class="icon-attention red"></span> <span data-i18n="Daemon was updated and needs to restart"></span></div><div class="buttons"><div class="form button restart red exclusive" onclick="mx.UpdateServiceActions.actionRestartDaemon(this)" data-i18n="Restart daemon"></div></div></div>
     
-    <div class="action"><div class="info" id="currentRunningState"></div><div class="buttons" id="currentRunningActions"><div class="form button kill red" onclick="mx.UNCore.actionKillProcess(this)" data-i18n="Stop"></div></div></div>
+    <div class="action"><div class="info" id="currentRunningState"></div><div class="buttons" id="currentRunningActions"><div class="form button kill red" onclick="mx.UpdateServiceActions.actionKillProcess(this)" data-i18n="Stop"></div></div></div>
     <div class="action" id="lastRunningJobsHeader"></div>
     <div class="list form table logfileBox" id="lastRunningJobsDetails"></div>
 

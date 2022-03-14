@@ -247,7 +247,7 @@ mx.Menu = (function( ret ) {
     
     function buildSubMenu(element, subGroup)
     {
-        //let currentIndex = 1;
+        let currentIndex = -1;
         let submenuButtonTemplate = document.createElement("div");
         submenuButtonTemplate.classList.add("service");
         submenuButtonTemplate.classList.add("button");
@@ -259,15 +259,18 @@ mx.Menu = (function( ret ) {
         {
             let entry = subGroup.getEntries()[entryKey];
             
-            /*let index = Math.floor(entry.getOrder()/100);
+            let index = Math.floor(entry.getOrder()/100);
             
             if( currentIndex != index )
             {
-                let separator = document.createElement("div");
-                separator.classList.add("separator");
-                element.appendChild(separator);
+                if( currentIndex != -1 )
+                {
+                    let separator = document.createElement("div");
+                    separator.classList.add("separator");
+                    element.appendChild(separator);
+                }
                 currentIndex = index;
-            }*/
+            }
             
             let submenuButton = submenuButtonTemplate.cloneNode(true);
             submenuButton.setAttribute("id", entry.getUId() );
@@ -278,7 +281,7 @@ mx.Menu = (function( ret ) {
         }
     }
         
-    ret.buildContentSubMenu = function(subGroup, callback)
+    ret.buildContentSubMenu = function(subGroup)
     {
         let entries = [];
         let callbacks = [];
@@ -324,72 +327,80 @@ mx.Menu = (function( ret ) {
         
         if( hasGroups ) entries.push('</div>')
 
-        callback(entries.join(""),callbacks);
+        return { 'content': entries.join(""), 'callbacks': callbacks };
     };
     
     ret.activateMenu = function(entry)
     {
-        mx.$$(".service.active").forEach(function(element){ element.classList.remove("active"); });
+        let lastActiveElement = mx.$(".service.active");
+        let lastActiveElementId = lastActiveElement ? lastActiveElement.id : null;
         
         let activeElementId = null;
         let activeSubmenuElementId = null;
+        let activeSubGroup = null;
         
         if( entry )
         {
-            let subGroup = entry.getType() == "subgroup" ? entry : entry.getSubGroup()
-                        
-            if( subGroup.getMenuEntries().length == 0 )
+            activeSubGroup = entry.getType() == "subgroup" ? entry : entry.getSubGroup()
+            if( activeSubGroup.getMenuEntries().length == 0 )
             {
-                activeElementId = subGroup.getUId();
+                activeElementId = activeSubGroup.getUId();
             }
             else
             {
-                activeSubmenuElementId = subGroup.getUId() + "-submenu";
+                activeSubmenuElementId = activeSubGroup.getUId() + "-submenu";
                 activeElementId = entry.getUId();
                 
-                let activeSubmenuElement = mx.$("#" + activeSubmenuElementId);
+            }
+        }
+        
+        if( activeSubmenuElementId )
+        {
+            let activeSubmenuElement = mx.$("#" + activeSubmenuElementId);
+            if( activeSubmenuElement.innerHTML == "" )
+            {
+                buildSubMenu(activeSubmenuElement, activeSubGroup);
 
-                if( activeSubmenuElement.innerHTML == "" )
-                {
-                    buildSubMenu(activeSubmenuElement, subGroup);
-
-                    activeSubmenuElement.style.display = "block";
-                    window.setTimeout(function(){ 
-                        activeSubmenuElement.style.maxHeight = activeSubmenuElement.scrollHeight + "px";
+                activeSubmenuElement.style.display = "block";
+                window.setTimeout(function(){ 
+                    activeSubmenuElement.style.maxHeight = activeSubmenuElement.scrollHeight + "px";
+                    
+                    window.setTimeout(function(){
+                        let mainMenuElement = mx.$("#menu .main");
+                        let mainRect = mainMenuElement.getBoundingClientRect();
+                        let mainOffset = mx.Core.getOffsets(mainMenuElement);
+                        let mainBottomPos = mainRect.height + mainOffset.top + mainMenuElement.scrollTop;
                         
-                        window.setTimeout(function(){
-                            let mainMenuElement = mx.$("#menu .main");
-                            let mainRect = mainMenuElement.getBoundingClientRect();
-                            let mainOffset = mx.Core.getOffsets(mainMenuElement);
-                            let mainBottomPos = mainRect.height + mainOffset.top + mainMenuElement.scrollTop;
-                            
-                            let rect = activeSubmenuElement.getBoundingClientRect();
-                            let offsets = mx.Core.getOffsets(activeSubmenuElement);
-                            let bottomPos = offsets.top + rect.height;
-                            
-                            if( bottomPos > mainBottomPos )
-                            {
-                                mainMenuElement.scrollTo({
-                                    top: mainMenuElement.scrollTop + ( bottomPos - mainBottomPos ) + 100,
-                                    behavior: 'smooth'
-                                });
-                            }
-                            
-                        },350);
-                    },0);
-                }
-                // needed to toggle submenu
-                else if( entry.getType() == "subgroup" )
-                {
-                    activeSubmenuElementId = null;
-                }
+                        let rect = activeSubmenuElement.getBoundingClientRect();
+                        let offsets = mx.Core.getOffsets(activeSubmenuElement);
+                        let bottomPos = offsets.top + rect.height;
+                        
+                        if( bottomPos > mainBottomPos )
+                        {
+                            mainMenuElement.scrollTo({
+                                top: mainMenuElement.scrollTop + ( bottomPos - mainBottomPos ) + 100,
+                                behavior: 'smooth'
+                            });
+                        }
+                        
+                    },350);
+                },0);
+            }
+            // needed to toggle submenu
+            else if( entry.getType() == "subgroup" && lastActiveElementId == activeElementId )
+            {
+                activeSubmenuElementId = null;
             }
         }
 
-        if( activeElementId)
+        if( lastActiveElementId != activeElementId)
         {
-            let element = document.getElementById(activeElementId);
-            element.classList.add("active");
+            if(lastActiveElement) lastActiveElement.classList.remove("active");
+            if( activeElementId ) // activeElementId is null for home
+            {
+                let element = document.getElementById(activeElementId);
+                element.classList.add("active");
+            }
         }
         
         mx.$$("#menu .group .submenu").forEach(function(element)

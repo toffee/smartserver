@@ -11,6 +11,9 @@ RUN groupadd -g {{system_groups['www'].id}} {{system_groups['www'].name}} && \
   docker-php-ext-install bcmath && \
   docker-php-ext-install mysqli pdo_mysql && \
 
+# preview generator nextcloud
+  apt-get install -y ffmpeg && \
+
 # GMP => needed by nextcloud bookmarks
 #RUN apt-get install -y libgmp-dev re2c libmhash-dev libmcrypt-dev file \
 #  && ln -s /usr/include/x86_64-linux-gnu/gmp.h /usr/local/include/ \
@@ -28,7 +31,7 @@ RUN groupadd -g {{system_groups['www'].id}} {{system_groups['www'].name}} && \
   docker-php-ext-install zip && \
 
 # APC Cache
-  pecl install apcu-5.1.18 && \
+  pecl install apcu && \
   docker-php-ext-enable apcu && \
 
 # ImageMagick
@@ -56,15 +59,34 @@ RUN groupadd -g {{system_groups['www'].id}} {{system_groups['www'].name}} && \
   
   mv "/usr/local/etc/php/php.ini-production" "/usr/local/etc/php/php.ini" && \
   echo "apc.enable_cli=1\n" >> "/usr/local/etc/php/conf.d/docker-php-ext-apcu.ini" && \
+  
+  echo "opcache.jit_buffer_size = 100M\n" >> "/usr/local/etc/php/conf.d/docker-php-ext-opcache.ini" && \
+  echo "opcache.jit = 1255\n" >> "/usr/local/etc/php/conf.d/docker-php-ext-opcache.ini" && \
+  # interned_strings_buffer was running full
+  echo "opcache.interned_strings_buffer = 16\n" >> "/usr/local/etc/php/conf.d/docker-php-ext-opcache.ini" && \
+  
   sed -i 's/memory_limit.*/memory_limit = 1024M/' /usr/local/etc/php/php.ini && \
-  sed -i 's/pm.start_servers.*/pm.start_servers = 15/' /usr/local/etc/php-fpm.d/www.conf && \
-  sed -i 's/pm.max_children.*/pm.max_children = 100/' /usr/local/etc/php-fpm.d/www.conf && \
-  sed -i 's/pm.min_spare_servers.*/pm.min_spare_servers = 15/' /usr/local/etc/php-fpm.d/www.conf && \
-  sed -i 's/pm.max_spare_servers.*/pm.max_spare_servers = 30/' /usr/local/etc/php-fpm.d/www.conf && \
+  
+  sed -i 's/pm.max_children.*/pm.max_children = 200/' /usr/local/etc/php-fpm.d/www.conf && \
+  
+  sed -i 's/pm.start_servers.*/pm.start_servers = 16/' /usr/local/etc/php-fpm.d/www.conf && \
+  sed -i 's/pm.min_spare_servers.*/pm.min_spare_servers = 8/' /usr/local/etc/php-fpm.d/www.conf && \
+  sed -i 's/pm.max_spare_servers.*/pm.max_spare_servers = 16/' /usr/local/etc/php-fpm.d/www.conf && \
+
+  #sed -i 's/pm.max_children.*/pm.max_children = 100/' /usr/local/etc/php-fpm.d/www.conf && \
+  
+  #sed -i 's/pm.start_servers.*/pm.start_servers = 15/' /usr/local/etc/php-fpm.d/www.conf && \
+  #sed -i 's/pm.min_spare_servers.*/pm.min_spare_servers = 15/' /usr/local/etc/php-fpm.d/www.conf && \
+  #sed -i 's/pm.max_spare_servers.*/pm.max_spare_servers = 30/' /usr/local/etc/php-fpm.d/www.conf && \
+
   sed -i 's/pm.process_idle_timeout.*/pm.process_idle_timeout = 15s/' /usr/local/etc/php-fpm.d/www.conf && \
+  
   sed -i 's/pm.max_requests.*/pm.max_requests = 500/' /usr/local/etc/php-fpm.d/www.conf && \
+  sed -i 's/expose_php.*/expose_php = Off/' /usr/local/etc/php/php.ini && \
   sed -i 's/access.log.*/access.log = \/dev\/null/' /usr/local/etc/php-fpm.d/docker.conf && \
   sed -i 's/domain="coder" rights="none"/domain="coder" rights="read"/' /etc/ImageMagick-6/policy.xml
+
+# https://stitcher.io/blog/php-8-jit-setup
 
 #TODO
 #      , systemd-devel         # php-systemd => nextcloud

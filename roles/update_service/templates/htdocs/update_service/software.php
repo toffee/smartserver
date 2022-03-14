@@ -15,19 +15,13 @@ if( !Auth::hasGroup("admin") )
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/main/fonts/css/animation.css">
-<link rel="stylesheet" href="/main/fonts/css/fontello.css">
 <link href="<?php echo Ressources::getCSSPath('/shared/'); ?>" rel="stylesheet">
 <link href="<?php echo Ressources::getCSSPath('/update_service/'); ?>" rel="stylesheet">
 <script type="text/javascript">var mx = { OnScriptReady: [], OnDocReady: [], Translations: [] };</script>
 <script src="<?php echo Ressources::getJSPath('/shared/'); ?>"></script>
 <script src="<?php echo Ressources::getComponentPath('/update_service/'); ?>"></script>
 <script src="<?php echo Ressources::getJSPath('/update_service/'); ?>"></script>
-</head>
-<body class="inline software spacer-800">
 <script>
-mx.OnScriptReady.push( mx.Page.initBody );
-
 mx.SNCore = (function( ret ) {
   
     var daemonApiUrl = mx.Host.getBase() + '../api.php'; 
@@ -78,15 +72,19 @@ mx.SNCore = (function( ret ) {
                     mx.UpdateServiceHelper.handleServerError(response["message"]);
                 }
             }
-            else if( this.status == 503 ) 
-            {
-                mx.UpdateServiceHelper.handleServerNotAvailable();
-                refreshDaemonStateTimer = window.setTimeout(function(){ refreshDaemonState(last_data_modified, callback) }, 15000);
-            }
             else
             {
-                if( this.status != 0 && this.status != 401 ) mx.UpdateServiceHelper.handleRequestError(this.status, this.statusText, this.response);
-                refreshDaemonStateTimer = window.setTimeout(function(){ refreshDaemonState(last_data_modified, callback) }, 15000);
+                let timeout = 15000;
+                if( this.status == 503 ) 
+                {
+                    mx.UpdateServiceHelper.handleServerNotAvailable();
+                }
+                else
+                {
+                    if( this.status != 0 && this.status != 401 ) mx.UpdateServiceHelper.handleRequestError(this.status, this.statusText, this.response);
+                }
+                
+                refreshDaemonStateTimer = mx.Page.handleRequestError(this.status,daemonApiUrl,function(){ refreshDaemonState(last_data_modified, callback) }, timeout);
             }
         };
         
@@ -132,7 +130,7 @@ mx.SNCore = (function( ret ) {
     { 
         refreshDaemonState(null, function(){}); 
         
-        mx.Page.init(mx.I18N.get("Software"));
+        mx.Page.refreshUI();
     }
     
     ret.openUrl = function(event,url)
@@ -145,7 +143,12 @@ mx.SNCore = (function( ret ) {
 })( mx.SNCore || {} );
     
 mx.OnDocReady.push( mx.SNCore.init );
+
+
 </script>
+</head>
+<body class="software">
+<script>mx.OnScriptReady.push( function(){ mx.Page.initFrame("spacer-800", mx.I18N.get("Software")); } );</script>
 <div class="list"></div>
 <div class="error"></div>
 </body>

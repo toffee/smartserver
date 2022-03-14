@@ -4,11 +4,7 @@ body.system #serverNeedsRestart,
 }
 body.system div.info,
 body.system div.header div:first-child {
-  color: var(--light-menu-text);
-}
-body.system.dark div.info,
-body.system.dark div.header div:first-child {
-  color: var(--dark-menu-text);
+  color: var(--content-text);
 }
 body.system div.info.green,
 body.system div.header.green {
@@ -28,9 +24,13 @@ body.system div.table {
 }
 
 body.system div.widget.summery {
-  margin-top: -5px;
+  margin-top: 0;
   padding-top: 0;
   padding-bottom: 20px;
+}
+
+body.system div.widget.summery .action:first-child {
+  margin-top: 0;
 }
 body.system div.summery,
 body.system div.widget {
@@ -39,7 +39,7 @@ body.system div.widget {
   margin: auto;
   margin-top: 5px;
   padding-top: 12px;
-  border: 1px solid #d2d2d2;
+  border: var(--widget-border);
   border-radius: 4px;
   position: relative;
   margin-top: 20px;
@@ -51,7 +51,7 @@ body.system div.widget div.header {
   transform: translateY(-50%);
   margin-top: -12px;
   margin-left: 10px;
-  background-color: var(--light-bg);
+  background-color: var(--bg);
   position: absolute;
   padding: 0 5px 5px 5px;
   display: flex;
@@ -64,9 +64,6 @@ body.system div.widget.summery div.header {
   margin-left: 0;
   background-color: none;
   font-size: 30px;
-}
-body.system.dark div.widget div.header {
-    background-color: var(--dark-bg);
 }
 body.system div.widget div.header {
   font-size: 20px;
@@ -97,36 +94,31 @@ body.system div.widget div.list.form.table div.row div.grow  {
 
 @media (hover: hover) {
   body.system div.widget div.action:hover {
-    background-color: var(--light-menu-hover-bg);
-  }
-  body.system.dark div.widget div.action:hover {
-    background-color: var(--dark-menu-hover-bg);
+    background-color: var(--content-hover-bg);
   }
 }
 
-@media screen and (max-width: 600px) {
-  body.system.inline {
-    padding-left: 0;
-    padding-right: 0;
-  }
-  body.system div.widget {
-    border: none;
-    margin-top: 60px;
-  }
-  body.system div.widget.summery {
+
+
+
+body.system.phone.inline {
+  padding-left: 0;
+  padding-right: 0;
+}
+body.system.phone div.widget {
+  border: none;
+  margin-top: 60px;
+}
+body.system.phone div.widget.summery {
   padding-bottom: 0;
-  }
-  body.system div.widget div.header {
-    margin-left: 0;
-  }
-  body.system div.widget div.action {
-    margin: 10px 0 10px 0;
-  }
+  margin-top: 0;
 }
-
-
-
-
+body.system.phone div.widget div.header {
+  margin-left: 0;
+}
+body.system.phone div.widget div.action {
+  margin: 10px 0 10px 0;
+}
 
 
 
@@ -142,12 +134,18 @@ body.system div.info.big {
   font-size: 22px;
 }
 body.system div.info .sub {
-  color: #AAA;
+  color: #999;
   font-size: 13px;
+  display: flex;
+  align-items: center;
 }
-body.system #smartserverChangeState .info {
+/*body.system div.info .sub span[class^="icon-"] {
   font-size: 13px;
+}*/
+body.system div.info .nobr {
+  white-space: nowrap;
 }
+
 body.system div.form.button {
   margin-left: 5px;
   white-space: nowrap;
@@ -155,28 +153,47 @@ body.system div.form.button {
 body.system div.buttons {
   white-space: nowrap;
 }
+body.system div.buttons .button.toggle {
+  padding: 13px 1px 13px 1px;
+  width: 25px;
+}
+
+body.system div.buttons .button.toggle span.icon-play:before {
+    transition: transform 100ms linear;
+    transform: rotate(90deg);
+}
+body.system div.buttons .button.toggle span.icon-play.open:before {
+    transform: rotate(-90deg);
+}
+@media (pointer: coarse) {
+  body.system div.buttons .button.toggle {
+    width: 35px;
+  }
+}
+body.system span.green,
 body.system .hint.green,
 body.system .info.green {
     color: var(--color-green);
 }
+body.system span.yellow,
 body.system .hint.yellow,
 body.system .info.yellow {
     color: var(--color-yellow);
 }
+body.system span.red,
 body.system .hint.red,
 body.system .info.red {
     color: var(--color-red);
 }
 
-
-
-
-
-
 body.system div.dialogLayer .confirmDialog {
   max-width: 350px;
 }
 
+body.system div.dialogLayer .confirmDialog ul {
+  margin-bottom: 0;
+  padding-left: 15px;
+}
 body.system div.dialogLayer .confirmDialog .table {
   max-width: 100%;
 }
@@ -210,7 +227,7 @@ body.system div.dialogLayer .important {
 }
 body.system div.dialogLayer .spacer {
   display: block;
-  margin: 5px 0 0 0;
+  margin: 10px 0 0 0;
 }
 
 
@@ -219,17 +236,14 @@ body.system div.dialogLayer .spacer {
 
 
 
-
-
-
-
-body.system div.detailView {
+body.system span.gitCommit,
+body.system span.detailView {
   cursor: pointer;
-  display: inline-block;
-  color: #1976d2;
+  color: var(--link-color);
 }
 @media (hover: hover) {
-  body.system div.detailView:hover {
+  body.system span.gitCommit:hover,
+  body.system span.detailView:hover {
     text-decoration: underline;
   }
 }
