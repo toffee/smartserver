@@ -21,18 +21,20 @@
   with_items:
     - { owner: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", dir: "{{htdocs_path}}fallback/tmpfs/" }
 
-- name: copy balancer fallback files
-  copy:
-    src: "templates/device404.jpg"
-    dest: "{{htdocs_path}}fallback/{{item}}"
+- name: "copy icons"
+  template:
+    src: "{{item}}"
+    dest: "{{htdocs_path}}main/icons/{{item | basename}}"
     owner: "{{system_users['www'].name}}"
     group: "{{system_groups['www'].name}}"
     mode: 0644
-  with_items:
-    - cam.jpg # automower
-    - cam.mjpg # automower
-    - snapshot.cgi # automower
-    - videostream.cgi # automower
-    - tmpfs/snap.jpg # camera strasse
-    - mjpegstream.cgi # camera strasse
+  with_items: 
+    - templates/webui/icons/huawei.svg
 
+- name: copy balancer fallback files
+  copy:
+    src: "templates/device404.jpg"
+    dest: "{{htdocs_path}}fallback/device404.jpg"
+    owner: "{{system_users['www'].name}}"
+    group: "{{system_groups['www'].name}}"
+    mode: 0644
