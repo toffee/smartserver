@@ -2,23 +2,6 @@ mx.UpdateServiceHelper = (function( ret ) {
     let hasError = false;
     let isRestarting = false;
     
-    function fixScrollHeight(element)
-    {
-        if( element.style.maxHeight )
-        {
-            if( element.innerHTML )
-            {
-                element.style.display = "block";
-                mx.UpdateServiceHelper.setScrollHeight(element)
-            }
-            else
-            {
-                element.style.maxHeight = "";
-                element.style.display = "";
-            }
-        }
-    }   
-    
     function hideError()
     {
         if( !hasError ) return;
@@ -158,56 +141,24 @@ mx.UpdateServiceHelper = (function( ret ) {
         }
     }
 
-    ret.setElementContent = function(content, id)
+    ret.initTable = function(headerElement,tableElement)
     {
-        var element = mx.$("#" + id);
-        if( element.dataset.content != content )
+        mx.UpdateServiceHelper.setToogle(headerElement.querySelector(".form.button.toggle"),tableElement);
+        if( tableElement.style.maxHeight )
         {
-            element.dataset.content = content;
-            element.innerHTML = content;
-            element.style.display = content ? "" : "None";
+            if( tableElement.innerHTML )
+            {
+                tableElement.style.display = "block";
+                mx.UpdateServiceHelper.setScrollHeight(tableElement)
+            }
+            else
+            {
+                tableElement.style.maxHeight = "";
+                tableElement.style.display = "";
+            }
         }
     }
     
-    ret.setTableContent = function(tableContent, tableId, headerContent, headerId)
-    {
-        var headerElement = mx.$("#" + headerId);
-        var tableElement = mx.$("#" + tableId);
-        if( !headerContent )
-        {
-            if( headerElement.style.display != "none" )
-            {
-                headerElement.dataset.content = "";
-                headerElement.innerHTML = "";
-                headerElement.style.display = "none";
-            }
-            if( tableElement.style.display != "none" )
-            {
-                tableElement.dataset.content = "";
-                tableElement.innerHTML = "";
-                tableElement.style.display = "none";
-            }
-        }
-        else
-        {
-            if( headerElement.dataset.content != headerContent )
-            {
-                headerElement.dataset.content = headerContent;
-                headerElement.innerHTML = headerContent;
-                headerElement.style.display = "";
-            }
-            if( tableElement.dataset.content != tableContent )
-            {
-                tableElement.dataset.content = tableContent;
-                tableElement.innerHTML = tableContent
-                tableElement.style.display = "";
-            }
-            
-            mx.UpdateServiceHelper.setToogle(mx.$("#" + headerId + " .form.button.toggle"),tableElement);
-            fixScrollHeight(tableElement);
-        }
-    }
-
     ret.setLastCheckedContent = function(dateFormatted,id)
     {
         var element = mx.$("#" + id);
