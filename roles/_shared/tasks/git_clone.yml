@@ -17,7 +17,7 @@
 #    accept_hostkey: yes
     repo: '{{git_clone_url}}'
     dest: '{{git_clone_path}}'
-    version: 'master'
+    version:  "{{ git_clone_version | default('master') }}"
   register: "git_clone_result"
   when: "_git_clone_result.rc == 1"
  
