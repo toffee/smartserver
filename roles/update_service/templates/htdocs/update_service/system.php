@@ -45,7 +45,7 @@ if( !Auth::hasGroup("admin") )
 
         var refreshDaemonStateTimer = 0;
         
-        var daemonApiUrl = mx.Host.getBase() + '../api.php'; 
+        var daemonApiUrl = mx.Host.getBase() + '../api/'; 
 
         function processData(last_data_modified, changed_data)
         {
@@ -287,7 +287,11 @@ if( !Auth::hasGroup("admin") )
         function refreshDaemonState(last_data_modified,callback)
         {
             var xhr = new XMLHttpRequest();
-            xhr.open("POST", daemonApiUrl);
+            xhr.open("POST", daemonApiUrl + "state/" );
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            
+            //application/x-www-form-urlencoded
+            
             xhr.withCredentials = true;
             xhr.onreadystatechange = function() {
                 if (this.readyState != 4) return;
@@ -311,21 +315,21 @@ if( !Auth::hasGroup("admin") )
                 else
                 {
                     let timeout = 15000;
-                    if( this.status == 503 ) 
+                    if( this.status == 0 || this.status == 503 ) 
                     {
                         mx.UpdateServiceHelper.handleServerNotAvailable();
                         timeout = mx.UpdateServiceHelper.isRestarting() ? 1000 : 15000;
                     }
                     else
                     {
-                        if( this.status != 0 && this.status != 401 ) mx.UpdateServiceHelper.handleRequestError(this.status, this.statusText, this.response);
+                        if( this.status != 401 ) mx.UpdateServiceHelper.handleRequestError(this.status, this.statusText, this.response);
                     }
                     
                     refreshDaemonStateTimer = mx.Page.handleRequestError(this.status,daemonApiUrl,function(){ refreshDaemonState(last_data_modified, callback) }, timeout);
                 }
             };
             
-            xhr.send(JSON.stringify({"action": "state", "parameter": { "type": "update", "last_data_modified": last_data_modified }}));
+            xhr.send(mx.Core.encodeDict( { "type": "update", "last_data_modified": last_data_modified } ));
         }
         
         ret.setUpdateJobStarted = function( _updateJobStarted ){ updateJobStarted = _updateJobStarted; }
@@ -346,25 +350,6 @@ if( !Auth::hasGroup("admin") )
         
         ret.handleDaemonState = function(state){ handleDaemonState(state); }
         
-        ret.toggle = function(btn,id)
-        {
-            var element = mx.$("#"+id);
-            if( element.style.maxHeight )
-            {
-                element.style.maxHeight = "";
-                mx.UpdateServiceHelper.setToogle(btn,element);
-                window.setTimeout(function(){ element.style.display=""; },300);
-            }
-            else
-            {
-                element.style.display = "block";
-                window.setTimeout(function(){ 
-                    mx.UpdateServiceHelper.setScrollHeight(element);
-                    mx.UpdateServiceHelper.setToogle(btn,element); 
-                },0);
-            }
-        }
-
         ret.init = function()
         { 
             mx.I18N.process(document);

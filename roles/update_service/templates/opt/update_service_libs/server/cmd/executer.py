@@ -3,6 +3,10 @@ import os
 import subprocess
 import traceback
 import glob
+import threading
+
+
+import time
 
 import pexpect 
 from pexpect.exceptions import EOF, TIMEOUT
@@ -13,6 +17,7 @@ from config import config
 
 from smartserver.logfile import LogFile
 from smartserver import command
+from smartserver import processlist
 
 from server.watcher import watcher
 
@@ -21,8 +26,6 @@ class CmdExecuter(watcher.Watcher):
     START_TIME_STR_FORMAT = "%Y.%m.%d_%H.%M.%S"
 
     env_path = "/sbin:/usr/sbin:/usr/local/sbin:/usr/local/bin:/usr/bin:/bin"
-
-    cmd_processlist = "/usr/bin/ps -alx"
 
     process_mapping = {
         "software_update_check": "software_check",
@@ -54,6 +57,21 @@ class CmdExecuter(watcher.Watcher):
         self.jobs = []
         self.initJobs()
         
+        self.external_cmd_type = None
+        self.external_cmd_type_pid = None
+        self.external_cmd_type_refreshed = None
+        self.external_cmd_type_requested = datetime.now() - timedelta(hours=1)
+
+        self.is_running = True
+        self.condition = threading.Condition()
+        self.thread = threading.Thread(target=self._checkExternalCmdTypes, args=())
+        self.thread.start()
+
+    def terminate(self):
+        with self.condition:
+            self.is_running = False
+            self.condition.notifyAll()
+            
     def isInterruptableJob(self,cmd_type):
         return cmd_type in [ "system_reboot", "daemon_restart" ]
     
@@ -68,7 +86,7 @@ class CmdExecuter(watcher.Watcher):
             data = filename.split("-")
             
             job = {}
-            job["timestamp"] = datetime.timestamp(datetime.strptime(data[0],"%Y.%m.%d_%H.%M.%S"));
+            job["timestamp"] = datetime.strptime(data[0],"%Y.%m.%d_%H.%M.%S").timestamp();
             job["start"] = data[0];
             job["duration"] = data[1];
             job["state"] = data[2];
@@ -100,7 +118,7 @@ class CmdExecuter(watcher.Watcher):
         return self.current_cmd_type
       
     def isRunning(self):
-        return self.isDaemonJobRunning() or self.getActiveCmdType() != None
+        return self.isDaemonJobRunning() or self.getExternalCmdType() != None
       
     def isDaemonJobRunning(self):
         return self.current_started != None
@@ -287,13 +305,46 @@ class CmdExecuter(watcher.Watcher):
             returncode = subprocess.call(['sudo', 'kill', str(child.pid)])
             return returncode
         return 0
+    
+    def _checkExternalCmdTypes(self):
+        with self.condition:
+            while self.is_running:
+                self._refreshExternalCmdType()
+                self.condition.wait( 1 if (datetime.now() - self.external_cmd_type_requested).total_seconds() < 10 else 60)
+                
+    def _refreshExternalCmdType(self): 
+        if not self.isDaemonJobRunning():
+            if self.external_cmd_type_pid is None or not processlist.Processlist.checkPid(self.external_cmd_type_pid):
+                external_cmd_type = None
+                external_cmd_type_pid = None
+                pids = processlist.Processlist.getPids(" |".join( CmdExecuter.process_mapping.keys()))
+                if pids is not None:
+                    for pid in pids:
+                        cmdline = processlist.Processlist.getCmdLine(pid)
+                        if cmdline is not None:
+                            for term in CmdExecuter.process_mapping:
+                                if "{} ".format(term) in cmdline:
+                                    external_cmd_type_pid = pid
+                                    external_cmd_type = CmdExecuter.process_mapping[term]
+                                    break
+                            if external_cmd_type is not None:
+                                break
+                
+                    
+                self.external_cmd_type = external_cmd_type
+                self.external_cmd_type_pid = external_cmd_type_pid
+        else:
+            self.external_cmd_type = None
+            self.external_cmd_type_pid = None
+        
+        self.external_cmd_type_refreshed = datetime.now()
 
-    def getActiveCmdType(self):
-        result = command.exec([ CmdExecuter.cmd_processlist ], shell=True)
-        stdout = result.stdout.decode("utf-8")
-        active_cmd_type = None
-        for term in CmdExecuter.process_mapping:
-            if "{} ".format(term) in stdout:
-                active_cmd_type = CmdExecuter.process_mapping[term]
-                break
-        return active_cmd_type
+    def getExternalCmdType(self, refresh = True):
+        self.external_cmd_type_requested = datetime.now()
+        if refresh:
+            self._refreshExternalCmdType()
+        else:
+            if (self.external_cmd_type_requested - self.external_cmd_type_refreshed).total_seconds() > 2:
+                with self.condition:
+                    self.condition.notifyAll()
+        return self.external_cmd_type

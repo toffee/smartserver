@@ -1,15 +1,16 @@
+- name: "fetch last git pull date"
+  shell: "git rev-parse HEAD"
+  changed_when: no
+  register: git_fetch_result
+
 - name: "confirm deployment"
+  vars:
+    deployment_date: "{{ ansible_date_time.iso8601_micro[0:-1]}}+00:00"
+    git_hash: "{{git_fetch_result.stdout}}"
   template:
     src: "templates/deployment.state"
     dest: "{{global_lib}}update_service/deployment.state"
     owner: root
     group: root
     mode: 0644
-
-- name: "touch deployment"
-  ansible.builtin.file:
-    dest: "{{global_lib}}update_service/deployment.state"
-    owner: root
-    group: root
-    mode: 0644
-    state: touch
+#2022-03-17 16:19:34.330117269 +0100

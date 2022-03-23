@@ -25,12 +25,12 @@ class DeploymentUpdate:
                 except JSONDecodeError:
                     pass
       
-    def filterPath( self, flag, path, deployment_mtime ):
+    def filterPath( self, flag, path, max_mtime ):
         if flag != "D":
             file_stat = os.stat("{}/{}".format(self.config.deployment_directory,path))
             file_mtime = file_stat.st_mtime
             
-            if file_mtime > deployment_mtime:
+            if file_mtime > max_mtime:
                 return True
         return False
     
@@ -39,7 +39,7 @@ class DeploymentUpdate:
         url = "https://github.com/{}/commit/{}".format(repository_owner,current_commit) if repository_owner is not None else None
         return {"date": current_date, "message": "\n".join(current_messages), "files": current_files, "url": url }
 
-    def process(self, update_time):
+    def process(self):
         smartserver_code = None
         smartserver_pull = None
         smartserver_changes = None
@@ -53,8 +53,10 @@ class DeploymentUpdate:
             result = command.exec([ "git", "status", "--porcelain" ], cwd=self.config.deployment_directory )
             uncommitted_changes = result.stdout.decode("utf-8").strip().split("\n")
 
-            deployment_stat = os.stat(self.config.deployment_state_file)
-            deployment_mtime = deployment_stat.st_mtime
+            last_deployment_state = {}
+            if os.path.isfile(config.deployment_state_file):
+                with open(config.deployment_state_file, 'r') as f:
+                    last_deployment_state = json.load(f)
             
             repository_owner = GitHub.getRepositoryOwner(self.config.git_remote) if "github" in self.config.git_remote else None
 
@@ -86,25 +88,28 @@ class DeploymentUpdate:
                     result = command.exec([ "git", "pull" ], cwd=self.config.deployment_directory )
                     if result.returncode != 0:
                         raise Exception(result.stdout.decode("utf-8"))
-                    smartserver_pull = update_time;
             else:
                 smartserver_code = "uncommitted_changes"
                 
-            last_deployment = datetime.fromtimestamp(deployment_mtime, tz=timezone.utc)
-            #last_deployment = datetime.strptime("2022-03-13 00:00:00 +0100","%Y-%m-%d %H:%M:%S %z")
-            
+            result = command.exec([ "stat", "-c", "%y", ".git/FETCH_HEAD" ], cwd=self.config.deployment_directory )
+            last_git_pull = result.stdout.decode("utf-8").strip()
+            smartserver_pull = "{}T{}{}:{}".format(last_git_pull[0:10],last_git_pull[11:26],last_git_pull[-5:-2],last_git_pull[-2:])
+
+            last_deployment_as_string = "{}{}".format(last_deployment_state["deployment_date"][0:-3],last_deployment_state["deployment_date"][-2:])
+            last_deployment = datetime.strptime(last_deployment_as_string,"%Y-%m-%dT%H:%M:%S.%f%z")
+                        
             #print( " ".join([ "git", "-C", self.config.deployment_directory, "rev-list", "-1", "--before", str(last_deployment), "origin/master" ]))
-            result = command.exec([ "git", "rev-list", "-1", "--before", str(last_deployment), "HEAD" ], cwd=self.config.deployment_directory )
-            ref = result.stdout.decode("utf-8").strip()
+            #result = command.exec([ "git", "rev-list", "-1", "--before", str(last_deployed_git), "HEAD" ], cwd=self.config.deployment_directory )
+            #ref = result.stdout.decode("utf-8").strip()
             
             #print( " ".join([ "git", "-C", self.config.deployment_directory, "diff-index", "--name-status", ref ]))
             #result = command.exec([ "git", "diff-index", "--name-status", ref ], cwd=self.config.deployment_directory )
             #committed_changes = result.stdout.decode("utf-8").strip().split("\n")
-            #print(committed_changes)
 
             # prepare commit messages
-            result = command.exec([ "git", "log", "--name-status", "--date=iso", str(ref) +  "..HEAD" ], cwd=self.config.deployment_directory )
+            result = command.exec([ "git", "log", "--name-status", "--date=iso", last_deployment_state["git_hash"] +  "..HEAD" ], cwd=self.config.deployment_directory )
             committed_changes = result.stdout.decode("utf-8").strip().split("\n")
+            #print(committed_changes)
             
             commits = {}
             current_commit = None
@@ -152,17 +157,16 @@ class DeploymentUpdate:
                 deleted_files = []
                 for file in commits[commit]["files"]:
                     flag, path = file
-                    if self.filterPath( flag, path, deployment_mtime ):
-                        files.append( {"flag": flag, "path": path} )
-                    elif flag == "D":
+                    if flag == "D":
                         deleted_files.append(path)
-                        
-                if len(files) + len(deleted_files) == len(commits[commit]["files"]):
-                    commits[commit]["files"] = files
-                    filtered_commits.append(commits[commit])
+                    else:
+                        files.append( {"flag": flag, "path": path} )
+                #if len(files) + len(deleted_files) == len(commits[commit]["files"]):
+                commits[commit]["files"] = files
+                filtered_commits.append(commits[commit])
 
             #print(commits)
-            #print(filtered_commit_messages)
+            #print(filtered_commits)
             #print(filtered_lines)
             #print(last_deployment)
             #print(commit_lines)
@@ -170,12 +174,15 @@ class DeploymentUpdate:
 
             filtered_files = {}
             #lines = [ele.split("\t") for ele in uncommitted_changes]
-            lines = [ele.strip().split(" ",1) for ele in uncommitted_changes]
-            for line in lines:
+            #lines = [ele.strip().split(" ",1) for ele in uncommitted_changes]
+            for line in uncommitted_changes:
                 if len(line) == 1:
                     continue
-                flag, path = line
-                if self.filterPath( flag, path, deployment_mtime ):
+                line = line.strip()
+                flag = line[:1]
+                path = line[1:].strip()
+                
+                if self.filterPath( flag, path, last_deployment.timestamp() ):
                     if path not in filtered_files or flag == "A":
                         filtered_files[path] = {"flag": flag, "path": path}
                             
@@ -183,7 +190,7 @@ class DeploymentUpdate:
             config_files = {}
             for filename in files:
                 file_stat = os.stat(filename)
-                if file_stat.st_mtime > deployment_mtime:
+                if file_stat.st_mtime > last_deployment.timestamp():
                     path = filename[len(config.deployment_directory):]
                     config_files[path] = {"flag": "M", "path": path}
 

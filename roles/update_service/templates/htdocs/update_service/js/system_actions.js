@@ -15,7 +15,9 @@ mx.UpdateServiceActions = (function( ret ) {
         window.setTimeout(function() { btn.classList.add("disabled"); },0);
         
         var xhr = new XMLHttpRequest();
-        xhr.open("POST", daemonApiUrl );
+        xhr.open("POST", daemonApiUrl + action + "/" );
+        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+        
         xhr.withCredentials = true;
         xhr.onreadystatechange = function() {
             if (this.readyState != 4) return;
@@ -40,7 +42,7 @@ mx.UpdateServiceActions = (function( ret ) {
                         mx.UpdateServiceHelper.handleServerError(response["message"]);
                     }
                 }
-                else if( this.status == 503 ) 
+                else if( this.status == 0 || this.status == 503 ) 
                 {
                     mx.UpdateServiceHelper.handleServerNotAvailable();
                 }
@@ -50,7 +52,8 @@ mx.UpdateServiceActions = (function( ret ) {
                 }
             }
         };
-        xhr.send(JSON.stringify({"action": action, "parameter": parameter }));
+        
+        xhr.send(mx.Core.encodeDict(parameter));
     }
     
     function dialogClose()
@@ -357,7 +360,7 @@ mx.UpdateServiceActions = (function( ret ) {
     
     ret.actionInstallUpdates = function(btn)
     { 
-        confirmAction(btn,'installSystemUpdates',btn,mx.UNCore.getUpdateHashes(),mx.I18N.get("You want to <span class='important'>install system updates</span>?"),"green");          
+        confirmAction(btn,'installSystemUpdates',mx.UNCore.getUpdateHashes(),mx.I18N.get("You want to <span class='important'>install system updates</span>?"),"green");          
     }
     
     ret.actionDeployUpdates = function(btn)
@@ -371,7 +374,7 @@ mx.UpdateServiceActions = (function( ret ) {
     
     ret.actionRefreshUpdateState = function(btn,type)
     { 
-        confirmAction(btn,'refreshSystemUpdateCheck', { "type": type });
+        confirmAction(btn,'refreshSystemUpdateCheck', type ? { "type": type } : {} );
     }
 
     ret.actionRebootSystem = function(btn)
