@@ -53,6 +53,7 @@ docker_fluentd_ip:                "172.30.8.200"
 
 docker_zigbee2mqtt_ip:            "172.30.20.200"
 docker_recorder_ip:               "172.30.21.200"
+docker_mytracker_ip:              "172.30.22.200"
 
 # 0 => production, 1 => production
 netgroup:                         "{{server_ip_r[2]}}"

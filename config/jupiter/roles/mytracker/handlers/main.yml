@@ -1,0 +1,8 @@
+- name: restart mytracker
+  systemd:
+    name: mytracker
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    masked: no
+  listen: "restart mytracker"

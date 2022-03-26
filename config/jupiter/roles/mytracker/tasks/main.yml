@@ -1,0 +1,107 @@
+- name: set mytracker version
+  set_fact:
+    mytracker_version: 'unknown'
+  tags: [ 'update_notifier_configs' ]
+  
+- name: prepare needed folder
+  file:
+    path: "{{item}}"
+    state: directory
+    owner: root
+    group: root
+    mode: 0750
+  with_items:
+    - "{{global_etc}}mytracker/"
+    - "{{global_log}}mytracker/"
+
+- name: build docker image
+  vars:
+    name: "mytracker"
+    image_name: "custom_mytracker"
+    image_version: "{{alpine_version}}-{{mytracker_version}}"
+    files:
+      - "{{config_path}}/roles/mytracker/templates/container/Dockerfile"
+  import_tasks: roles/container/tasks/build_docker_image.yml
+
+- name: create docker network
+  docker_network:
+    name: mytracker
+    internal: yes
+    ipam_config:
+      - subnet: "{{docker_mytracker_ip.split('.')[:3] | join('.')}}.0/24"
+        gateway: "{{docker_mytracker_ip.split('.')[:3] | join('.')}}.1"
+    connected:
+      - mosquitto
+    appends: yes
+  tags: ['mosquitto']
+
+- name: create docker container
+  docker_container:
+    name: mytracker
+    image: "custom_mytracker:{{alpine_version}}-{{mytracker_version}}"
+    state: present
+#    recreate: true
+    env:
+      TZ: "{{timezone}}"
+    log_driver: journald
+    log_options:
+      tag: mytracker
+    container_default_behavior: "compatibility"
+    network_mode: "default"
+    networks:
+      - name: "mytracker"
+        ipv4_address: "{{docker_mytracker_ip}}"
+    networks_cli_compatible: yes
+    volumes:
+      - '{{global_lib}}mytracker/:/var/lib/mytracker:z'
+      - '{{global_log}}mytracker/:{{global_log}}mytracker:z'
+    published_ports:
+      - "5000:5000"
+  notify: "restart mytracker"
+
+- name: add container name
+  vars:
+    host_name: "mytracker"
+    host_ip_address: "{{docker_mytracker_ip}}"
+  import_tasks: roles/network/tasks/add_to_hosts.yml
+
+
+- name: set logrotate job
+  vars:
+    logrotate_path: "{{global_log}}mytracker/*.log"
+  copy:
+    content: "{{ lookup('template', 'templates/logrotate') }}"
+    dest: "/etc/logrotate.d/ansible_mytracker"
+    owner: root
+    group: root
+    mode: 0640
+
+# ***** FINALIZE *****
+- name: register webui
+  vars:
+    name: "mytracker"
+    js_file: "templates/webui/mytracker.js"
+    icons: [ 'templates/webui/icons/mytracker_logo.svg' ]
+  import_tasks: roles/apache_webui/tasks/add_webui.yml
+
+- name: copy apache config
+  vars:
+    config_file: "templates/etc/apache2/_.ansible.conf.d/mytracker.conf"
+  import_tasks: roles/apache/tasks/add_config.yml
+ 
+- name: copy fluentd config
+  vars:
+    config_file: "templates/etc/fluent/_.ansible.d/mytracker.conf"
+  import_tasks: roles/fluentd/tasks/add_config.yml
+      
+- name: create systemd service
+  vars:
+    container_name: "mytracker"
+    container_after: [ "mosquitto" ]
+  import_tasks: roles/container/tasks/add_docker_service.yml
+
+- name: trigger mytracker handler
+  vars:
+    notify: "restart mytracker"
+    service: "mytracker.service"
+  import_tasks: roles/_shared/tasks/service_check.yml
