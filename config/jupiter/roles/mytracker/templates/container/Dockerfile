@@ -1,6 +1,6 @@
 FROM alpine:{{alpine_version}}
 
-RUN apk --no-cache add git sqlite python3 python3-dev py3-pip
+RUN apk --no-cache add git sqlite python3 python3-dev py3-pip tzdata 
 
 RUN mkdir /mytracker && \
     git clone --single-branch --branch master https://github.com/toffee/MySensorsTracker.git /mytracker && \
