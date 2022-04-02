@@ -1,7 +1,7 @@
 - name: set version
   set_fact:
     prometheus_version: '2.34.0'
-  tags: [ 'update_notifier_configs' ]    
+  tags: [ 'update_notifier_config' ]    
 
 - name: prepare needed folder
   file:
@@ -45,6 +45,12 @@
 #    recreate: true
     env:
       TZ: "{{timezone}}"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--log.format=json"
     log_driver: journald
     log_options:
       tag: prometheus
