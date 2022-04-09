@@ -12,7 +12,6 @@
     mode: 0750
   with_items:
     - "{{global_etc}}mytracker/"
-    - "{{global_log}}mytracker/"
 
 - name: build docker image
   vars:
@@ -43,6 +42,8 @@
 #    recreate: true
     env:
       TZ: "{{timezone}}"
+      FLASK_ENV: "development"
+      FLASK_DEBUG : "False"
     log_driver: journald
     log_options:
       tag: mytracker
@@ -54,7 +55,6 @@
     networks_cli_compatible: yes
     volumes:
       - '{{global_lib}}mytracker/:/var/lib/mytracker:z'
-      - '{{global_log}}mytracker/:{{global_log}}mytracker:z'
     published_ports:
       - "5000:5000"
   notify: "restart mytracker"
@@ -64,17 +64,6 @@
     host_name: "mytracker"
     host_ip_address: "{{docker_mytracker_ip}}"
   import_tasks: roles/network/tasks/add_to_hosts.yml
-
-
-- name: set logrotate job
-  vars:
-    logrotate_path: "{{global_log}}mytracker/*.log"
-  copy:
-    content: "{{ lookup('template', 'templates/logrotate') }}"
-    dest: "/etc/logrotate.d/ansible_mytracker"
-    owner: root
-    group: root
-    mode: 0640
 
 # ***** FINALIZE *****
 - name: register webui

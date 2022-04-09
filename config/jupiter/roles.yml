@@ -18,10 +18,10 @@
 #- { import_role: { name: ci_service }, tags: [ 'ci_service' ] }                         # continues integration test service
 
 - { import_role: { name: "config/jupiter/roles/hosts" }, tags: [ 'hosts' ] }                # add local host names/IPs to DNS 
-- { import_role: { name: "config/jupiter/roles/asterisk" }, tags: [ 'asterisk' ] }          # asterisk SIP server
+#- { import_role: { name: "config/jupiter/roles/asterisk" }, tags: [ 'asterisk' ] }          # asterisk SIP server
 - { import_role: { name: "config/jupiter/roles/paradox" }, tags: [ 'paradox' ] }            # configuration for alarm system
 - { import_role: { name: "config/jupiter/roles/zigbee2mqtt" }, tags: [ 'zigbee2mqtt' ] }    # configuration of zigbee2mqtt
-- { import_role: { name: "config/jupiter/roles/recorder" }, tags: [ 'recorder' ] }          # configuration of OwnTracks Recorder
-- { import_role: { name: "config/jupiter/roles/flexisip" }, tags: [ 'flexisip' ] }          
+#- { import_role: { name: "config/jupiter/roles/recorder" }, tags: [ 'recorder' ] }          # configuration of OwnTracks Recorder
+#- { import_role: { name: "config/jupiter/roles/flexisip" }, tags: [ 'flexisip' ] }          
 - { import_role: { name: "config/jupiter/roles/unifi" }, tags: [ 'unifi' ] }              
 - { import_role: { name: "config/jupiter/roles/mytracker" }, tags: [ 'mytracker' ] }              
