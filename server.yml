@@ -42,6 +42,9 @@
     # search for "import_tasks: roles/apache_webui/tasks/add_webui.yml" to see which ones
     - { import_role: { name: apache_webui, tasks_from: create_shared_folder, handlers_from: empty }, tags: [ 'apache_webui', "apache_webui_config", ] }    # creates {{htdocs_path}}main/components
 
+    # needed by all roles which needs to register their own datasources or dashboards
+    - { import_role: { name: grafana, tasks_from: create_shared_folder, handlers_from: empty }, tags: [ 'grafana', "grafana_config" ] }    # creates {{ global_etc }}grafana/provisioning/datasources/ & {{ global_lib }}grafana/dashboards/
+
     - { import_role: { name: nextcloud, tasks_from: create_shared_folder, handlers_from: empty }, tags: [ 'nextcloud', 'php' ] }
 
     - { import_role: { name: openhab_toolbox, tasks_from: create_shared_folder, handlers_from: empty }, tags: [ 'openhab_toolbox', 'php', 'apache' ] }
@@ -118,7 +121,11 @@
     - { import_role: { name: netdata }, tags: [ 'netdata' ] }                                    # server monitoring
 #    - { import_role: { name: netdata, tasks_from: main_container, handlers_from: empty }, tags: [ 'netdata_container' ] }
 
-    - { import_role: { name: librenms }, tags: [ 'librenms' ], when: "librenms_devices is defined" } # network monitoring
+    - { import_role: { name: librenms }, tags: [ 'librenms' ], when: "librenms_devices | length > 0" } # network monitoring                                          [docker,user:1000|1000]
+    - { import_role: { name: openwrt }, tags: [ 'openwrt' ], when: "openwrt_devices | length > 0" } # default configs for uploading to openwrt to allow monitoring
+    - { import_role: { name: speedtest }, tags: [ 'speedtest' ] }                                # inhouse network performance test                                  [docker,user:1000|1000]
+    
+    - { import_role: { name: system_service }, tags: [ 'system_service', 'alpine' ] }            # system monitoring                                                 [docker,user:root]
 
     - { import_role: { name: grafana }, tags: [ 'grafana' ] }                                    # graphical dashboards                                              [docker,user:root]
 
@@ -152,7 +159,7 @@
 
     - { import_role: { name: pihole, tasks_from: whitelist, handlers_from: empty }, tags: [ 'pihole' ] }   # add whitelist entries
 
-    - { import_role: { name: librenms, tasks_from: apply_config, handlers_from: empty }, tags: [ 'librenms', 'librenms_config' ] }   # apply librenms configs
+    - { import_role: { name: librenms, tasks_from: apply_config, handlers_from: empty }, tags: [ 'librenms', 'librenms_config' ], when: "librenms_devices | length > 0" }   # apply librenms configs
 
     - { import_role: { name: nextcloud, tasks_from: enable_apps, handlers_from: empty }, tags: [ 'nextcloud', 'nextcloud_apps' ] }   # enable nextcloud apps needs a running system (php, database, redis ...)
 

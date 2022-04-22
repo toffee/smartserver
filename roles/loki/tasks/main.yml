@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    loki_version: '2.4.2'
+    loki_version: '2.5.0'
   tags: [ 'update_notifier_config' ]    
 
 - name: prepare needed folder
@@ -90,6 +90,15 @@
     container_name: "loki"
   import_tasks: roles/container/tasks/add_docker_service.yml
   
+- name: register grafana configs
+  vars:
+    name: "loki"
+    datasources: 
+      - "templates/grafana/datasources/loki.yaml"
+    dashboards:
+      - "templates/grafana/dashboards/Logs.json"
+  import_tasks: roles/grafana/tasks/add_datasource.yml
+
 - name: register update notifier
   vars:
     name: "loki"

@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    prometheus_version: '2.34.0'
+    prometheus_version: '2.35.0'
   tags: [ 'update_notifier_config' ]    
 
 - name: prepare needed folder
@@ -80,6 +80,13 @@
     rule: "proto tcp dport 443 saddr {{docker_prometheus_ip}}"
   import_tasks: roles/firewall/tasks/allow_service.yml
   tags: [ 'firewall_config' ]
+
+- name: register grafana configs
+  vars:
+    name: "loki"
+    datasources: 
+      - "templates/grafana/datasources/prometheus.yaml"
+  import_tasks: roles/grafana/tasks/add_datasource.yml
 
 - name: register webui
   vars:
