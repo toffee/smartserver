@@ -4,8 +4,8 @@ from lib.dto._changeable import Changeable
 class Group(Changeable):
     WIFI = "wifi"
     
-    def __init__(self, gid, type):
-        super().__init__()
+    def __init__(self, cache, gid, type):
+        super().__init__(cache)
         
         self.gid = gid
         self.type = type
@@ -18,19 +18,11 @@ class Group(Changeable):
     def getType(self):
         return self.type
 
-    def setDetail(self, key, value):
-        if key not in self.details or self.details[key] != value:
-            self._markAsChanged(key, "{}{}".format( "add " if key not in self.details else "", key))
-            self.details[key] = value
-        
-    def getDetail(self, key):
-        return self.details.get(key, None)
-
     def getSerializeable(self):
         return {
             "gid": self.gid,
             "type": self.type,
-            "details": self.details
+            "details": self._getDetails()
         }
         
     def __repr__(self):

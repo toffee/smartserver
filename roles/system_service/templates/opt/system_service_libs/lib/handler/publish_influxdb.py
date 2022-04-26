@@ -4,6 +4,7 @@ import requests
 
 from lib.handler import _handler
 from lib.dto.group import Group
+from lib.dto.connection_stat import ConnectionStat
 
 
 class InfluxDBHandler(): 
@@ -35,24 +36,21 @@ class InfluxDBPublisher(_handler.Handler):
             try:
                 messurements = self._collectMessurements()
                 self._submitMessurements(messurements)
-                timeout = 60
             except requests.exceptions.ConnectionError:
                 logging.warning("InfluxDB currently not available. Will 15 seconds")
-                timeout = 60
                 
             with self.condition:
-                self.condition.wait(timeout)
+                self.condition.wait(self.config.influxdb_publish_interval)
                 
     def _collectMessurements(self):
         messurements = []
         
-        for stat in list(self.cache.getStats()):
-            if stat.getInterface() is not None:
-                continue
-            
-            mac = stat.getMAC()
-            device = self.cache.getUnlockedDevice(mac)
-            if device.getIP() is None:
+        devices = self.cache.getDevices()
+        
+        for stat in list(filter(lambda s: type(s) is ConnectionStat, self.cache.getStats() )):
+            device = stat.getUnlockedDevice()
+
+            if device is None or device.getIP() is None:
                 continue
             
             if device.supportsWifi():
@@ -63,16 +61,18 @@ class InfluxDBPublisher(_handler.Handler):
                     if group is not None and group.getType() == Group.WIFI:
                         band = group.getDetail("band")
                 
-                signal = stat.getDetail("signal")
-                if signal is not None:
-                    messurement = "network_signal,ip={},band={} value={}".format(device.getIP(),band,signal)
+                if stat.getDetail("signal") is not None:
+                    messurement = "network_signal,ip={},band={} value={}".format(device.getIP(),band,stat.getDetail("signal"))
                 else:
                     messurement = "network_signal,ip={},band={} value=0".format(device.getIP(),band)
                 messurements.append(messurement)
                 
-            messurements.append("network_in_avg,ip={} value={}".format(device.getIP(),stat.getInAvg()))
-            messurements.append("network_out_avg,ip={} value={}".format(device.getIP(),stat.getOutAvg()))
-            messurements.append("network_total_avg,ip={} value={}".format(device.getIP(),stat.getInAvg() + stat.getOutAvg()))
+            if stat.getInAvg() is not None or stat.getOutAvg() is not None:
+                if stat.getInAvg() is not None:
+                    messurements.append("network_in_avg,ip={} value={}".format(device.getIP(),stat.getInAvg()))
+                if stat.getOutAvg() is not None:
+                    messurements.append("network_out_avg,ip={} value={}".format(device.getIP(),stat.getOutAvg()))
+                messurements.append("network_total_avg,ip={} value={}".format(device.getIP(),stat.getInAvg() + stat.getOutAvg()))
                 
         return messurements
 
@@ -80,6 +80,7 @@ class InfluxDBPublisher(_handler.Handler):
         if len(messurements) == 0:
             return
         
+        #logging.info(messurements)
         logging.info("Submit {} messurements".format(len(messurements)))
         
         #logging.info(messurements)

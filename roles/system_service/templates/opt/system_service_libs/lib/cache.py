@@ -1,12 +1,14 @@
 import threading
 import inspect
 from datetime import datetime
+import time
 import logging
 
 from lib.dto._changeable import Changeable
 from lib.dto.group import Group
-from lib.dto.device import Device
-from lib.dto.stat import Stat
+from lib.dto.device import Device, Connection
+from lib.dto.device_stat import DeviceStat
+from lib.dto.connection_stat import ConnectionStat
 from lib.dto.event import Event
 from lib.helper import Helper
 
@@ -26,9 +28,32 @@ class Cache():
 
         self.ip_mac_map = {}
         self.ip_dns_map = {}
+
+        self.gateway_mac = None
+
+        while True:
+            self.gateway_mac = self.ip2mac(self.config.default_gateway_ip)
+            if self.gateway_mac is not None:
+                break
+            logging.info("Waiting for gateway {}".format(self.config.default_gateway_ip))
+            time.sleep(1)
+            
+        logging.info("Gateway initialized")
         
-    #def getDevice(self, mac):
-    #    return self.devices.get(mac, None)
+    def getGatewayMAC(self):
+        return self.gateway_mac
+    
+    def getGatewayInterface(self, vlan):
+        return "lan{}".format(vlan)
+    
+    def getGatewayConnection(self):
+        return Connection(Connection.ETHERNET, self.config.default_vlan, self.getGatewayMAC(), self.getGatewayInterface(self.config.default_vlan))
+
+    def getWanMAC(self):
+        return "00:00:00:00:00:00"
+    
+    def getWanInterface(self):
+        return "wan"
     
     def _eventLog(self, stack, msg):
         [_, file ] = stack[1][1].rsplit("/", 1)
@@ -48,11 +73,9 @@ class Cache():
     def getUnlockedGroup(self, gid ):
         return self.groups.get(gid, None)
 
-    def getGroup(self, gid, type, autocreate = True ):
+    def getGroup(self, gid, type):
         if gid not in self.groups:
-            if not autocreate:
-                return None
-            group = Group(gid, type)
+            group = Group(self, gid, type)
             self.groups[gid] = group
         else:
             group = self.groups[gid]
@@ -86,11 +109,9 @@ class Cache():
     def getUnlockedDevice(self, mac ):
         return self.devices.get(mac, None)
     
-    def getDevice(self, mac, autocreate = True ):
+    def getDevice(self, mac):
         if mac not in self.devices:
-            if not autocreate:
-                return None
-            device = Device(mac,"device",self)
+            device = Device(self, mac,"device")
             self.devices[mac] = device
         else:
             device = self.devices[mac]
@@ -121,16 +142,20 @@ class Cache():
     def getStats(self):
         return list(self.stats.values())
 
-    def getUnlockedStat(self, mac, interface = None ):
+    def getUnlockedDeviceStat(self, mac ):
+        return self.getUnlockedConnectionStat(mac, None)
+        
+    def getUnlockedConnectionStat(self, mac, interface ):
         id = "{}-{}".format(mac, interface)
         return self.stats.get(id, None)
     
-    def getStat(self, mac, interface = None, autocreate = True ):
+    def getDeviceStat(self, mac):
+        return self.getConnectionStat(mac, None)
+    
+    def getConnectionStat(self, mac, interface):
         id = "{}-{}".format(mac, interface)
         if id not in self.stats:
-            if not autocreate:
-                return None
-            stat = Stat(id, mac, interface)
+            stat = ConnectionStat(self, mac, interface) if interface is not None else DeviceStat(self, mac)
             self.stats[id] = stat
         else:
             stat = self.stats[id]
@@ -140,21 +165,22 @@ class Cache():
     def confirmStat(self, stat, event_callback ):
         stat.unlock()
 
-        related_device = self.devices.get(stat.getMAC(), None)
-
         [state, change_raw, change_details] = stat.confirmModificationState()
         if state == Changeable.NEW:
             event_action = Event.ACTION_CREATE
-            self._eventLog(inspect.stack(), "Add stat {} - [{}]".format(stat.toStr(related_device), change_details))
+            self._eventLog(inspect.stack(), "Add stat {} - [{}]".format(stat, change_details))
         elif state == Changeable.CHANGED:
             event_action = Event.ACTION_MODIFY
-            self._eventLog(inspect.stack(), "Update stat {} - [{}]".format(stat.toStr(related_device), change_details))
+            self._eventLog(inspect.stack(), "Update stat {} - [{}]".format(stat, change_details))
         else:
             return
 
         event_callback(Event(Event.TYPE_STAT, event_action, stat, change_raw))
 
-    def removeStat(self, mac, interface, event_callback):
+    def removeDeviceStat(self, mac, event_callback):
+        self.removeInterfaceStat(mac, None, event_callback)
+        
+    def removeConnectionStat(self, mac, interface, event_callback):
         id = "{}-{}".format(mac, interface)
         if id in self.stats:
             related = self.devices.get(mac, None)
@@ -165,9 +191,14 @@ class Cache():
     def ip2mac(self,ip):
         now = datetime.now()
         if ip not in self.ip_mac_map or (now - self.ip_mac_map[ip][1]).total_seconds() > self.config.cache_ip_mac_revalidation_interval:
-            mac = Helper.ip2mac(ip)
+            mac = Helper.ip2mac(ip, self.config.main_interface)
             if mac is None:
-                return None
+                logging.info("Not able to resolve ip2mac. Fallback to ping")
+                # try to force an arp table update
+                if Helper.ping(ip):
+                    mac = Helper.ip2mac(ip, self.config.main_interface)
+                    if mac is None:
+                        return None
             self.ip_mac_map[ip] = [mac, now]
 
         return self.ip_mac_map[ip][0]

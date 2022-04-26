@@ -4,6 +4,7 @@ from datetime import datetime
 import logging
 
 from lib.handler import _handler
+from lib.dto.device_stat import DeviceStat
 from lib.dto.event import Event
 import paho.mqtt.client as mqtt
 
@@ -74,7 +75,7 @@ class MQTTPublisher(_handler.Handler):
     def _checkPublishedValues(self):
         while self.is_running:
             now = datetime.now()
-            timeout = self.config.publisher_republish_interval
+            timeout = self.config.mqtt_republish_interval
             
             for mac in list(self.published_values.keys()):
                 if self.cache.getUnlockedDevice(mac) is None:
@@ -85,11 +86,11 @@ class MQTTPublisher(_handler.Handler):
                     [last_publish, value] = self.published_values[mac][key]
                     
                     _diff = (now-last_publish).total_seconds()
-                    if _diff >= self.config.publisher_republish_interval:
+                    if _diff >= self.config.mqtt_republish_interval:
                         #logging.info("republish")
                         self._publishValue(mac, key, value)
                     else:
-                        _timeout = self.config.publisher_republish_interval - _diff
+                        _timeout = self.config.mqtt_republish_interval - _diff
                         if _timeout < timeout:
                             timeout = _timeout
 
@@ -106,7 +107,7 @@ class MQTTPublisher(_handler.Handler):
 
         ip = device.getIP()
         if ip not in self.allowed_details:
-            self.allowed_details[ip] = [] #["signal"]
+            self.allowed_details[ip] = ["wan_type","wan_state"]
             if ip in self.config.user_devices:
                 self.allowed_details[ip].append("online_state")
         
@@ -122,15 +123,28 @@ class MQTTPublisher(_handler.Handler):
         if len(_details) == 0:
             return False
 
-        logging.info("PUBLISH {} of {}".format(_details, device))
+        _to_publish = {}
+        if type(stat) is DeviceStat:
+            for detail in _details:
+                if detail == "online_state":
+                    key = "network/{}/{}".format(device.getIP(),"online")
+                    value = "ON" if stat.isOnline() else "OFF"
+                    _to_publish[detail] = [mac,key,value]
+        else:
+            for detail in _details:
+                #if detail == "signal":
+                #    self.mqtt_handler.publish("network/{}/{}".format(device.getIP(),"signal"), stat.getDetail("signal") )
+                if detail in ["wan_type","wan_state"] and stat.getDetail(detail) is not None:
+                    key = "network/{}/{}".format(device.getIP(),detail)
+                    _to_publish[detail] = [mac,key,stat.getDetail(detail)]
+                
+        if len(_to_publish.values()) == 0:
+            return False
 
-        for detail in _details:
-            #if detail == "signal":
-            #    self.mqtt_handler.publish("network/{}/{}".format(device.getIP(),"signal"), stat.getDetail("signal") )
-            if detail == "online_state":
-                key = "network/{}/{}".format(device.getIP(),"online")
-                value = "ON" if stat.isOnline() else "OFF"
-                self._publishValue(mac, key, value)
+        logging.info("PUBLISH {} of {}".format(list(_to_publish.keys()), device))
+
+        for [mac, key, value] in _to_publish.values():
+            self._publishValue(mac, key, value)
                 
         with self.condition:
             self.condition.notifyAll()
@@ -145,7 +159,10 @@ class MQTTPublisher(_handler.Handler):
         self.published_values[mac][key] = [datetime.now(), value]
     
     def getEventTypes(self):
-        return [ { "types": [Event.TYPE_DEVICE, Event.TYPE_STAT], "actions": [Event.ACTION_CREATE, Event.ACTION_MODIFY], "details": None } ]
+        return [ 
+            { "types": [Event.TYPE_DEVICE], "actions": [Event.ACTION_CREATE, Event.ACTION_MODIFY], "details": ["ip"] },
+            { "types": [Event.TYPE_STAT], "actions": [Event.ACTION_CREATE, Event.ACTION_MODIFY], "details": ["online_state","wan_type","wan_state"] } 
+        ]
 
     def processEvents(self, events):
         for event in events:
@@ -155,14 +172,27 @@ class MQTTPublisher(_handler.Handler):
             if event.getType() == Event.TYPE_DEVICE:
                 if event.getObject().getMAC() in self.skipped_macs:
                     device = event.getObject()
-                    stat = self.cache.getUnlockedStat(device.getMAC())
-                    if stat is not None and self._publishValues(device, stat):
+                    stats = []
+                    stat = self.cache.getUnlockedDeviceStat(device.getMAC())
+                    if stat is not None:
+                        stats.append(stat)
+                    if device.getConnection() is not None:
+                        stat = self.cache.getUnlockedConnectionStat(device.getConnection().getTargetMAC(), device.getConnection().getTargetInterface())
+                        if stat is not None:
+                            stats.append(stat)
+                        
+                    all_stats_published = True
+                    for stat in stats:
+                        if not self._publishValues(device, stat):
+                            all_stats_published = False
+                    if all_stats_published and device.getMAC() in self.skipped_macs:
                         del self.skipped_macs[device.getMAC()]
+
             elif event.getType() == Event.TYPE_STAT:
                 stat = event.getObject()
-                if stat.getInterface() is not None:
+                device = stat.getUnlockedDevice()
+                    
+                if device is None:
                     continue
 
-                device = self.cache.getUnlockedDevice(stat.getMAC())
                 self._publishValues(device, stat, event.getDetails())               
-        return []
