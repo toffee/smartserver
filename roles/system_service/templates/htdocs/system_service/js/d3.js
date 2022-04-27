@@ -132,6 +132,31 @@ mx.D3 = (function( ret )
     {
     }
     
+    ret.openChart = function(ip, has_traffic, has_wifi)
+    {
+        let height = ( bodyHeight * 0.8 ) / 2;
+        let url_prefix = 'https://grafana.' + document.location.host;
+        let url = url_prefix + '/d-solo/system-info/system-info?theme=' + ( mx.Page.isDarkTheme() ? 'dark': 'light' ) + '&var-host=' + ip + '&orgId=1';
+        let body = "";
+        if( has_traffic ) body += '<iframe src="' + url + '&panelId=7" width="100%" height="' + height + '" frameborder="0"></iframe>';
+        if( has_wifi ) body += '<iframe src="' + url + '&panelId=4" width="100%" height="' + height + '" frameborder="0"></iframe>';
+        
+        dialog = mx.Dialog.init({
+            body: body,
+            buttons: [
+                { "text": mx.I18N.get("Open Grafana"), "callback": function(){ window.open(url_prefix + '/d/system-info/system-info?orgId=1', '_blank'); }  },
+                { "text": mx.I18N.get("Close") },
+            ],
+            class: "confirmDialog",
+            destroy: true
+        });
+        dialog.open();
+        mx.Page.refreshUI(dialog.getRootElement());
+
+        //url = "https://grafana.smartmarvin.de/d/system-info/system-info?var-host=" + device.ip + "&orgId=1";
+        //url = "https://grafana.smartmarvin.de/d/system-info/system-info?var-host=" + device.ip + "&viewPanel=6&orgId=1";
+    }
+    
     function initTree(endCount)
     {
         bodyRect = document.body.getBoundingClientRect();
@@ -523,9 +548,19 @@ mx.D3 = (function( ret )
     {
         let device = d.data.device
         let html = "<div>";
-        if( device.ip ) html += "<div><div>IP:</div><div>" + device.ip + "</div></div>";
+        if( device.ip ) 
+        {
+            let has_traffic = d.data.interface_stat && d.data.interface_stat.traffic.in_avg !== null;
+            let has_wifi = device.connection["type"] == "wifi";
+            
+            html += "<div><div>IP:</div><div";
+            if( has_traffic || has_wifi ) html += ' class="link" onclick="mx.D3.openChart(\'' + device.ip + '\', ' + ( has_traffic ? 'true' : 'false' ) + ', ' + ( has_wifi ? 'true' : 'false' ) + ')"';
+            html += ">" + device.ip;
+            if( has_traffic || has_wifi ) html += ' <span class="icon-chart-area"></span>';
+            html += "</div></div>";
+        }
         if( device.dns ) html += "<div><div>DNS:</div><div>" + device.dns + "</div></div>";
-        if( device.mac ) html += "<div><div>MAC:</div><div>" + device.mac + "</div></div>";
+        html += "<div><div>MAC:</div><div>" + device.mac + "</div></div>";
         
         if( d.data.device_stat )
         {
@@ -555,24 +590,30 @@ mx.D3 = (function( ret )
         html += "<div><div>Type:</div><div>" + device.type + "</div></div>";
     
         html += showRows(device.details,"Details","rows");
-        html += showRows(device.services,"Services","rows");
+
+        services = {}
+        Object.entries(device.services).forEach(function([key, value])
+        {
+            if( value == "http" ) value = {"value": value, "link": "http://" + device.dns };
+            else if( value == "https" ) value = {"value": value, "link": "https://" + device.dns };
+            
+            services[key] = value;
+        });
+        
+        html += showRows(services,"Services","rows");
         //html += showRows(device.ports,"Ports","rows");
         
         connection_data = {}
-        device.gids.forEach(function(gid){
-            let group = groups.filter(group => group["gid"] == gid );
-            if( group[0]["type"] == "wifi" )
-                connection_data = group[0]["details"]
-            else
-                html += showRows(group[0]["details"],group[0]["type"],"rows");
-        });
-        
+        wan_data = {}
+
         if( device.connection )
         {
             if( device.connection["vlans"] )
                 connection_data["Vlan"] = "" + device.connection["vlans"];
             if( device.connection["target_interface"] && device.connection["type"] != "wifi" )
                 connection_data["Port"] = device.connection["target_interface"];
+            else
+                connection_data["Port"] = "Wifi";
             
             if( d.data.interface_stat )
             {
@@ -589,7 +630,7 @@ mx.D3 = (function( ret )
                             duplex += " - " + ( d.data.interface_stat["details"]["duplex"]["value"] == "full" ? "FullDuplex" : "HalfDuplex" );
                         }
                         
-                        connection_data["Speed"] = formatSpeed(inSpeed) + (inSpeed == outSpeed ? '' : ' RX / ' + formatSpeed(outSpeed) + " TX" ) + duplex;
+                        connection_data["Speed"] = { "value": formatSpeed(inSpeed) + (inSpeed == outSpeed ? '' : ' RX / ' + formatSpeed(outSpeed) + " TX" ) + duplex };
                     }
                 }
 
@@ -597,18 +638,23 @@ mx.D3 = (function( ret )
                 {
                     if( key == "duplex" )
                         return;
-                        
-                    let _value = value["value"];
-                    if( value["format"] == "attenuation" ) 
-                        _value += " db";
-                    
-                    connection_data[key] = _value;
+                                           
+                    if( key == "wan_type" ) wan_data["type"] = value;
+                    else if( key == "wan_state" ) wan_data["state"] = value;
+                    else connection_data[key] = value;
                 });
             }
+
         }
         
         html += showRows(connection_data,"Network","rows");
-            
+        html += showRows(wan_data,"Wan","rows");
+
+        device.gids.forEach(function(gid){
+            let group = groups.filter(group => group["gid"] == gid );
+            html += showRows(group[0]["details"],group[0]["type"],"rows");
+        });
+
         if( d.data.device_stat )
         {
             Object.entries(d.data.device_stat["details"]).forEach(function([key, value])
@@ -736,18 +782,24 @@ mx.D3 = (function( ret )
             Object.entries(rows).forEach(function([key, value])
             {
                 [key, value] = formatDetails(key, value)
+
+                if( !(value && typeof( value ) == "object") ) value = {"value": value}
+
+                let _value = value["value"];
+                if( value["format"] == "attenuation" ) 
+                    _value += " db";
                 
-                if( value && typeof( value ) == "object" )
-                {
-                    value = value["value"]
-                }
-                html += "<div><div>" + key + "</div><div>" + value + "</div></div>";
+                html += "<div";
+                
+                if( value["link"] )
+                    html += " class=\"link\" onclick=\"window.open('" + value["link"] + "', '_blank')\"";
+                
+                html += "><div>" + key + "</div><div>" + _value + "</div></div>";
             });
             html += "</div></div></div>";
         }
         return html;
     }
-
 
     return ret;
 })( mx.D3 || {} );

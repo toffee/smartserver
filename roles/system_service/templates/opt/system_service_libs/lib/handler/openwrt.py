@@ -128,14 +128,14 @@ class OpenWRT(_handler.Handler):
         ubus_session_id = self.sessions[openwrt_ip][0]
                             
         if now - self.last_check[openwrt_ip]["network"] >= self.config.openwrt_network_interval:
-            [timeout, self.last_check[openwrt_ip]["network"] ] = self._processWifiNetworks(openwrt_ip, ubus_session_id, now, events, timeout, self.config.openwrt_network_interval)
+            [timeout, self.last_check[openwrt_ip]["network"] ] = self._processWifiNetworks(openwrt_ip, ubus_session_id, now, events, timeout, self.config.openwrt_network_interval, openwrt_mac)
                             
         if now - self.last_check[openwrt_ip]["client"] >= self.config.openwrt_client_interval:  
             [timeout, self.last_check[openwrt_ip]["client"] ] = self._processWifiClients(openwrt_ip, ubus_session_id, now, events, timeout, self.config.openwrt_client_interval, openwrt_mac)
             
         return timeout
                 
-    def _processWifiNetworks(self, openwrt_ip, ubus_session_id, now, events, global_timeout, call_timeout):
+    def _processWifiNetworks(self, openwrt_ip, ubus_session_id, now, events, global_timeout, call_timeout, openwrt_mac):
         wifi_network_result = self._getWifiNetworks(openwrt_ip, ubus_session_id)
         
         _active_vlans = {}
@@ -192,6 +192,15 @@ class OpenWRT(_handler.Handler):
                     
             self.cache.unlock()
         
+        # set device type
+        _device = self.cache.getUnlockedDevice(openwrt_mac)
+        if _device is not None and _device.getType() != "network":
+            self.cache.lock()
+            device = self.cache.getDevice(openwrt_mac)
+            device.setType("network")
+            self.cache.confirmDevice( device, lambda event: events.append(event) )
+            self.cache.unlock()
+
         if global_timeout > call_timeout:
             global_timeout = call_timeout
 
@@ -241,16 +250,16 @@ class OpenWRT(_handler.Handler):
                     stat = self.cache.getConnectionStat(target_mac,target_interface)
                     if uid in self.client_wifi_connections[openwrt_ip]:
                         in_bytes = stat.getInBytes()
-                        if in_bytes > 0:
+                        if in_bytes is not None:
                             time_diff = now - self.client_wifi_connections[openwrt_ip][uid][0]
                             byte_diff = details["bytes"]["rx"] - in_bytes
                             if byte_diff > 0:
                                 stat.setInAvg(byte_diff / time_diff)
                             
-                        outBytes = stat.getOutBytes()
-                        if outBytes > 0:
+                        out_bytes = stat.getOutBytes()
+                        if out_bytes is not None:
                             time_diff = now - self.client_wifi_connections[openwrt_ip][uid][0]
-                            byte_diff = details["bytes"]["tx"] - outBytes
+                            byte_diff = details["bytes"]["tx"] - out_bytes
                             if byte_diff > 0:
                                 stat.setOutAvg(byte_diff / time_diff)
 

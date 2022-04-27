@@ -145,8 +145,11 @@ body, svg {
     height: 100%;
 }
 .tooltip {
-    background: #fff;
+    background: var(--bg);
     pointer-events: auto;
+    max-width: 200px;
+    max-width: 400px;
+    white-space: normal;
 }
 .tooltip span.text > div,
 .tooltip div.rows > div {
@@ -165,17 +168,22 @@ body, svg {
 .tooltip span.text > div > div > div:first-child {
     font-weight: bold;
 }
-.tooltip div.rows {
-    padding: 0 !important;
+
+.tooltip div.rows > div > div > div:first-child {
+    width: 100px;
 }
 
-@keyframes traffic_arrived {
-  from {
-     fill: #111;
-  }
-  to {
-     fill: #b5ce69;
-  }
+.tooltip span.text > div > div > div.link,
+.tooltip div.rows > div > div.link {
+    cursor: pointer;
+    color: var(--link-color);
+}
+.tooltip span.text > div > div > div.link:hover,
+.tooltip div.rows > div > div.link:hover {
+    text-decoration: underline;
+}
+.tooltip div.rows {
+    padding: 0 !important;
 }
 
 svg g.links {
@@ -198,11 +206,12 @@ svg g.links path.offline {
 svg g.nodes rect.container {
     stroke-width: 0.5;
     stroke: var(--content-text);
-    fill: #fff;
+    fill: var(--bg);
 }
 
+svg g.nodes rect.container.hub,
 svg g.nodes rect.container.network {
-    fill: #d2e2ef;
+    fill: var(--content-hightlight-bg);
 }
 
 svg g.nodes circle.online,
@@ -218,7 +227,12 @@ svg g.nodes circle.offline {
 }
 
 svg g.nodes rect.traffic {
-    fill: white;
+    fill: var(--bg);
+}
+
+svg g.nodes text.traffic tspan,
+svg g.nodes text.identifier {
+    fill: var(--content-text);
 }
 
 svg g.nodes text.name,
@@ -235,6 +249,11 @@ svg g.nodes text.traffic.arrived {
     animation-duration: 0.5s;
     animation-direction: alternate;
     animation-iteration-count: 5;
+}
+
+body.dark svg g.nodes text.name,
+body.dark svg g.nodes text.details {
+    fill: #ccc;
 }
 /*.tooltip div.services > div > div > div:first-child {
     text-align: right;

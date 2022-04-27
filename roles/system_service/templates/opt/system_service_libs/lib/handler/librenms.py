@@ -142,8 +142,9 @@ class LibreNMS(_handler.Handler):
                 
                 mac = _device["mac"]
                 device = self.cache.getDevice(mac)
+                if device.getType() == "device":
+                    device.setType(_device["type"])
                 device.setIP(_device["ip"])
-                device.setType(_device["type"])
                 device.setDetail("hardware", _device["hardware"], "string")
                 self.cache.confirmDevice( device, lambda event: events.append(event) )
                             
@@ -216,13 +217,17 @@ class LibreNMS(_handler.Handler):
                     time_diff_slot = math.ceil(time_diff / self.config.librenms_poller_interval)
                     time_diff = time_diff_slot * self.config.librenms_poller_interval
                     
-                    in_diff = _port["ifInOctets"] - stat.getInBytes()
-                    if in_diff > 0 or time_diff > self.config.librenms_poller_interval * 2:
-                        stat.setInAvg(in_diff / time_diff)
+                    in_bytes = stat.getInBytes()
+                    if in_bytes is not None:
+                        in_diff = _port["ifInOctets"] - in_bytes
+                        if in_diff > 0 or time_diff > self.config.librenms_poller_interval * 2:
+                            stat.setInAvg(in_diff / time_diff)
 
-                    out_diff = _port["ifOutOctets"] - stat.getOutBytes()
-                    if out_diff > 0 or time_diff > self.config.librenms_poller_interval * 2:
-                        stat.setOutAvg(out_diff / time_diff)
+                    out_bytes = stat.getOutBytes()
+                    if out_bytes is not None:
+                        out_diff = _port["ifOutOctets"] - out_bytes
+                        if out_diff > 0 or time_diff > self.config.librenms_poller_interval * 2:
+                            stat.setOutAvg(out_diff / time_diff)
 
                 stat.setInBytes(_port["ifInOctets"])
                 stat.setOutBytes(_port["ifOutOctets"])
