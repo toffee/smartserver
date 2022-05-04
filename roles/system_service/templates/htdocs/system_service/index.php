@@ -11,36 +11,146 @@ require "../shared/libs/ressources.php";
 <script src="<?php echo Ressources::getJSPath('/shared/'); ?>"></script>
 <script src="<?php echo Ressources::getJSPath('/system_service/'); ?>"></script>
 <script src="<?php echo Ressources::getComponentPath('/system_service/'); ?>"></script>
-<script src="https://d3js.org/d3.v7.js"></script>
 <script>
 mx.UNCore = (function( ret ) {
-    var daemonApiUrl = mx.Host.getBase() + 'api/'; 
-    
-    var refreshDaemonStateTimer = 0;
-    var groups = [];    
-    var devices = [];    
+    var groups = {};    
+    var devices = {};    
     var stats = {};    
     var root_device_mac = null;
     
-    function handleDaemonState(state)
+    var nodes = {};
+    
+    var rootNode = null;
+
+    function getGroup(gid)
     {
-        window.clearTimeout(refreshDaemonStateTimer);
-        
-        let groupsChanged = false;
-        let devicesChanged = false;
-        let statsChanged = false;
-        
-        if( state["changed_data"].hasOwnProperty("groups") )
+        return groups[gid];
+    }
+    
+    function getDeviceStat(device)
+    {
+        return stats.hasOwnProperty(device["mac"]) ? stats[device["mac"]] : null;
+    }
+
+    function getInterfaceStat(device)
+    {
+        if( device["connection"] )
         {
-            groups = state["changed_data"]["groups"];
-            groupsChanged = true;
+            key = device["connection"]["target_mac"] + ":" + device["connection"]["target_interface"];
+            if( stats.hasOwnProperty(key) ) return stats[key];
         }
-        
-        if( state["changed_data"].hasOwnProperty("devices") )
+        return null;
+    }
+
+    function isOnline(device)
+    {
+        if( device.type == 'hub' )
         {
-            root_device_mac = state["changed_data"]["root"];
-            devices = state["changed_data"]["devices"];
-            devices = devices.sort(function(a, b)
+            let all_children_online = true;
+            for(let child_device of device.connected_from) 
+            {
+                let child_device_stat = getDeviceStat(child_device);
+                if( !child_device_stat || child_device_stat.offline_since != null )
+                {
+                    all_children_online = false;
+                    break;
+                }
+            }
+            return all_children_online;
+        }
+
+        let device_stat = getDeviceStat(device);
+        return device_stat && device_stat.offline_since == null;
+    }
+
+    function initNode(device)
+    {
+        let node = {};
+        node["name"] = device["mac"];
+        node["device"] = device;
+        node["children"] = [];
+
+        nodes[device["mac"]] = node;
+
+        return node;
+    }
+    
+    function initChildren(parentNode, devices, stats)
+    {
+        let connectedDevices = Object.values(devices).filter(data => data["connection"] && parentNode["device"]["mac"] == data["connection"]["target_mac"]);
+        
+        for( i in connectedDevices)
+        {
+            if( connectedDevices[i]["mac"] in nodes )
+            {
+                continue;
+            }
+          
+            childNode = initNode(connectedDevices[i], stats);
+            parentNode["children"].push(childNode);
+
+            if( childNode["device"]["connected_from"].length > 0 )
+            {
+                initChildren(childNode, devices, stats);
+            }
+        }
+    }
+    
+    function buildStructure()
+    {
+        nodes = {};
+
+        Object.values(devices).forEach(function(device)
+        {
+            device["connected_from"] = [];
+        });
+
+        Object.values(devices).forEach(function(device)
+        {
+            if( !device["connection"] || !devices[device["connection"]["target_mac"]] ) return;
+            
+            devices[device["connection"]["target_mac"]]["connected_from"].push(device);
+        });
+
+        let rootDevices = Object.values(devices).filter(data => root_device_mac == data["mac"] );
+        if( rootDevices.length > 0 )
+        {
+            rootNode = initNode(rootDevices[0], stats);
+        
+            if( rootNode["device"]["connected_from"].length > 0 )
+            {
+                initChildren(rootNode, devices, stats);
+            }
+        }
+        else
+        {
+            rootNode = null;
+        }
+    }
+
+    function processData(data)
+    {
+        //console.log(data);
+        
+        if( data.hasOwnProperty("root") ) root_device_mac = data["root"];
+        
+        // **** PROCESS DEVICES ****
+        let replacesNodes = data["devices"]["replace"];
+        
+        let now = new Date().getTime();
+        let _devices = {}
+        if( replacesNodes ) devices = {}
+        data["devices"]["values"].forEach(function(device)
+        {
+            device["update"] = now;
+            devices[device["mac"]] = device;
+            _devices[device["mac"]] = device;
+        });
+        
+        // **** SORT DEVICES ****
+        if( data["devices"]["values"].length > 0 )
+        {
+            _devices = Object.values(devices).sort(function(a, b)
             {
                 if( a.ip == null ) return -1;
                 if( b.ip == null ) return 1;
@@ -50,86 +160,112 @@ mx.UNCore = (function( ret ) {
                 
                 return a.ip > b.ip;
             });
-            devicesChanged = true;
-        }
-        
-        if( state["changed_data"].hasOwnProperty("stats") )
-        {
-            let _stats = {}
             
-            state["changed_data"]["stats"].forEach(function(stat)
+            devices = {}
+            _devices.forEach(function(device)
             {
-                key = stat["interface"] ? stat["mac"]+":"+stat["interface"] : stat["mac"]
-                _stats[key] = stat;
+                devices[device["mac"]] = device;
             });
-            
-            //console.log(_stats)
-            stats = _stats;
-            statsChanged = true;
         }
-            
-        if( groupsChanged || devicesChanged || statsChanged )
+        
+        // **** BUILD REPLACED STRUCTURE ****
+        if( replacesNodes || rootNode == null ) 
         {
-            mx.D3.drawCircles( root_device_mac, groupsChanged || devicesChanged ? devices : null, groupsChanged || devicesChanged ? groups : null, statsChanged || devicesChanged ? stats : null , 15000);
-        }
-
-        refreshDaemonStateTimer = window.setTimeout(function(){ refreshDaemonState(state["last_data_modified"], null) }, 5000);
-             
-        mx.Page.refreshUI();
-    }
-    
-    function refreshDaemonState(last_data_modified,callback)
-    {
-        var xhr = new XMLHttpRequest();
-        xhr.open("POST", daemonApiUrl + "state/" );
-        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-        
-        xhr.withCredentials = true;
-        xhr.onreadystatechange = function() {
-            if (this.readyState != 4) return;
+            if( rootNode == null ) mx.Error.confirmSuccess();
             
-            if( this.status == 200 ) 
+            buildStructure();
+            
+            _devices = devices;
+            replacesNodes = true;
+        }
+        // **** UPDATE STRUCTURE ****
+        else
+        {
+            Object.values(nodes).forEach(function(node)
             {
-                var response = JSON.parse(this.response);
-                if( response["status"] == "0" )
-                {
-                    mx.Error.confirmSuccess();
-                    
-                    handleDaemonState(response);
-                    
-                    if( callback ) callback();
-                }
-                else
-                {
-                    mx.Error.handleServerError(response["message"]);
-                }
-            }
-            else
-            {
-                let timeout = 15000;
-                if( this.status == 0 || this.status == 503 ) 
-                {
-                    mx.Error.handleServerNotAvailable( mx.I18N.get( "Service is currently not available") );
-                }
-                else
-                {
-                    if( this.status != 401 ) mx.Error.handleRequestError(this.status, this.statusText, this.response);
-                }
-                
-                refreshDaemonStateTimer = mx.Page.handleRequestError(this.status,daemonApiUrl,function(){ refreshDaemonState(last_data_modified, callback) }, 15000);
-            }
-        };
+                node["device"] = devices[node["device"]["mac"]];
+            });
+        }
         
-        xhr.send(mx.Core.encodeDict( { "last_data_modified": last_data_modified } ));
+        // **** PROCESS GROUPS ****
+        data["groups"]["added"].forEach(function(group)
+        {
+            group["update"] = now;
+            groups[group["gid"]] = group;
+        });
+        data["groups"]["modified"].forEach(function(group)
+        {
+            group["update"] = now;
+            groups[group["gid"]] = group;
+        });
+        data["groups"]["deleted"].forEach(function(group)
+        {
+            delete groups[group["gid"]];
+        });
+
+        // **** PROCESS STATS ****
+        data["stats"]["added"].forEach(function(stat)
+        {
+            stat["update"] = now;
+            key = stat["interface"] ? stat["mac"]+":"+stat["interface"] : stat["mac"];
+            stats[key] = stat;
+        });
+        data["stats"]["modified"].forEach(function(stat)
+        {
+            stat["update"] = now;
+            key = stat["interface"] ? stat["mac"]+":"+stat["interface"] : stat["mac"];
+            stats[key] = stat;
+        });
+        data["stats"]["deleted"].forEach(function(stat)
+        {
+            key = stat["interface"] ? stat["mac"]+":"+stat["interface"] : stat["mac"];
+            delete stats[key];
+        });
+        
+        Object.values(devices).forEach(function(device)
+        {
+            device["isOnline"] = isOnline(device);
+            device["deviceStat"] = getDeviceStat(device);
+            device["interfaceStat"] = getInterfaceStat(device);
+            
+            if( device["deviceStat"] && device["deviceStat"]["update"] > device["update"] ) device["update"] = device["deviceStat"]["update"];
+            if( device["interfaceStat"] && device["interfaceStat"]["update"] > device["update"] ) device["update"] = device["interfaceStat"]["update"];
+            
+            _groups = [];
+            device["gids"].forEach(function(gid)
+            {
+                _groups.push(getGroup(gid));
+            });
+            device["groups"] = _groups;
+        });
+        
+        if( rootNode == null )
+        {
+            mx.Error.handleError( mx.I18N.get("Network analysis is in progress")  );
+        }
+        else
+        {
+            mx.D3.drawStructure( replacesNodes ? rootNode : null, groups, stats);
+        }
     }
         
     ret.init = function()
     { 
-        mx.D3.init();
-        
         mx.I18N.process(document);
         
-        refreshDaemonState(null, function(state){});
+        //refreshDaemonState(null, function(state){});
+        
+        const socket = io("/", {path: '/system_service/api/socket.io' });
+        socket.on('connect', function() {
+            mx.Error.confirmSuccess();
+            socket.emit('call', "network_data");
+        });
+        socket.on('disconnect', function() {
+            mx.Error.handleError( mx.I18N.get( "Service is currently not available") );
+        });
+        socket.on('network_data', function(data) {
+            processData(data);
+        });
     }
     return ret;
 })( mx.UNCore || {} );
@@ -139,128 +275,7 @@ mx.OnDocReady.push( mx.UNCore.init );
 </head>
 <body class="inline">
 <script>mx.OnScriptReady.push( function(){ mx.Page.initFrame("", mx.I18N.get("Network visualizer")); } );</script>
-<style>
-body, svg {
-    width: 100%;
-    height: 100%;
-}
-.tooltip {
-    background: var(--bg);
-    pointer-events: auto;
-    max-width: 200px;
-    max-width: 400px;
-    white-space: normal;
-}
-.tooltip span.text > div,
-.tooltip div.rows > div {
-    display: table;
-}
-.tooltip span.text > div > div,
-.tooltip div.rows > div > div {
-    display: table-row;
-}
-.tooltip span.text > div > div > div,
-.tooltip div.rows > div > div > div {
-    display: table-cell;
-    padding: 3px;
-    text-align: left;
-}
-.tooltip span.text > div > div > div:first-child {
-    font-weight: bold;
-}
-
-.tooltip div.rows > div > div > div:first-child {
-    width: 100px;
-}
-
-.tooltip span.text > div > div > div.link,
-.tooltip div.rows > div > div.link {
-    cursor: pointer;
-    color: var(--link-color);
-}
-.tooltip span.text > div > div > div.link:hover,
-.tooltip div.rows > div > div.link:hover {
-    text-decoration: underline;
-}
-.tooltip div.rows {
-    padding: 0 !important;
-}
-
-svg g.links {
-    fill: none;
-    stroke-width: 1;
-    stroke: var(--content-text);
-}
-svg g.links path.online,
-svg g.links path.offline {
-    stroke-width: 2;
-}
-
-svg g.links path.online {
-    stroke: var(--color-green);
-}
-svg g.links path.offline {
-    stroke: var(--color-red);
-}
-
-svg g.nodes rect.container {
-    stroke-width: 0.5;
-    stroke: var(--content-text);
-    fill: var(--bg);
-}
-
-svg g.nodes rect.container.hub,
-svg g.nodes rect.container.network {
-    fill: var(--content-hightlight-bg);
-}
-
-svg g.nodes circle.online,
-svg g.nodes circle.offline {
-    stroke-width: 0.5;
-    stroke: var(--content-text);
-}
-svg g.nodes circle.online {
-    fill: var(--color-green);
-}
-svg g.nodes circle.offline {
-    fill: var(--color-red);
-}
-
-svg g.nodes rect.traffic {
-    fill: var(--bg);
-}
-
-svg g.nodes text.traffic tspan,
-svg g.nodes text.identifier {
-    fill: var(--content-text);
-}
-
-svg g.nodes text.name,
-svg g.nodes text.details {
-    fill: #777;
-    font-weight: 300;
-}
-svg g.nodes text.details tspan.hs {
-    font-weight: 500;
-}
-
-svg g.nodes text.traffic.arrived {
-    animation-name: traffic_arrived;
-    animation-duration: 0.5s;
-    animation-direction: alternate;
-    animation-iteration-count: 5;
-}
-
-body.dark svg g.nodes text.name,
-body.dark svg g.nodes text.details {
-    fill: #ccc;
-}
-/*.tooltip div.services > div > div > div:first-child {
-    text-align: right;
-}*/
-</style>
 <div class="error"></div>
-<div id="tooltip"></div>
 <svg id="network"></svg>
 </body>
 </html>
