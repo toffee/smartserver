@@ -6,7 +6,7 @@
 
 - name: set unifi version
   set_fact:
-    unifi_version: "7.0.25-ls147"
+    unifi_version: "7.1.61-ls148"
     unifi_uid: "{{system_users['unifi'].id}}"
     unifi_user: "{{system_users['unifi'].name}}"
     unifi_gid: "{{system_groups['unifi'].id}}"
