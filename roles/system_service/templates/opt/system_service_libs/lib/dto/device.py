@@ -10,9 +10,9 @@ class Connection():
     
     INTERFACE_DEFAULT = "default"
     
-    def __init__(self, type, vlan, target_mac, target_interface ):
+    def __init__(self, type, target_mac, target_interface, details_list ):
         self.type = type
-        self.vlans = [ vlan ]
+        self.details_list = details_list
         self.target_mac = target_mac
         self.target_interface = target_interface
         self.enabled = True
@@ -20,20 +20,23 @@ class Connection():
     def getType(self):
         return self.type
             
-    def getVLANs(self):
-        return self.vlans
+    def getDetailsList(self):
+        return self.details_list
 
-    def addVLAN(self, vlan):
-        self.vlans.append(vlan)
+    def addDetails(self, details):
+        self.details_list.append(details)
 
-    def setVLAN(self, vlan):
-        self.vlans = [ vlan ]
+    def hasDetails(self, details):
+        for _details in self.details_list:
+            if _details == details:
+                return True
+        return False
 
-    def hasVLAN(self, vlan):
-        return vlan in self.vlans
-
-    def removeVLAN(self, vlan):
-        self.vlans.remove(vlan)
+    def removeDetails(self, details):
+        for _details in list(self.details_list):
+            if _details == details:
+                self.details_list.remove(_details)
+                break
 
     def getTargetMAC(self):
         return self.target_mac
@@ -48,7 +51,7 @@ class Connection():
         return self.enabled
 
     def getSerializeable(self):
-        return { "vlans": self.vlans, "type": self.type, "target_mac": self.target_mac, "target_interface": self.target_interface }
+        return { "type": self.type, "target_mac": self.target_mac, "target_interface": self.target_interface, "details": self.details_list }
     
     def __repr__(self):
         return "{} => {}:{}".format(self.type,self.target_mac,self.target_interface)
@@ -137,7 +140,7 @@ class Device(Changeable):
             self._markAsChanged("info")
             self.info = info
 
-    def addHopConnection(self, type, vlan, target_mac, target_interface):
+    def addHopConnection(self, type, target_mac, target_interface, details = None ):
         self._checkLock()
         if target_mac == self.cache.getGatewayMAC():
             _connections = list(filter(lambda c: c.getTargetMAC() == target_mac, self.hop_connections ))
@@ -157,41 +160,38 @@ class Device(Changeable):
             if not _connection.isEnabled():
                 _connection.setEnabled(True)
             
-            if _connection.hasVLAN(vlan):
+            if _connection.hasDetails(details) or details is None:
                 return
             
-            if type == Connection.WIFI:
-                _connection.setVLAN(vlan)
-            else:
-                _connection.addVLAN(vlan)
+            _connection.addDetails(details)
         else:
             if type == Connection.WIFI:
                 self.supports_wifi = True
                 
-            self.hop_connections.append(Connection(type, vlan, target_mac, target_interface))
+            self.hop_connections.append(Connection(type, target_mac, target_interface, [ details ] if details is not None else [] ))
 
         #self.connection = None
         
         target_device = self.cache.getUnlockedDevice(target_mac)
-        self._markAsChanged("connection", "add connection to {}:{}".format(target_device if target_device else target_mac,vlan))    
+        self._markAsChanged("connection", "add connection to {}:{}".format(target_device if target_device else target_mac, details))    
        
-    def removeHopConnection(self, type, vlan, target_mac, target_interface):
+    def removeHopConnection(self, type, target_mac, target_interface, details):
         self._checkLock()
         _connections = list(filter(lambda c: c.getType() == type and c.getTargetMAC() == target_mac and c.getTargetInterface() == target_interface, self.hop_connections ))
         if len(_connections) > 0:
             _connection = _connections[0]
-            if not _connection.hasVLAN(vlan):
+            if not _connection.hasDetails(details):
                 return
             
-            _connection.removeVLAN(vlan)
-            if len(_connection.getVLANs()) == 0:
+            _connection.removeDetails(details)
+            if len(_connection.getDetailsList()) == 0:
                 self.hop_connections.remove(_connection)
             
             #if _connection == self.connection:
             #    self.connection = None
 
             target_device = self.cache.getUnlockedDevice(target_mac)
-            self._markAsChanged("connection", "remove connection from {}:{}".format(target_device if target_device else target_mac, vlan))            
+            self._markAsChanged("connection", "remove connection from {}:{}".format(target_device if target_device else target_mac, details))            
             
     def disableHopConnection(self, type, target_mac, target_interface):
         _connections = list(filter(lambda c: c.getType() == type and c.getTargetMAC() == target_mac and c.getTargetInterface() == target_interface, self.hop_connections ))
@@ -199,7 +199,7 @@ class Device(Changeable):
             connection.setEnabled(False)
             
             target_device = self.cache.getUnlockedDevice(target_mac)
-            self._markAsChanged("connection", "disable connection to {}:{}".format(target_device if target_device else target_mac,",".join(str(v) for v in connection.getVLANs())))    
+            self._markAsChanged("connection", "disable connection to {}:{}".format(target_device if target_device else target_mac, connection.getDetailsList() ))    
 
     def cleanDisabledHobConnections(self, type, event_callback):
         _connections = list(filter(lambda c: c.getType() == type and not c.isEnabled(), self.hop_connections ))
@@ -210,7 +210,7 @@ class Device(Changeable):
             
             target_mac = _connection.getTargetMAC()
             target_device = self.cache.getUnlockedDevice(target_mac)
-            self._markAsChanged("connection", "remove disabled connection from {}:{}".format(target_device if target_device else target_mac, ",".join(str(v) for v in connection.getVLANs())))
+            self._markAsChanged("connection", "remove disabled connection from {}:{}".format(target_device if target_device else target_mac, connection.getDetailsList() ))
 
     def getHopConnections(self):
         return list(self.hop_connections)
@@ -236,11 +236,11 @@ class Device(Changeable):
         hop_count = 0
         for _connection in self.getHopConnections():
             processed_hops = { self._getCache().getWanMAC(): True, self._getCache().getGatewayMAC(): True }
-            _hop_count = self._getGWHopCount(_connection, 0, processed_hops, processed_devices)
+            _hop_count = 9999 if _connection.getType() == Connection.WIFI else self._getGWHopCount(_connection, 0, processed_hops, processed_devices)
             if _hop_count >= hop_count:
                 hop_count = _hop_count
                 connection = _connection
-                
+
         self.connection = connection
 
     def _getGWHopCount(self, connection, count, processed_hops, processed_devices ):

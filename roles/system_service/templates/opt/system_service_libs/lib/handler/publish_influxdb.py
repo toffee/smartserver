@@ -1,6 +1,6 @@
-import threading
 import logging
 import requests
+import time
 
 from lib.handler import _handler
 from lib.dto.group import Group
@@ -15,32 +15,26 @@ class InfluxDBPublisher(_handler.Handler):
     def __init__(self, config, cache ):
         super().__init__()
       
-        self.is_running = True
-      
         self.config = config
         self.cache = cache
-        
-        self.condition = threading.Condition()
-        self.thread = threading.Thread(target=self._processStats, args=())
 
-    def start(self):
-        self.thread.start()
-        
-    def terminate(self):
-        with self.condition:
-            self.is_running = False
-            self.condition.notifyAll()
-        
-    def _processStats(self):
-        while self.is_running:
+    def _run(self):
+        while self._isRunning():
             try:
-                messurements = self._collectMessurements()
-                self._submitMessurements(messurements)
-            except requests.exceptions.ConnectionError:
-                logging.warning("InfluxDB currently not available. Will 15 retry in seconds")
+                if self._isSuspended():
+                    self._confirmSuspended()
+                    
+                try:
+                    messurements = self._collectMessurements()
+                    self._submitMessurements(messurements)
+                except requests.exceptions.ConnectionError:
+                    logging.warning("InfluxDB currently not available. Will 15 retry in seconds")
                 
-            with self.condition:
-                self.condition.wait(self.config.influxdb_publish_interval)
+                self._wait(self.config.influxdb_publish_interval)
+
+            except Exception as e:
+                timeout = self._handleUnexpectedException(e)
+                self._sleep(timeout)
                 
     def _collectMessurements(self):
         messurements = []
@@ -53,26 +47,26 @@ class InfluxDBPublisher(_handler.Handler):
             if device is None or device.getIP() is None:
                 continue
             
-            if device.supportsWifi():
+            inAvg = None
+            outAvg = None
+            for data in stat.getDataList():
+                if device.supportsWifi() and data.getDetail("signal") is not None:
+                    messurements.append("network_signal,ip={},band={} value={}".format(device.getIP(),data.getConnectionDetail("band"), data.getDetail("signal")))
+                if data.getInAvg() is not None:
+                    if inAvg is None:
+                        inAvg = 0
+                    inAvg += data.getInAvg()
+                if data.getOutAvg() is not None:
+                    if outAvg is None:
+                        outAvg = 0
+                    outAvg += data.getOutAvg()
                 
-                band = "none"
-                for gid in device.getGIDs():
-                    group = self.cache.getUnlockedGroup(gid)
-                    if group is not None and group.getType() == Group.WIFI:
-                        band = group.getDetail("band")
-                
-                if stat.getDetail("signal") is not None:
-                    messurement = "network_signal,ip={},band={} value={}".format(device.getIP(),band,stat.getDetail("signal"))
-                else:
-                    messurement = "network_signal,ip={},band={} value=0".format(device.getIP(),band)
-                messurements.append(messurement)
-                
-            if stat.getInAvg() is not None or stat.getOutAvg() is not None:
-                if stat.getInAvg() is not None:
-                    messurements.append("network_in_avg,ip={} value={}".format(device.getIP(),stat.getInAvg()))
-                if stat.getOutAvg() is not None:
-                    messurements.append("network_out_avg,ip={} value={}".format(device.getIP(),stat.getOutAvg()))
-                messurements.append("network_total_avg,ip={} value={}".format(device.getIP(),stat.getInAvg() + stat.getOutAvg()))
+            if inAvg is not None or outAvg is not None:
+                if inAvg is not None:
+                    messurements.append("network_in_avg,ip={} value={}".format(device.getIP(),inAvg))
+                if outAvg is not None:
+                    messurements.append("network_out_avg,ip={} value={}".format(device.getIP(),outAvg))
+                messurements.append("network_total_avg,ip={} value={}".format(device.getIP(),inAvg + outAvg))
                 
         return messurements
 

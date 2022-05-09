@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import threading
 import logging
-
+from collections import deque
 
 from lib.dto.device import Device, Connection
 from lib.dto.event import Event
@@ -9,6 +9,8 @@ from lib.dto.event import Event
 
 class Dispatcher(): 
     def __init__(self, config, cache, handler ):
+        self.is_running = True
+        
         self.config = config
         self.cache = cache
         self.handler = handler
@@ -17,6 +19,11 @@ class Dispatcher():
         self.registered_handler = []
 
         self.virtual_devices = []
+        
+        self.event_queue = deque()
+        
+        self.event = threading.Event()
+        self.thread = threading.Thread(target=self._worker, args=())
         
     def register(self, handler):
         handler.setDispatcher(self)
@@ -30,17 +37,36 @@ class Dispatcher():
         self.event_pipeline.append([event_types, handler])
         
     def start(self):
+        self.thread.start()
+        
         for handler in self.registered_handler:
             handler.start()
             
     def terminate(self):
+        self.is_running = False
+        self.event.set()
+        
         for handler in self.registered_handler:
             handler.terminate()
                
     def dispatch(self, source_handler, events):
+        self.event_queue.append([source_handler,events])
+        self.event.set()
+            
+    def _worker(self):
+        while self.is_running:
+            while len(self.event_queue) > 0:
+                [source_handler,events] = self.event_queue.popleft()
+                self._dispatch(source_handler, events)
+            self.event.wait()
+            self.event.clear()
+
+    #def dispatch(self, source_handler, events):
+    def _dispatch(self, source_handler, events):
         # *** recalculate main connection ***
         has_connection_changes = False
         for event in events:
+            #logging.info("DEBUG: {} {}".format(str(source_handler.__class__),event))
             if event.getType() == Event.TYPE_DEVICE and event.hasDetail("connection"):
                 has_connection_changes = True
                 break
@@ -100,25 +126,21 @@ class Dispatcher():
                     continue
                 
                 _device = connected_map[key][0]
-                _connections = _device.getHopConnections()
-                vlans = _connections[0].getVLANs()
-                target_mac = _connections[0].getTargetMAC()
-                target_interface = _connections[0].getTargetInterface()
+                _connection = _device.getConnection()
+                details_list = _connection.getDetailsList()
+                target_mac = _connection.getTargetMAC()
+                target_interface = _connection.getTargetInterface()
                 
                 #logging.info("{} {}".format(key, len(connected_map[key])))
                 #for device in connected_map[key]:
                 #    logging.info("  - {}".format(device.getMAC()))
                 
                 virtual_device = Device(self.cache, key,"hub")
-                virtual_connection = Connection(Connection.ETHERNET, vlans[0], target_mac, target_interface)
-                for i in range(1,len(vlans)):
-                    virtual_connection.addVLAN(vlans[i])
+                virtual_connection = Connection(Connection.ETHERNET, target_mac, target_interface, details_list)
                 virtual_device.setVirtualConnection(virtual_connection)
                 
                 for device in connected_map[key]:
-                    virtual_connection = Connection(Connection.VIRTUAL, vlans[0], virtual_device.getMAC(), "hub")
-                    for i in range(1,len(vlans)):
-                        virtual_connection.addVLAN(vlans[i])
+                    virtual_connection = Connection(Connection.VIRTUAL, virtual_device.getMAC(), "hub", details_list)
                     device.setVirtualConnection(virtual_connection)
                     
                 virtual_devices.append(virtual_device)
