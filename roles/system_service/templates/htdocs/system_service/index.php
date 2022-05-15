@@ -232,10 +232,13 @@ mx.UNCore = (function( ret ) {
             if( device["interfaceStat"] && device["interfaceStat"]["update"] > device["update"] ) device["update"] = device["interfaceStat"]["update"];
             
             _groups = [];
-            device["gids"].forEach(function(gid)
+            if( device["connection"] )
             {
-                _groups.push(getGroup(gid));
-            });
+                device["connection"]["details"].forEach(function(details)
+                {
+                    if( details["gid"] ) _groups.push(getGroup(details["gid"]));
+                });
+            }
             device["groups"] = _groups;
         });
         
@@ -257,17 +260,21 @@ mx.UNCore = (function( ret ) {
         
         //refreshDaemonState(null, function(state){});
         
+        function handleErrors()
+        {
+            mx.Error.handleError( mx.I18N.get( "Service is currently not available") );
+        }
         const socket = io("/", {path: '/system_service/api/socket.io' });
         socket.on('connect', function() {
             mx.Error.confirmSuccess();
             socket.emit('call', "network_data");
         });
-        socket.on('disconnect', function() {
-            mx.Error.handleError( mx.I18N.get( "Service is currently not available") );
-        });
         socket.on('network_data', function(data) {
             processData(data);
         });
+        socket.on('connect_error', err => handleErrors(err))
+        socket.on('connect_failed', err => handleErrors(err))
+        socket.on('disconnect', err => handleErrors(err))
     }
     return ret;
 })( mx.UNCore || {} );
@@ -277,7 +284,7 @@ mx.OnDocReady.push( mx.UNCore.init );
 </head>
 <body class="inline">
 <script>mx.OnScriptReady.push( function(){ mx.Page.initFrame("", mx.I18N.get("Network visualizer")); } );</script>
-<div class="error"></div>
+<div class="contentLayer error"></div>
 <svg id="network"></svg>
 </body>
 </html>

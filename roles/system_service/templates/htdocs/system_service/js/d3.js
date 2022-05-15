@@ -309,7 +309,7 @@ mx.D3 = (function( ret )
 
             if( group != null )
             {
-                let _stat = d.data.device.interfaceStat.data.filter(data => data["connection_details"]["band"] == group.details.band["value"]);
+                let _stat = d.data.device.interfaceStat.data.filter(data => data["connection_details"]["gid"] == group.gid);
                 if( _stat.length > 0)
                     stat = _stat[0];
             }
@@ -485,7 +485,7 @@ mx.D3 = (function( ret )
     {
         let device = d.data.device
         let html = "<div>";
-        if( device.ip ) 
+        if( device.ip && device.connection ) 
         {
             let has_traffic = device.interfaceStat && device.interfaceStat.data.filter(d => d.traffic && d.traffic.in_avg !== null).length > 0;
             let has_wifi = device.connection["type"] == "wifi";
@@ -541,6 +541,8 @@ mx.D3 = (function( ret )
         html += showRows(services,"Services","rows");
         //html += showRows(device.ports,"Ports","rows");
         
+        wan_data = []
+
         if( device.connection )
         {
             connection_data = []
@@ -564,8 +566,6 @@ mx.D3 = (function( ret )
                 connection_data.push( { "name": "Vlan", "value": vlans.join(",") } );
             
             html += showRows(connection_data,"Network","rows");
-
-            wan_data = []
 
             let interface_stat = device.interfaceStat;
             if( interface_stat )
@@ -608,9 +608,9 @@ mx.D3 = (function( ret )
                         else connection_data.push( { "name": key, "value": value["value"], "format": value["format"] } );
                     });
 
-                    if( data["connection_details"] && data["connection_details"]["band"] )
+                    if( data["connection_details"] && data["connection_details"]["gid"] )
                     {
-                        let group = device.groups.filter(group => group.details.band["value"] == data["connection_details"]["band"] );
+                        let group = device.groups.filter(group => group.gid == data["connection_details"]["gid"] );
                         if( group.length > 0 )
                         {
                             Object.entries(group[0]["details"]).forEach(function([key,value])

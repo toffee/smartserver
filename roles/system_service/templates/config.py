@@ -26,6 +26,8 @@ influxdb_token = "{{vault_influxdb_admin_token}}"
 
 default_vlan = 1
 
+startup_error_timeout = 5
+
 remote_suspend_timeout = 300
 remote_error_timeout = 900
 
@@ -33,8 +35,8 @@ cache_ip_dns_revalidation_interval = 900
 cache_ip_mac_revalidation_interval = 900
 
 arp_scan_interval = 60
-arp_unvalidated_offline_device_timeout = 60
-arp_validated_offline_device_timeout = 900
+arp_soft_offline_device_timeout = 60
+arp_hard_offline_device_timeout = 900
 arp_clean_device_timeout = 60 * 60 * 24 * 7
 
 openwrt_network_interval = 900

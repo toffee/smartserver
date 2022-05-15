@@ -10,6 +10,7 @@ from lib.dto.event import Event
 class Dispatcher(): 
     def __init__(self, config, cache, handler ):
         self.is_running = True
+        self.is_initialized = False
         
         self.config = config
         self.cache = cache
@@ -36,12 +37,9 @@ class Dispatcher():
         
         self.event_pipeline.append([event_types, handler])
         
-    def start(self):
+    def start(self):           
         self.thread.start()
         
-        for handler in self.registered_handler:
-            handler.start()
-            
     def terminate(self):
         self.is_running = False
         self.event.set()
@@ -54,6 +52,9 @@ class Dispatcher():
         self.event.set()
             
     def _worker(self):
+        for handler in self.registered_handler:
+            handler.start()
+
         while self.is_running:
             while len(self.event_queue) > 0:
                 [source_handler,events] = self.event_queue.popleft()
@@ -180,7 +181,7 @@ class Dispatcher():
                     groups_deleted.append(event.getObject())
                 else:
                     groups_modified.append(event.getObject())
-            elif event.getType() == Event.TYPE_STAT:
+            elif event.getType() == Event.TYPE_DEVICE_STAT or event.getType() == Event.TYPE_CONNECTION_STAT:
                 if event.getAction() == Event.ACTION_CREATE:
                     stats_added.append(event.getObject())
                 elif event.getAction() == Event.ACTION_DELETE:

@@ -4,7 +4,6 @@ import re
 import requests
 from urllib3.exceptions import InsecureRequestWarning
 import json
-import traceback
 import logging
 #import cProfile, pstats
 #from pstats import SortKey
@@ -21,10 +20,7 @@ from lib.helper import Helper
 
 class OpenWRT(_handler.Handler): 
     def __init__(self, config, cache ):
-        super().__init__()
-      
-        self.config = config
-        self.cache = cache
+        super().__init__(config,cache)
         
         self.sessions = {}
         
@@ -37,19 +33,21 @@ class OpenWRT(_handler.Handler):
         self.wifi_clients = {}
         
         self.delayed_lock = threading.Lock()
-        self.delayed_devices = {}
+        self.delayed_wifi_devices = {}
         self.delayed_wakeup_timer = None
 
         requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
-    def _run(self):
+    def _initNextRuns(self):
         now = datetime.now()
-
         for openwrt_ip in self.config.openwrt_devices:
             self.sessions[openwrt_ip] = [ None, datetime.now()]
-
             self.next_run[openwrt_ip] = {"wifi_networks": now, "wifi_clients": now}
-        
+
+    def _run(self):
+        self._initNextRuns()
+
+        for openwrt_ip in self.config.openwrt_devices:
             self.wifi_networks[openwrt_ip] = {}
 
             self.wifi_associations[openwrt_ip] = {}
@@ -74,33 +72,34 @@ class OpenWRT(_handler.Handler):
                         self.sessions[openwrt_ip] = [ None, datetime.now() ]
                         timeout = 0
                     else:
-                        logging.error("OpenWRT '{}' got exception {} - '{}'. Will suspend for 15 minutes.".format(openwrt_ip, e.getCode(), e))
-                        timeout = self.config.remote_error_timeout
-                        self._suspend(openwrt_ip)
+                        self.cache.cleanLocks(self, events)
+                        timeout = self._handleExpectedException(e, "OpenWRT '{}' got exception {} - '{}'".format(openwrt_ip, e.getCode(), e), openwrt_ip, self.config.remote_error_timeout)
                 except NetworkException as e:
-                    logging.warning("{}. Will retry in {} seconds.".format(str(e), e.getTimeout()))
-                    timeout = e.getTimeout()
-                    self._suspend(openwrt_ip)
+                    self._initNextRuns()
+                    self.cache.cleanLocks(self, events)
+                    timeout = self._handleExpectedException(e, str(e), openwrt_ip, e.getTimeout())
                 except Exception as e:
+                    self._initNextRuns()
                     self.cache.cleanLocks(self, events)
                     timeout = self._handleUnexpectedException(e, openwrt_ip)
                     
             if len(events) > 0:
                 self._getDispatcher().dispatch(self,events)
                 
-            now = datetime.now()
-            for openwrt_ip in self.config.openwrt_devices:
-                for next_run in self.next_run[openwrt_ip].values():
-                    diff = (next_run - now).total_seconds()
-                    if diff < timeout:
-                        timeout = diff
+            if not self._isSuspended():
+                now = datetime.now()
+                for openwrt_ip in self.config.openwrt_devices:
+                    for next_run in self.next_run[openwrt_ip].values():
+                        diff = (next_run - now).total_seconds()
+                        if diff < timeout:
+                            timeout = diff
 
             if timeout > 0:
                 if self._isSuspended(openwrt_ip):
                     self._sleep(timeout)
                 else:
                     self._wait(timeout)
-                    
+                                        
     def _processDevice(self, openwrt_ip, events ):
         openwrt_mac = self.cache.ip2mac(openwrt_ip)
         if openwrt_mac is None:
@@ -244,21 +243,27 @@ class OpenWRT(_handler.Handler):
                     if mac == self.cache.getGatewayMAC():
                         continue
                                 
-                    target_mac = openwrt_mac
-                    target_interface = mac
                     vlan = wlan_network["vlan"]
                     gid = wlan_network["gid"]
                     band = wlan_network["band"]
                     
-                    uid = "{}-{}".format(mac, gid)
+                    target_mac = openwrt_mac
+                    target_interface = mac
+
+                    uid = "{}-{}-{}".format(mac, target_mac, gid)
                     
-                    connection_details = { "vlan": vlan, "band": band }
+                    connection_details = { "vlan": vlan, "gid": gid }
 
                     device = self.cache.getDevice(mac)
-                    device.cleanDisabledHobConnections(target_mac, lambda event: events.append(event))
                     device.addHopConnection(Connection.WIFI, target_mac, target_interface, connection_details );
-                    device.addGID(gid)
                     self.cache.confirmDevice( device, lambda event: events.append(event) )
+                    
+                    # user device online states are check in arpscan
+                    if device.getIP() is not None and device.getIP() not in self.config.user_devices:
+                        stat = self.cache.getDeviceStat(mac)
+                        stat.setLastSeen(True)
+                        stat.setOnline(True)
+                        self.cache.confirmStat( stat, lambda event: events.append(event) )
 
                     details = client_result["clients"][mac]
                 
@@ -298,9 +303,7 @@ class OpenWRT(_handler.Handler):
             for [ _, uid, mac, gid, vlan, target_mac, target_interface, connection_details ] in list(self.wifi_associations[openwrt_ip].values()):
                 if uid not in _active_associations:
                     device = self.cache.getDevice(mac)
-                    device.removeGID(gid);
-                    # **** connection cleanup and stats cleanup happens in cleanDisabledHobConnection ****
-                    device.disableHopConnection(Connection.WIFI, target_mac, target_interface)
+                    device.removeHopConnection(Connection.WIFI, target_mac, target_interface, connection_details, True)
                     self.cache.confirmDevice( device, lambda event: events.append(event) )
 
                     self.cache.removeConnectionStatDetails(target_mac,target_interface,connection_details, lambda event: events.append(event))
@@ -374,16 +377,22 @@ class OpenWRT(_handler.Handler):
         Helper.logProfiler(self, start, "Clients of '{}' fetched".format(ip))
         return self._parseResult(ip, r, "client_list")
     
+    def _isKnownWifiClient(self, mac):
+        for openwrt_ip in self.config.openwrt_devices:
+            if mac in self.wifi_clients[openwrt_ip]:
+                return True
+        return False
+    
     def _delayedWakeup(self):
         with self.delayed_lock:
             self.delayed_wakeup_timer = None
             
             missing_wifi_macs = []
-            for mac in list(self.delayed_devices.keys()):
-                for openwrt_ip in self.config.openwrt_devices:
-                    if mac not in self.wifi_clients[openwrt_ip]:
-                        missing_wifi_macs.append(mac)
-                del self.delayed_devices[mac]
+            for mac in list(self.delayed_wifi_devices.keys()):
+                if not self._isKnownWifiClient(mac):
+                    missing_wifi_macs.append(mac)
+                    
+                del self.delayed_wifi_devices[mac]
             
             triggered_types = {}
             for openwrt_ip in self.next_run:
@@ -399,7 +408,7 @@ class OpenWRT(_handler.Handler):
                 logging.info("Delayed trigger not needed anymore")
                 
     def getEventTypes(self):
-        return [ { "types": [Event.TYPE_STAT], "actions": [Event.ACTION_MODIFY], "details": ["online_state"] } ]
+        return [ { "types": [Event.TYPE_DEVICE_STAT], "actions": [Event.ACTION_MODIFY], "details": ["online_state"] } ]
 
     def processEvents(self, events):
         with self.delayed_lock:
@@ -410,13 +419,14 @@ class OpenWRT(_handler.Handler):
                 if device is None:
                     logging.error("Unknown device for stat {}".format(stat))
                 
-                if not self.has_wifi_networks or not device.supportsWifi():
+                if not self.has_wifi_networks or not device.supportsWifi() or not stat.isOnline():
                     continue
                     
-                logging.info("Delayed trigger started for {}".format(device))
+                self.delayed_wifi_devices[device.getMAC()] = device
 
-                self.delayed_devices[device.getMAC()] = device
                 has_new_devices = True
+
+                logging.info("Delayed trigger started for {}".format(device))
                     
             if has_new_devices:
                 if self.delayed_wakeup_timer is not None:

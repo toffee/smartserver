@@ -36,8 +36,8 @@ class Helper():
                                 bufsize=1,  # 0=unbuffered, 1=line-buffered, else buffer-size
                                 universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT )
 
-    def ping(ip, interface):
-        result = command.exec(["/bin/ping", "-c", "1", ip ], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, exitstatus_check = False)
+    def ping(ip, interface, timeout):
+        result = command.exec(["/bin/ping", "-W", str(timeout), "-c", "1", ip ], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, exitstatus_check = False)
         if result.returncode == 0:
             return Helper.ip2mac(ip, interface)
         return None
@@ -52,7 +52,7 @@ class Helper():
         return None
 
     def arpscan(interface, network ):
-        result = command.exec(["/usr/local/bin/arp-scan", "--interface", interface, network], exitstatus_check = False)
+        result = command.exec(["/usr/local/bin/arp-scan", "-N", "-x", "--retry=1", "--interface", interface, network], exitstatus_check = False)
         if result.returncode == 0:
             rows = result.stdout.decode().strip().split("\n")
             
