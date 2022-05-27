@@ -17,22 +17,23 @@ class InfluxDBPublisher(_handler.Handler):
 
     def _run(self):
         while self._isRunning():
-            try:
-                if self._isSuspended():
-                    self._confirmSuspended()
-                    
+            if not self._isSuspended():
                 try:
                     messurements = self._collectMessurements()
                     self._submitMessurements(messurements)
                 except requests.exceptions.ConnectionError:
-                    logging.warning("InfluxDB currently not available. Will 15 retry in seconds")
+                    logging.warning("InfluxDB currently not available. Will retry in {} seconds".format(self.config.influxdb_publish_interval))
+                except Exception as e:
+                    self._handleUnexpectedException(e)
                 
-                self._wait(self.config.influxdb_publish_interval)
+            suspend_timeout = self._getSuspendTimeout()
+            if suspend_timeout > 0:
+                timeout = suspend_timeout
+            else:
+                timeout = self.config.influxdb_publish_interval
+                
+            self._wait(timeout)
 
-            except Exception as e:
-                timeout = self._handleUnexpectedException(e)
-                self._sleep(timeout)
-                
     def _collectMessurements(self):
         messurements = []
         
@@ -48,7 +49,9 @@ class InfluxDBPublisher(_handler.Handler):
             outAvg = None
             for data in stat.getDataList():
                 if device.supportsWifi() and data.getDetail("signal") is not None:
-                    messurements.append("network_signal,ip={},band={} value={}".format(device.getIP(),data.getConnectionDetail("band"), data.getDetail("signal")))
+                    gid = data.getConnectionDetail("gid")
+                    band = self.cache.getUnlockedGroup(gid).getDetail("band")
+                    messurements.append("network_signal,ip={},band={} value={}".format(device.getIP(),band, data.getDetail("signal")))
                 if data.getInAvg() is not None:
                     if inAvg is None:
                         inAvg = 0

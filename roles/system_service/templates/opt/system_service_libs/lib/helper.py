@@ -21,12 +21,24 @@ class Helper():
             
     #    return arp_result
     
-    def logEvent(frame, msg):
-        [_, file ] = frame.f_code.co_filename.rsplit("/", 1)
+    def logError(msg, caller_frame = 1):
+        Helper._log(logging.error, msg, caller_frame)
 
-        #stack[1][3], 
-        logging.info(msg, extra={"custom_module": "{}:{}".format( file[:-3] , frame.f_lineno ) })
-    
+    def logWarning(msg, caller_frame = 1):
+        Helper._log(logging.error, msg, caller_frame)
+
+    def logInfo(msg, caller_frame = 1):
+        Helper._log(logging.info, msg, caller_frame)
+
+    def _log(log, msg, caller_frame):
+        frame = sys._getframe(caller_frame + 1)
+        
+        module = "{}:{}".format( frame.f_code.co_filename.replace("/",".")[:-3] , frame.f_lineno )
+        module = module.ljust(25)
+        module = module[-25:]
+        
+        log(msg, extra={"custom_module": module })
+
     def logProfiler(cls, start, msg):
         pass
         #logging.info("*** PROFILER *** {} - {} in {} seconds".format(cls.__class__.__name__, msg, round( (datetime.now() - start).total_seconds(), 3 ) ) )

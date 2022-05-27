@@ -7,6 +7,7 @@ import traceback
 import json
 
 from lib.dto.event import Event
+from lib.helper import Helper
 
 
 class Handler:
@@ -42,9 +43,6 @@ class Handler:
             self.event.wait(timeout)
             self.event.clear()
         
-    def _sleep(self, timeout):
-        time.sleep(timeout)
-        
     def _wakeup(self):
         if self.event is not None:
             self.event.set()
@@ -53,24 +51,27 @@ class Handler:
         return self.is_running
     
     def _isSuspended(self, key = None):
-        return self.is_suspended.get(key, False)
-    
-    def _confirmSuspended(self, key = None):
-        logging.warning("Resume {}".format(self.__class__.__name__))
-        self.is_suspended[key] = False
+        return self._getSuspendTimeout(key) > 0
+        
+    def _getSuspendTimeout(self, key = None):
+        suspend_data = self.is_suspended.get(key, None)
+        if suspend_data is not None:
+            suspend_time = (datetime.now() - suspend_data[0]).total_seconds()
+            if suspend_time > suspend_data[1]:
+                Helper.logWarning("Resume {}{}".format(self.__class__.__name__, " {}".format(key) if key is not None else ""), 2)
+                self.is_suspended[key] = None
+            else:
+                return suspend_data[1] - suspend_time
+        return 0
         
     def _handleExpectedException(self, msg, key, timeout = 60):
-        logging.error("{}.{}".format(msg, " Will suspend for {}.".format(timedelta(seconds=timeout) if timeout >= 0 else "")))
-        #logging.error(traceback.format_exc())
-        self.is_suspended[key] = True
-        return timeout
+        Helper.logError("{}.{}".format(msg, " Will suspend{} for {}.".format(" {}".format(key) if key is not None else "", timedelta(seconds=timeout) if timeout >= 0 else "")), 2)
+        self.is_suspended[key] = [datetime.now(), timeout]
     
     def _handleUnexpectedException(self, e, key = None, timeout = 900):
-        logging.error("{} got unexpected exception.{}".format(self.__class__.__name__, " Will suspend for {} minute(s).".format(timeout / 60) if timeout >= 0 else ""))
-        logging.error(traceback.format_exc())
-        if timeout >= 0:
-            self.is_suspended[key] = True
-        return timeout
+        Helper.logError("{} got unexpected exception.{}".format(self.__class__.__name__, " Will suspend{} for {} minute(s).".format(" {}".format(key) if key is not None else "", timeout / 60) if timeout >= 0 else ""), 2)
+        Helper.logError(traceback.format_exc(), 2)
+        self.is_suspended[key] = [datetime.now(), timeout]
         
     def setDispatcher(self, dispatcher):
         self.dispatcher = dispatcher

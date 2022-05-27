@@ -12,7 +12,15 @@ authenticate() {
     
     echo -n "Check password ... "
     sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP /bin/true
-    if [ $? -eq 0 ]
+    
+    EXIT_CODE=`echo $?`
+    
+    if [ "$EXIT_CODE" -eq 6 ]
+    then
+      echo "unknown key fingerprint."
+      echo "Login manually first"
+      exit
+    elif [ "$EXIT_CODE" -eq 0 ]
     then
       echo "ok"
       break
@@ -62,19 +70,34 @@ connectivity
 
 authenticate
 
+source "$IP.env"
+
 echo "Installing software ..."
 sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg update"
 sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg remove wpad-basic-wolfssl"
-sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg install mc wpad-wolfssl hostapd-utils snmpd"
 
-echo "Copy default configs ..."
-sshpass -f <(printf '%s\n' $PASSWORD) scp -r $SOURCE/default/* root@$IP:/
+sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg install mc wpad-wolfssl hostapd-utils"
 
-# must be last because of changed shadow
-echo "Copy custom configs ..."
+if [ -f "$SOURCE/$IP/etc/config/snmp" ]; then
+  echo "Install snmpd packages ..."
+  sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg install snmpd"
+fi
+
+grep "ieee80211r '1'" "$SOURCE/$IP/etc/config/wireless" > /dev/null
+if [ $? -eq 0 ]
+then
+  echo "Install roaming packages ..."
+  sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg install umdns dawn luci-app-dawn"
+  sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "[ -f /etc/seccomp/umdns.json ] && mv /etc/seccomp/umdns.json /etc/seccomp/umdns.json.disabled"
+fi
+
+echo "Copy configs ..."
 sshpass -f <(printf '%s\n' $PASSWORD) scp -r $SOURCE/$IP/* root@$IP:/
 
-authenticate
+#authenticate
+
+echo "Apply hostname and timezone ..."
+sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "uci set system.cfg01e48a.hostname='$HOSTNAME' & uci set system.cfg01e48a.zonename='$TIMEZONE' & uci commit;"
 
 #/etc/init.d/rpcd restart
 #/etc/init.d/snmpd restart
