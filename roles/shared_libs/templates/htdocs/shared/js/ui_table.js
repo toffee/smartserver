@@ -19,14 +19,14 @@ mx.Table = (function( ret ) {
             if( column["grow"] ) cls.push("grow");
             if( column["class"] ) cls.push(column["class"]);
             if( column["align"] ) cls.push(column["align"] == "left" ? "left-align" : "right-align");
-            if( options["sort"] ) cls.push("sort");
+            if( options["sort"] && column["sort"] ) cls.push("sort");
             
             content += "<div";
             if( cls.length ) content += " class=\"" + cls.join(" ") + "\"";
             content += ">";
             if( column["value"] ) content += column["value"];
             
-            if( options["sort"] && column["sort"]["value"] == options["sort"]["value"] ) content += "<span class=\"" + ( options["sort"]["reverse"] ? "icon-up": "icon-down-1" ) + "\"></span> ";
+            if( options["sort"] && column["sort"] && column["sort"]["value"] == options["sort"]["value"] ) content += "<span class=\"" + ( options["sort"]["reverse"] ? "icon-up": "icon-down-1" ) + "\"></span> ";
             
             content += "</div>";
         });
@@ -77,13 +77,29 @@ mx.Table = (function( ret ) {
         {
             let rowElement = tableElement.childNodes[i+1];
             
-            if( row["onclick"] ) rowElement.addEventListener("click",row["onclick"]);
+            if( row["events"] )
+            {
+                Object.keys(row["events"]).forEach(function(event)
+                {
+                    rowElement.addEventListener(event,row["events"][event]);
+                });
+            }
+            
+            //if( row["onclick"] ) rowElement.addEventListener("click",row["onclick"]);
             
             row["columns"].forEach(function(column,j)
             {
-                if( !column["onclick"] ) return;
+                if( column["events"] )
+                {
+                    Object.keys(column["events"]).forEach(function(event)
+                    {
+                        rowElement.childNodes[j].addEventListener(event,column["events"][event]);
+                    });
+                }
+                
+                //if( !column["onclick"] ) return;
 
-                rowElement.childNodes[j].addEventListener("click",column["onclick"]);
+                //rowElement.childNodes[j].addEventListener("click",column["onclick"]);
             });
         });
         
@@ -94,6 +110,8 @@ mx.Table = (function( ret ) {
 
             headerElement.childNodes[i].addEventListener("click",function()
             {
+                if( !column["sort"] ) return;
+                
                 options["sort"]["callback"](column["sort"]["value"],!options["sort"]["reverse"]);
             });
         });
