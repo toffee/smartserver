@@ -109,6 +109,12 @@
     host_ip_address: "{{oven_ip}}"
   import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
 
+- name: add host weather name
+  vars:
+    host_name: "weather"
+    host_ip_address: "{{weather_ip}}"
+  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+
 - name: add host moode01 name
   vars:
     host_name: "moode01"
