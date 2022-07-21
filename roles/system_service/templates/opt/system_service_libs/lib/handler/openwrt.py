@@ -72,7 +72,7 @@ class OpenWRT(_handler.Handler):
                         self._initNextRuns(openwrt_ip)
                     else:
                         self.cache.cleanLocks(self, events)
-                        self._handleExpectedException("OpenWRT '{}' got exception {} - '{}'".format(openwrt_ip, e.getCode(), e), openwrt_ip, self.config.remote_error_timeout)
+                        self._handleExpectedException("OpenWRT '{}' ({})' got exception {} - '{}'".format(openwrt_ip, e.getType(), e.getCode(), e), openwrt_ip, self.config.remote_error_timeout)
                 except NetworkException as e:
                     self._initNextRuns()
                     self.cache.cleanLocks(self, events)
@@ -151,7 +151,15 @@ class OpenWRT(_handler.Handler):
                 band = _wifi_network["config"]["band"];
                 gid = "{}-{}-{}".format(openwrt_ip,ssid,band)
                 
-                wifi_interface_details_result = self._getWifiInterfaceDetails(openwrt_ip, ubus_session_id, ifname)
+                try:
+                    wifi_interface_details_result = self._getWifiInterfaceDetails(openwrt_ip, ubus_session_id, ifname)
+                except UbusCallException as e:
+                    if e.getCode() == -32000:
+                        logging.warning("OpenWRT '{}' interface '{}' has gone during processing wifi networks".format(openwrt_ip, ifname))
+                        continue
+                    else:
+                        raise e
+
                 channel = wifi_interface_details_result["channel"]
                 priority = 1 if channel > 13 else 0
                 
@@ -227,8 +235,7 @@ class OpenWRT(_handler.Handler):
                 client_results.append([client_result,wlan_network])
             except UbusCallException as e:
                 if e.getCode() == -32000:
-                    logging.warning("OpenWRT '{}' interface '{}' has gone".format(openwrt_ip, wlan_network["ifname"]))
-                    
+                    logging.warning("OpenWRT '{}' interface '{}' has gone during processing wifi clients".format(openwrt_ip, wlan_network["ifname"]))
                     # force refresh for wifi networks & clients
                     self.next_run[openwrt_ip]["wifi_networks"] = datetime.now()
                 else:
@@ -377,14 +384,14 @@ class OpenWRT(_handler.Handler):
         start = datetime.now()
         r = self._post(ip, json)
         Helper.logProfiler(self, start, "Network details of '{}' fetched".format(ip))
-        return self._parseResult(ip, r, "device_details")
+        return self._parseResult(ip, r, "device_details of '{}'".format(interface))
 
     def _getWifiClients(self, ip, session, interface ):
         json = { "jsonrpc": "2.0", "id": 1, "method": "call", "params": [ session, "hostapd.{}".format(interface), "get_clients", {} ] }
         start = datetime.now()
         r = self._post(ip, json)
         Helper.logProfiler(self, start, "Clients of '{}' fetched".format(ip))
-        return self._parseResult(ip, r, "client_list")
+        return self._parseResult(ip, r, "client_list of '{}'".format(interface))
     
     def _isKnownWifiClient(self, mac):
         for openwrt_ip in self.config.openwrt_devices:
@@ -465,6 +472,9 @@ class UbusCallException(Exception):
     def getCode(self):
         return self.code
     
+    def getType(self):
+        return self.type
+
 class UbusResponseException(Exception):
     def __init__(self, ip, type, message):
         super().__init__(message)
