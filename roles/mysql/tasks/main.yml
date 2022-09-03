@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    mysql_version: "10.7.4"
+    mysql_version: "10.8.4"
   tags: [ 'update_notifier_config' ]
   
 - name: prepare needed folder
@@ -53,7 +53,6 @@
     volumes:
       - '{{ global_etc }}mysql:/etc/mysql:z'
       - '{{ global_lib }}mysql:/var/lib/mysql:z'
-      - '{{backup_path}}mysql:/var/lib/mysql_backup:z'
     container_default_behavior: "compatibility"
     network_mode: "default"
     networks:
@@ -62,6 +61,7 @@
     networks_cli_compatible: yes
     exposed_ports:
       - "3306"  
+  register: mysql_container
   notify: "restart mysql"
 
 - name: add container name
@@ -83,7 +83,7 @@
 - name: create cron job
   vars:
     name: "MySQL Core Backup"
-    cmd: "docker exec mysql sh -c \"/usr/bin/mysqldump mysql -h 127.0.0.1 | bzip2 -c > /var/lib/mysql_backup/mysql_$(date +\\%Y-\\%m-\\%d).sql.bz2\""
+    cmd: "docker exec mysql sh -c \"/usr/bin/mysqldump mysql -h 127.0.0.1\" | bzip2 -c > /dataRaid/backups/mysql/mysql_$(date +\\%Y-\\%m-\\%d).sql.bz2"
     file: "ansible_mysql"
     hour: "1"
     minute: "0"
@@ -115,6 +115,14 @@
     notify: "restart mysql"
     service: "mysql.service"
   import_tasks: roles/_shared/tasks/service_check.yml
+
+- name: check mysql service
+  import_tasks: roles/mysql/tasks/wait_until_ready.yml
+  when: mysql_container.changed
+
+- name: check mysql upgrade
+  shell: "docker exec mysql sh -c \"/usr/bin/mysql_upgrade\""
+  when: mysql_container.changed
   
 # ***** SHARED DATABASE ****
 - name: create database

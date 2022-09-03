@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    librenms_version: '22.6.0'
+    librenms_version: '22.8.0'
   tags: [ 'update_notifier_config' ]    
 
 - name: prepare needed folder
@@ -48,15 +48,14 @@
   notify: "restart librenms"
 
 - name: create docker network
-  docker_network:
-    name: librenms
-    ipam_config:
-      - subnet: "{{docker_librenms_ip.split('.')[:3] | join('.')}}.0/24"
-        gateway: "{{docker_librenms_ip.split('.')[:3] | join('.')}}.1"
-    connected:
+  vars:
+    network_name: "librenms"
+    network_ip: "{{docker_librenms_ip}}"
+    network_internal: no
+    network_container:
       - mysql
       - redis
-    appends: yes
+  import_tasks: roles/container/tasks/add_docker_network.yml
   tags: [ 'mysql', 'redis' ]
 
 - name: create docker container
@@ -121,7 +120,7 @@
     librenms_ferm_rules: |
       [
       {% for network in intern_networks %}
-        "outerface {{main_network_interface}} saddr {{docker_librenms_ip}} daddr {{network}}"
+        "saddr {{docker_librenms_ip}} daddr {{network}}"
       {% endfor %}
       ]
   tags: [ 'firewall_config' ]

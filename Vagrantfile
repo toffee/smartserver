@@ -26,12 +26,14 @@ vagrant [OPTION] ... CMD
 --config <demo|your_custom_config>:
   Used configuration. All configurations are located inside ./config/ folder
 
---os <suse|fedora>:
+--os <suse|fedora|ubuntu|alma>:
   Used linux distribution. 
   
-  <suse>   : openSUSE Leap 15.3 (bento/opensuse-leap-15.3)
-  <fedora> : Fedora 35 Server (fedora/35-cloud-base)
-  <ubuntu> : Ubuntu 21.10 (ubuntu/impish64)
+  <suse>      : openSUSE Leap 15.4 (bento/opensuse-leap-15.4)
+  <fedora>    : Fedora 35 Server (fedora/35-cloud-base)
+  <ubuntu>    : Ubuntu 21.10 (ubuntu/jammy64)
+
+  <almalinux> : AlmaLinux 9 (almalinux/9) (BETA)
 
 --ansible [-vvv]:
   Optional argument to provide additional parameters for ansible. 
@@ -47,20 +49,21 @@ Example: vagrant --config=demo --os=suse up
       when '--os'
         if arg == "suse" then
             setup_os = "suse"
-            #setup_version = "15.2"
-            #setup_image = "bento/opensuse-leap-" + setup_version
-            setup_version = "15.3"
+            setup_version = "15.4"
             setup_image = "opensuse/Leap-" + setup_version + ".x86_64"
         elsif arg == "ubuntu" then
             setup_os = "ubuntu"
-            #setup_version = "20.04"
-            #setup_image = "ubuntu/focal64"
-            setup_version = "21.04"
-            setup_image = "ubuntu/impish64"
+            setup_version = "22.10"
+            setup_image = "ubuntu/jammy64"
         elsif arg == "fedora" then
             setup_os = "fedora"
+            #setup_version = "36" => https://github.com/hashicorp/vagrant/issues/12762
             setup_version = "35"
             setup_image = "fedora/" + setup_version + "-cloud-base"
+        elsif arg == "almalinux" then
+            setup_os = "almalinux"
+            setup_version = "9"
+            setup_image = "almalinux/" + setup_version
         end
       when '--ansible'
         setup_ansible=arg
@@ -122,6 +125,8 @@ Vagrant.configure(2) do |config|
         vb.name = $image_name
         vb.customize ["modifyvm", :id, "--memory", "6144"]
         vb.customize ["modifyvm", :id, "--cpus", "2"]
+        #vb.customize ["natnetwork", "add", "--netname", "smartserver", "--network", "#{$env_ip}/24", "--enable"]
+        #vb.customize ["modifyvm", :id, "--nic2", "natnetwork"]
     end
 
     setup.vm.provider "hyperv" do |hv|
@@ -156,6 +161,11 @@ Vagrant.configure(2) do |config|
         sudo pip install ansible==2.10.7
         SHELL
     elsif setup_os == 'fedora' then
+        setup.vm.provision "shell", inline: <<-SHELL
+        sudo yum --assumeyes install python python3-netaddr python3-pip
+        sudo pip install ansible==2.10.7
+        SHELL
+    elsif setup_os == 'almalinux' then
         setup.vm.provision "shell", inline: <<-SHELL
         sudo yum --assumeyes install python python3-netaddr python3-pip
         sudo pip install ansible==2.10.7
