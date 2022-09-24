@@ -33,18 +33,16 @@
     files:
       - "{{config_path}}roles/zigbee2mqtt/templates/container/Dockerfile"
   import_tasks: roles/container/tasks/build_docker_image.yml
- 
+
 - name: create docker network
-  docker_network:
-    name: zigbee2mqtt
-    #internal: yes
-    ipam_config:
-      - subnet: "{{docker_zigbee2mqtt_ip.split('.')[:3] | join('.')}}.0/24"
-        gateway: "{{docker_zigbee2mqtt_ip.split('.')[:3] | join('.')}}.1"
-    connected:
+  vars:
+    network_name: "zigbee2mqtt"
+    network_ip: "{{docker_zigbee2mqtt_ip}}"
+    network_internal: yes
+    network_container:
       - mosquitto
-    appends: yes
-  tags: ['mosquitto'] 
+  import_tasks: roles/container/tasks/add_docker_network.yml
+  tags: [ 'mosquitto' ]
   
 - name: create docker container
   docker_container:

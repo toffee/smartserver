@@ -23,16 +23,14 @@
   import_tasks: roles/container/tasks/build_docker_image.yml
 
 - name: create docker network
-  docker_network:
-    name: mytracker
-    internal: yes
-    ipam_config:
-      - subnet: "{{docker_mytracker_ip.split('.')[:3] | join('.')}}.0/24"
-        gateway: "{{docker_mytracker_ip.split('.')[:3] | join('.')}}.1"
-    connected:
+  vars:
+    network_name: "mytracker"
+    network_ip: "{{docker_mytracker_ip}}"
+    network_internal: yes
+    network_container:
       - mosquitto
-    appends: yes
-  tags: ['mosquitto']
+  import_tasks: roles/container/tasks/add_docker_network.yml
+  tags: [ 'mosquitto' ]  
 
 - name: create docker container
   docker_container:
