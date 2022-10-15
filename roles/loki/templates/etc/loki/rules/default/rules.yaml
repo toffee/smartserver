@@ -2,7 +2,7 @@
   - name: alerting
     interval: 60s
     rules:
-      - alert: error
+      - alert: log error
         expr: |
             sum by (group,log)(
               count_over_time(
@@ -14,9 +14,12 @@
             )
             > 0.0
         for: 0s
+        labels:
+            notifyGroup: "logs-{{'{{'}} $labels.group {{'}}'}}"
+            severity: error
         annotations:
-            logurl: "https://{{server_domain}}/?ref=admin|system|grafana_logs"
-      - alert: alert
+            url: "https://{{server_domain}}/?ref=admin|system|grafana_logs"
+      - alert: log alert
         expr: |
             sum by (group,log)(
               count_over_time(
@@ -28,6 +31,9 @@
             )
             > 0.0
         for: 0s
+        labels:
+            notifyGroup: "logs-{{'{{'}} $labels.group {{'}}'}}"
+            severity: critical
         annotations:
-            logurl: "https://{{server_domain}}/?ref=admin|system|grafana_logs"
+            url: "https://{{server_domain}}/?ref=admin|system|grafana_logs"
 

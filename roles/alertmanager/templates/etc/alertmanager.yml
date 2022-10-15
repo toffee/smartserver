@@ -8,49 +8,97 @@ global:
 #  - /etc/alertmanager/templates/*.tmpl
 
 route:
-  group_by: 
-    - group
-    - alertname
+  group_by:
+    - notifyGroup
 #    - log
-  group_wait: 1m
-  group_interval: 1m
-  repeat_interval: 5m
-  receiver: email-receiver
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 24h
+  receiver: default
   routes:
+# Netdata logs und warnings
     - matchers:
+      - notifyGroup="netdata"
+      - severity="warn"
+      receiver: silent
+    - matchers:
+      - notifyGroup=~"logs-.*"
       - group="netdata"
-      receiver: dummy
+      receiver: silent
+# SSH Errors 13.10.2022
     - matchers:
-      - group="crony"
-      receiver: dummy
-    - matchers:
+      - notifyGroup=~"logs-.*"
       - group="sshd"
       - log=~".*Failed to release session.*"
-      receiver: dummy
+      receiver: silent
+# Loki errors 13.10.2022
+    - matchers:
+      - notifyGroup=~"logs-.*"
+      - group="loki"
+      - log=~".*error fetching chunks.*"
+      receiver: silent
+# FS CACHE 13.10.2022
+    - matchers:
+      - notifyGroup=~"logs-.*"
+      - group="kernel"
+      - log=~"FS-Cache .*"
+      receiver: silent
+# Nextcloud News fetcher 13.10.2022
+    - matchers:
+      - notifyGroup=~"logs-.*"
+      - group="nextcloud"
+      - log=~".*Unable to parse content from.*"
+      receiver: silent
+# Apache access logs
+    - matchers:
+      - notifyGroup=~"logs-.*"
+      - group="apache"
+      - log=~".*logfile=access\.log.*"
+      receiver: silent
 #    - matchers:
+#      - notifyGroup=~"logs-.*"
+#      - group="apache"
+#      - log=~".*/cgi-bin/.%2e/.*"
+#      receiver: silent
+#    - matchers:
+#      - notifyGroup=~"logs-.*"
+#      - group="crony"
+#      receiver: silent
+#    - matchers:
+#      - notifyGroup=~"logs-.*"
 #      - group="php"
 #      - log=~".*oops, unknown child \([0-9]*\) exited with code 127.*"
-#      receiver: dummy
-    - matchers:
-      - group="grafana"
-      - log=~".*abort Handler.*"
-      receiver: dummy
+#      receiver: silent
 #    - matchers:
+#      - notifyGroup=~"logs-.*"
+#      - group="grafana"
+#      - log=~".*abort Handler.*"
+#      receiver: silent
+#    - matchers:
+#      - notifyGroup=~"logs-.*"
 #      - group="apache"
 #      - log=~".*/grafana/api/live/ws.*Mobile.*"
-#      receiver: dummy
+#      receiver: silent
+# **********************************
     - matchers:
-      - group="apache"
-      - log=~".*/update_service/api.php.*503.*"
-      receiver: dummy
+      - notifyGroup=~"logs-.*"
+      group_interval: 15m
+      receiver: logs
+{% if cloud_vpn != 'None' %}{% for peer in cloud_vpn.peers %}
     - matchers:
-      - group="apache"
-      - log=~".*/cgi-bin/.%2e/.*"
-      receiver: dummy
+      - notifyGroup="cloud-peer-{{peer}}"
+      receiver: cloud-peer-{{peer}}
+{% endfor %}{% endif %}
 
 receivers:
-  - name: dummy
-  - name: email-receiver
+  - name: silent
+  - name: default
+    email_configs:
+      - to: {{root_email}}
+        headers:
+          Reply-To: '{{root_email}}'
+        send_resolved: true
+  - name: logs
     email_configs:
       - to: {{root_email}}
         headers:
@@ -59,3 +107,14 @@ receivers:
 #          send_resolved: true
 #        html: ''
 #        text: ''
+{% if cloud_vpn != 'None' %}{% for peer in cloud_vpn.peers %}
+  - name: cloud-peer-{{peer}}
+    email_configs:
+      - to: {{cloud_vpn.peers[peer]["notification_email"]}}
+        headers:
+          Reply-To: '{{root_email}}'
+          subject: 'Cloud peer status'
+        text: '{{'{{'}} .Status | toUpper {{'}} • {{'}} range .Alerts {{'}}{{'}} .Annotations.summary {{'}}{{'}} end {{'}}'}}'
+        html: ''
+        send_resolved: true
+{% endfor %}{% endif %}

@@ -24,6 +24,8 @@ vpn_cloud_services:               "{
 {% endif %}
 }"
 
+vpn_cloud_check_ip:               "10.102.0.200"
+
 macvlan_ips:                      "[
 {% if pihole_ip != 'None' %}'{{pihole_ip}}',{% endif %}
 {% if dlna_ip != 'None' %}'{{dlna_ip}}',{% endif %}

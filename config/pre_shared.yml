@@ -56,6 +56,7 @@ docker_recorder_ip:               "172.30.21.200"
 docker_mytracker_ip:              "172.30.22.200"
 
 docker_vcontrold_ip:              "172.30.50.200"
+docker_weather_forecast_ip:       "172.30.51.200"
 
 # version of alpine linux used in several container based roles
 alpine_version:                   "3.16.2"

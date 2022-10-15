@@ -1,0 +1,20 @@
+groups:
+- name: system_service
+  rules:
+  - alert: System service database availability
+    expr: 'system_service_state{job="system_service",hostname=""} == 0'
+    for: 0m
+    labels:
+      notifyGroup: "system_service"
+      severity: critical
+    annotations:
+      summary: "System service '{{'{{'}} $labels.type {{'}}'}}'"
+
+  - alert: System service device availability
+    expr: 'system_service_state{job="system_service",hostname!=""} == 0'
+    for: 0m
+    labels:
+      notifyGroup: "system_service"
+      severity: critical
+    annotations:
+      summary: "System service device '{{'{{'}} $labels.type {{'}}'}}' - '{{'{{'}} $labels.hostname {{'}}'}}'"

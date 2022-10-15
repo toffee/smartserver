@@ -1,0 +1,106 @@
+- name: prepare needed folder
+  file:
+    path: "{{item}}"
+    state: directory
+    owner: root
+    group: root
+    mode: 0750
+  with_items:
+    - "{{global_etc}}cloud_check/"
+
+- name: build docker image
+  vars:
+    name: "cloud_check"
+    image_name: "custom_cloud_check"
+    image_version: "{{alpine_version}}"
+    files:
+      - roles/cloud_check/templates/container/Dockerfile
+  import_tasks: roles/container/tasks/build_docker_image.yml
+
+- name: create docker network
+  vars:
+    network_name: "cloud_check"
+    network_ip: "{{vpn_cloud_check_ip}}"
+    network_internal: no
+    network_container:
+      - cloud_mosquitto
+      - prometheus
+  import_tasks: roles/container/tasks/add_docker_network.yml
+  tags: [ 'prometheus', 'cloud_mosquitto', 'alpine' ]
+  notify: 
+    - "restart prometheus"
+    - "restart cloud_mosquitto"
+
+- name: create docker container
+  docker_container:
+    name: cloud_check
+    image: "custom_cloud_check:{{alpine_version}}"
+    state: present
+#    recreate: true
+    env:
+      TZ: "{{timezone}}"
+    log_driver: journald
+    log_options:
+      tag: cloud_check
+    container_default_behavior: "compatibility"
+    network_mode: "default"
+    networks:
+      - name: "cloud_check"
+        ipv4_address: "{{vpn_cloud_check_ip}}"
+    networks_cli_compatible: yes
+    volumes:
+      - '{{global_etc}}cloud_check/:/etc/cloud_check:z'
+      - '{{cloud_path}}/remote:/cloud/remote:z,rshared'
+  notify: "restart cloud_check"
+
+- name: copy config
+  template:
+    src: "templates{{item.src}}"
+    dest: "{{item.dest}}"
+    owner: root
+    group: root
+    mode: 0640
+  with_items:
+    - { src: "/config.py", dest: "{{global_etc}}cloud_check/config.py" }
+  notify: "restart cloud_check"
+
+- name: copy service
+  copy:
+    src: "templates{{item.src}}"
+    dest: "{{item.dest}}"
+    owner: root
+    group: root
+    mode: 0640
+  with_items:
+    - { src: "/etc/daemon.py", dest: "{{global_etc}}cloud_check/daemon.py" }
+  notify: "restart cloud_check"
+
+# ***** FINALIZE *****
+- name: register prometheus metrics
+  vars:
+    name: "cloud_check"
+    rules_file: "templates/prometheus/rules.yml"
+    scrape_file: "templates/prometheus/scrape.yml"
+  import_tasks: roles/prometheus/tasks/add_config.yml
+
+- name: allow cloud_check service
+  vars:
+    name: "wireguard.cloud_check"
+    rules:
+        - "outerface {{main_network_interface}} saddr {{vpn_cloud_check_ip}} proto tcp dport 80"
+        - "outerface {{main_network_interface}} saddr {{vpn_cloud_check_ip}} proto icmp"
+    is_docker: True
+  import_tasks: roles/firewall/tasks/allow_service.yml
+  tags: [ 'firewall_config' ]
+
+- name: create systemd service
+  vars:
+    container_name: "cloud_check"
+    container_after: [ "cloud_mosquitto" ]
+  import_tasks: roles/container/tasks/add_docker_service.yml
+
+- name: trigger cloud_check handler
+  vars:
+    notify: "restart cloud_check"
+    service: "cloud_check.service"
+  import_tasks: roles/_shared/tasks/service_check.yml

@@ -64,6 +64,10 @@ connectivity() {
   fi
 }
 
+if [[ -n $1 ]]; then
+  IP=$1
+fi
+
 SOURCE=`dirname "$0"`
 
 connectivity
@@ -72,32 +76,46 @@ authenticate
 
 source "$SOURCE/$IP.env"
 
-echo "Installing software ..."
+echo "Refresh package lists ..."
 sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg update"
-sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg remove wpad-basic-wolfssl"
 
-sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg install mc openssh-sftp-server wpad-wolfssl hostapd-utils"
+echo "Install core packages ..."
+sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg install mc openssh-sftp-server"
+
+if [[ "$ADDITIONAL_PACKAGES" != "" ]]; then
+  echo "Install custom packages ..."
+  sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg install" $ADDITIONAL_PACKAGES
+fi
 
 if [ -f "$SOURCE/$IP/etc/config/snmp" ]; then
   echo "Install snmpd packages ..."
   sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg install snmpd"
 fi
 
-grep "ieee80211r '1'" "$SOURCE/$IP/etc/config/wireless" > /dev/null
-if [ $? -eq 0 ]
-then
-  echo "Install roaming packages ..."
-  sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg install umdns dawn luci-app-dawn"
-  sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "[ -f /etc/seccomp/umdns.json ] && mv /etc/seccomp/umdns.json /etc/seccomp/umdns.json.disabled"
+if [[ "$IS_AP" == 1 ]]; then
+  echo "Install wifi packages ..."
+  sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg remove wpad-basic-wolfssl"
+  sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg install wpad-wolfssl hostapd-utils"
+
+  grep "ieee80211r '1'" "$SOURCE/$IP/etc/config/wireless" > /dev/null
+  if [ $? -eq 0 ]
+  then
+    echo "Install roaming packages ..."
+    sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg install umdns dawn luci-app-dawn"
+    sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "[ -f /etc/seccomp/umdns.json ] && mv /etc/seccomp/umdns.json /etc/seccomp/umdns.json.disabled"
+  fi
 fi
 
 echo "Copy configs ..."
-sshpass -f <(printf '%s\n' $PASSWORD) scp -r $SOURCE/$IP/* root@$IP:/
+sshpass -f <(printf '%s\n' $PASSWORD) scp -rp $SOURCE/$IP/* root@$IP:/
 
 #authenticate
 
 echo "Apply hostname and timezone ..."
 sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "uci set system.cfg01e48a.hostname='$HOSTNAME' & uci set system.cfg01e48a.zonename='$TIMEZONE' & uci commit;"
+
+echo "Force web redirect ..."
+sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "uci set uhttpd.main.redirect_https='on' & uci commit;"
 
 #/etc/init.d/rpcd restart
 #/etc/init.d/snmpd restart

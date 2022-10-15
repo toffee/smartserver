@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    prometheus_version: '2.38.0'
+    prometheus_version: '2.39.1'
   tags: [ 'update_notifier_config' ]    
 
 - name: prepare needed folder
@@ -11,18 +11,41 @@
     group: "{{item.group}}"
     mode: 0750
   with_items:
-    - { user: "nobody", group: "{{ 'nobody' if is_fedora else 'nogroup'}}", path: "{{ global_etc }}prometheus" }
     - { user: "nobody", group: "{{ 'nobody' if is_fedora else 'nogroup'}}", path: "{{ global_lib }}prometheus" }
     - { user: "root", group: "root", path: "{{backup_path}}prometheus" }
 
+#- name: copy config
+#  template:
+#    src: "templates/etc/prometheus.yml"
+#    dest: "{{ global_etc }}prometheus/prometheus.yml"
+#    owner: nobody
+#    group: "{{ 'nobody' if is_fedora else 'nogroup'}}"
+#    mode: 0640
+#  notify: "restart prometheus"
+
 - name: copy config
-  template:
-    src: "templates/etc/prometheus.yml"
-    dest: "{{ global_etc }}prometheus/prometheus.yml"
-    owner: nobody
-    group: "{{ 'nobody' if is_fedora else 'nogroup'}}"
-    mode: 0640
+  copy:
+    src: "templates/etc/prometheus/{{item.path}}"
+    dest: "{{ global_etc }}prometheus/{{item.path}}"
+    owner: "{{item.user}}"
+    group: "{{item.group}}"
+    mode: "{{item.mode}}"
+  with_items:
+    - { user: "nobody", group: "{{ 'nobody' if is_fedora else 'nogroup'}}", mode: "u=rw,g=r,o=", path: "rules/prometheus.yml" }
+    - { user: "nobody", group: "{{ 'nobody' if is_fedora else 'nogroup'}}", mode: "u=rw,g=r,o=", path: "prometheus.yml.tpl" }
+    - { user: "root", group: "root", mode: "u=rwx,g=rx,o=", path: "generator" }
   notify: "restart prometheus"
+
+- name: set docker selinux configuration => is_fedora
+  sefcontext:
+    target: "{{ global_etc }}prometheus/generator"
+    setype: "bin_t"
+  register: sefcontext_result
+  when: is_fedora|bool
+
+- name: reload selinux configuration => is_fedora and sefcontext changed
+  shell: "restorecon -irv {{ global_etc }}prometheus"
+  when: is_fedora|bool and sefcontext_result.changed
 
 - name: check started docker
   systemd:
@@ -110,8 +133,10 @@
 - name: create systemd service
   vars:
     container_name: "prometheus"
+    container_pre_exec: "{{ global_etc }}prometheus/generator"
     container_routes:
       - { "subnet": "default", "gateway": "{{docker_prometheus_ip.split('.')[:3] | join('.')}}.1"}
+    container_after: [ "alertmanager" ]
   import_tasks: roles/container/tasks/add_docker_service.yml
   
 - name: register update notifier
