@@ -24,6 +24,7 @@ default_variables: {
     "staging_ip":     { "default": "" },                          # "192.168.8.50" your testserver ip
 
     "intern_networks": { "default": [ "{{server_network}}" ] },
+    "trusted_networks": { "default": [] },
 
     # pihole and dlna ip's should be part of a contiguous area at the end of your server network
     # this contiguous area is configured as a subnet which is routed completely to a virtual macvlan bridge interface and is not usable for other device ip's anymore
@@ -154,11 +155,15 @@ default_variables: {
     "vault_deployment_config_git": { "default": "https://github.com/HolgerHees/smartserver.git" },
     "vault_deployment_token_git": { "default": None },            # only needed if you enable "ci_service"
 
+    #"vault_dockerhub_username":   { "default": "holgerhees" },
+    #"vault_dockerhub_password":   { "default": None },
+
     "vault_openhab_config_git": {},                               # a cloned git url of "https://github.com/HolgerHees/openhab-config.git"
     "vault_openhab_mysql_username": { "default": "openhab" },     # used for openhab data
     "vault_openhab_mysql_password": {},
-    
-    
+
+    "netflow_collector": { "default": no },                         # used for librenms and system_service (network monitoring)
+
     "network_devices": { "default": [] },                         # used for librenms and system_service (network monitoring)
     # *** EXAMPLE ***
     # {

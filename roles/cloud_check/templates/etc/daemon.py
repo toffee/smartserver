@@ -27,6 +27,10 @@ PEER_STATE_PING_OK = 1
 PEER_STATE_ONLINE  = 2
 PEER_STATE_UNKNOWN = -1
 
+MQTT_STATE_OFFLINE = 0
+MQTT_STATE_ONLINE = 1
+MQTT_STATE_UNKNOWN = -1
+
 MOUNT_STATE_UNMOUNTED = 0
 MOUNT_STATE_MOUNTED = 1
 MOUNT_STATE_UNKNOWN = -1
@@ -80,7 +84,7 @@ class PeerJob(threading.Thread):
         self.has_ping_error = False
 
         self.last_running_state = PEER_STATE_UNKNOWN
-        self.last_mount_state = MOUNT_STATE_UNMOUNTED
+        self.last_mount_state = MOUNT_STATE_UNKNOWN
 
         self.error_count = 0
 
@@ -159,18 +163,22 @@ class PeerJob(threading.Thread):
                         # **** PUBLISH ****
                         #print("{} {}".format(self.peer,running_state))
                         if self.last_running_state != running_state:
-                            Helper.logInfo("New state for pear '{}' is '{}'".format(self.peer, running_state))
+                            Helper.logInfo("New running state for peer '{}' is '{}'".format(self.peer, running_state))
                         self.mqtt_client.publish("{}/cloud/peer/{}".format(config.peer_name,self.peer), payload=running_state, qos=0, retain=False)
                         self.last_running_state = running_state
 
                         if running_state == PEER_STATE_ONLINE:
                             # CHECK mountpoint
                             if not self._checkmount(self.peer):
-                                self.last_mount_state = MOUNT_STATE_UNMOUNTED
+                                mount_state = MOUNT_STATE_UNMOUNTED
                             else:
-                                self.last_mount_state = MOUNT_STATE_MOUNTED
+                                mount_state = MOUNT_STATE_MOUNTED
                         else:
-                            self.last_mount_state = MOUNT_STATE_UNKNOWN
+                            mount_state = MOUNT_STATE_UNKNOWN
+
+                        if self.last_mount_state != mount_state:
+                            Helper.logInfo("New mount state for pear '{}' is '{}'".format(self.peer, mount_state))
+                        self.last_mount_state = mount_state
 
                     end = time.time()
                     sleep_time = sleep_time - (end-start)
@@ -245,6 +253,8 @@ class Handler(threading.Thread):
 
         self.event = threading.Event()
 
+        self.last_mqtt_state = {}
+
     def connectMqtt(self):
         Helper.logInfo("Connection to mqtt ...", end='')
         self.mqtt_client = mqtt.Client()
@@ -290,13 +300,15 @@ class Handler(threading.Thread):
 
                 if source_peer not in topic_state:
                     if source_peer in self.peer_jobs and not self.peer_jobs[source_peer].isOnline():
-                        topic_state[source_peer] = -1
+                        topic_state[source_peer] = MQTT_STATE_UNKNOWN
                     else:
-                        topic_state[source_peer] = 0
+                        topic_state[source_peer] = MQTT_STATE_OFFLINE
 
                 if Helper.getAgeInSeconds(topic_data["updated"]) < CHECK_INTERVAL * 2:
                     state_metrics.append("cloud_check_topic{{source_peer=\"{}\",target_peer=\"{}\"}} {}".format(source_peer,target_peer,int(topic_data["state"])))
-                    topic_state[source_peer] = 1
+
+                    # mqtt state is unknown during startup where updated is datetime.now() but state is PEER_STATE_UNKNOWN
+                    topic_state[source_peer] = MQTT_STATE_ONLINE if topic_data["state"] != PEER_STATE_UNKNOWN else MQTT_STATE_UNKNOWN
                     continue
                 else:
                     state_metrics.append("cloud_check_topic{{source_peer=\"{}\",target_peer=\"{}\"}} {}".format(source_peer,target_peer,PEER_STATE_UNKNOWN))
@@ -304,6 +316,9 @@ class Handler(threading.Thread):
 
             for peer in topic_state:
                 state_metrics.append("cloud_check_peer_mqtt_state{{peer=\"{}\"}} {}".format(peer,topic_state[peer]))
+                if peer not in self.last_mqtt_state or self.last_mqtt_state[peer] != topic_state[peer]:
+                    Helper.logInfo("New mqtt state for pear '{}' is '{}'".format(peer, topic_state[peer]))
+                    self.last_mqtt_state[peer] = topic_state[peer]
 
             # **** CHECK IF ALL PEERS ARE ONLINE ****
             for peer in config.cloud_peers:
@@ -325,7 +340,7 @@ class Handler(threading.Thread):
 
                 # **** NOTIFY PEERS IF THEY ARE OFFLINE ****
                 peer_job = self.peer_jobs[peer]
-                if state_count == len(config.cloud_peers):
+                if state_count == len(config.cloud_peers) or max_state != PEER_STATE_OFFLINE:
                     state_metrics.append("cloud_check_peer_online_state{{peer=\"{}\"}} {}".format(peer,max_state))
                 else:
                     state_metrics.append("cloud_check_peer_online_state{{peer=\"{}\"}} {}".format(peer,PEER_STATE_UNKNOWN))
@@ -355,7 +370,7 @@ class Handler(threading.Thread):
 
         next_topic_checks = datetime.now()
         while self.is_running:
-            if self.is_checking:
+            if self.is_checking or not self.is_online:
                 # **** CHECK INTERNET CONNECTIVITY ****
                 Helper.logInfo("Check internet connectivity")
                 is_online = Helper.ping("8.8.8.8", 5)
@@ -374,7 +389,7 @@ class Handler(threading.Thread):
                         job.resume()
 
             #Helper.logInfo(sleep_time)
-            self.event.wait( CHECK_INTERVAL )
+            self.event.wait( CHECK_INTERVAL if self.is_online else CHECK_INTERVAL * 10 )
             self.event.clear()
 
     def on_connect(self,client,userdata,flags,rc):
