@@ -65,7 +65,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "alias": "Gas consumption",
+          "alias": "Gas consumption - year",
           "dsType": "influxdb",
           "groupBy": [
             {
@@ -109,7 +109,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Gas Consumption",
+      "title": "Gas Consumption - years",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -194,7 +194,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "alias": "Gas consumption",
+          "alias": "Gas consumption - week/month",
           "dsType": "influxdb",
           "groupBy": [
             {
@@ -238,7 +238,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Gas consumption",
+      "title": "Gas consumption - week/month",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -320,7 +320,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "alias": "Gas consumption",
+          "alias": "Gas consumption - hour/day",
           "dsType": "influxdb",
           "groupBy": [
             {
@@ -447,7 +447,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "alias": "Gas consumption",
+          "alias": "Gas consumption - year",
           "dsType": "influxdb",
           "groupBy": [
             {
@@ -491,7 +491,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": "364d",
-      "title": "Gas consumption (Lest year)",
+      "title": "Gas consumption (Last years)",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -578,7 +578,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "alias": "Gas consumption",
+          "alias": "Gas consumption - week/month",
           "dsType": "influxdb",
           "groupBy": [
             {
@@ -703,7 +703,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "alias": "Gas consumption",
+          "alias": "Gas consumption - hour/day",
           "dsType": "influxdb",
           "groupBy": [
             {
