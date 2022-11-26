@@ -50,7 +50,7 @@
   vars:
     host_name: "cloud_mosquitto"
     host_ip_address: "{{vpn_cloud_services.local.mosquitto}}"
-  import_tasks: roles/network/tasks/add_to_hosts.yml
+  import_tasks: roles/_shared/tasks/add_to_hosts.yml
 
 # ***** FINALIZE *****
 #- name: copy fluentd config

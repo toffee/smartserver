@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    grafana_version: '9.2.3'
+    grafana_version: '9.2.6'
     natel_discrete_plugin_version: "0.1.1"
   tags: [ 'update_notifier_config' ]    
 
@@ -17,6 +17,7 @@
     - "{{ global_etc }}grafana/provisioning/dashboards/"
     - "{{ global_etc }}grafana/provisioning/notifiers/"
     - "{{ global_etc }}grafana/provisioning/plugins/"
+    - "{{ global_etc }}grafana/provisioning/alerting/"
 
 #- name: synchronize shared grafana dashboards
 #  synchronize:
@@ -104,10 +105,10 @@
       - loki
       - prometheus
       - alertmanager
+    notify_dependenies:
+      - "restart prometheus"
   import_tasks: roles/container/tasks/add_docker_network.yml
   tags: [ 'influxdb', 'loki', 'mysql', 'prometheus', 'alertmanager' ]
-  notify: 
-    - "restart prometheus"
 
 - name: create docker container
   docker_container:
@@ -145,7 +146,7 @@
   vars:
     host_name: "grafana"
     host_ip_address: "{{docker_grafana_ip}}"
-  import_tasks: roles/network/tasks/add_to_hosts.yml
+  import_tasks: roles/_shared/tasks/add_to_hosts.yml
 
 # ***** FINALIZE *****
 - name: register webui

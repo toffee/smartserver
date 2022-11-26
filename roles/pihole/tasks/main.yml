@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    pihole_version: '2022.10'
+    pihole_version: '2022.11.1'
   tags: [ 'update_notifier_config' ]
   
 - name: prepare needed folder
@@ -69,6 +69,11 @@
     hour: "1"
     minute: "0"
   import_tasks: roles/cron/tasks/add_cronjob.yml
+
+- name: copy fluentd config
+  vars:
+    config_file: "templates/etc/fluent/_.ansible.d/pihole.conf"
+  import_tasks: roles/fluentd/tasks/add_config.yml
 
 - name: create systemd service
   vars:

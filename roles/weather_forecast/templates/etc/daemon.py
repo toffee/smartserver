@@ -303,7 +303,7 @@ class Handler(threading.Thread):
         self.current_values = None
         self.forecast_values = None
 
-        self.state_metrics = { "data_provider": -1, "data_current": -1, "data_forecast": -1, "publish": -1 }
+        self.state_metrics = { "data_provider": -1, "data_current": -1, "data_forecast": -1, "publish": -1, "mysql": -1, "mqtt": -1 }
 
         self.consume_errors = { "forecast": None, "current": None, "summery": None }
         self.consume_refreshed = { "forecast": None, "current": None, "summery": None }
@@ -311,15 +311,20 @@ class Handler(threading.Thread):
         self.last_consume_error = None
 
     def connectMqtt(self):
-        print("Connection to mqtt ...", end='', flush=True)
-        self.mqtt_client = mqtt.Client()
-        self.mqtt_client.on_connect = lambda client, userdata, flags, rc: self.on_connect(client, userdata, flags, rc)
-        self.mqtt_client.on_disconnect = lambda client, userdata, rc: self.on_disconnect(client, userdata, rc)
-        self.mqtt_client.on_message = lambda client, userdata, msg: self.on_message(client, userdata, msg) 
-        self.mqtt_client.connect(config.mosquitto_host, 1883, 60)
-        print(" initialized", flush=True)
-        
-        self.mqtt_client.loop_start()
+        while True:
+            try:
+                print("Connection to mqtt ...", flush=True)
+                self.mqtt_client = mqtt.Client()
+                self.mqtt_client.on_connect = lambda client, userdata, flags, rc: self.on_connect(client, userdata, flags, rc)
+                self.mqtt_client.on_disconnect = lambda client, userdata, rc: self.on_disconnect(client, userdata, rc)
+                self.mqtt_client.on_message = lambda client, userdata, msg: self.on_message(client, userdata, msg)
+                self.mqtt_client.connect(config.mosquitto_host, 1883, 60)
+
+                self.mqtt_client.loop_start()
+                break
+            except Exception as e:
+                print("MQTT {}. Retry in 5 seconds".format(str(e)))
+                time.sleep(5)
         
     def run(self):
         #status = os.fdopen(self.dhcpListenerProcess.stdout.fileno())
@@ -357,6 +362,8 @@ class Handler(threading.Thread):
 
                 self.state_metrics["data_provider"] = 1
                 self.state_metrics["publish"] = 1
+                self.state_metrics["mysql"] = 1
+                self.state_metrics["mqtt"] = 1
             except ForecastDataException as e:
                 print("{}: {}".format(str(e.__class__),str(e)), flush=True)
                 self.state_metrics["data_forecast"] = 0
@@ -369,8 +376,15 @@ class Handler(threading.Thread):
                 print("{}: {}".format(str(e.__class__),str(e)), flush=True)
                 self.state_metrics["data_provider"] = 0
                 error_count += 1
+            except MySQLdb._exceptions.OperationalError as e:
+                print("{}: {}".format(str(e.__class__),str(e)), flush=True)
+                self.state_metrics["mysql"] = 0
+                error_count += 1
+            #except MQTT Exceptions?? as e:
+            #    print("{}: {}".format(str(e.__class__),str(e)), flush=True)
+            #    self.state_metrics["mqtt"] = 0
+            #    error_count += 1
             except Exception:
-            #except MySQLdb._exceptions.OperationalError as e:
                 print("{}: {}".format(str(e.__class__),str(e)), flush=True)
                 self.state_metrics["publish"] = 0
                 error_count += 1
@@ -390,6 +404,7 @@ class Handler(threading.Thread):
         
     def on_disconnect(self,client, userdata, rc):
         print("Disconnect from mqtt with result code:"+str(rc), flush=True)
+        self.state_metrics["mqtt"] = 0
 
     def on_message(self,client,userdata,msg):
         topic = msg.topic.split("/")
@@ -489,11 +504,14 @@ class Handler(threading.Thread):
             if is_refreshed:
                 self.consume_refreshed[state_name] = datetime.now()
 
-        except Exception as e:
+        except MySQLdb._exceptions.OperationalError as e:
+            print("{}: {}".format(str(e.__class__),str(e)), flush=True)
+            self.state_metrics["mysql"] = 0
             self.consume_errors[state_name] = datetime.now()
-
-            print("Exception: {}".format(str(e)))
+        except Exception as e:
+            print("{}: {}".format(str(e.__class__),str(e)), flush=True)
             traceback.print_exc()
+            self.consume_errors[state_name] = datetime.now()
 
     def getStateMetrics(self):
         state_metrics = []

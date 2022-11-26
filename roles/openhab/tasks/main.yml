@@ -6,7 +6,7 @@
 
 - name: set openhab version
   set_fact:
-    openhab_version: "3.3.0"
+    openhab_version: "3.3.0" # remove "container_post_exec" on update to version 3.4.0
     openhab_uid: "{{system_users['openhab'].id}}"
     openhab_user: "{{system_users['openhab'].name}}"
     openhab_gid: "{{system_groups['openhab'].id}}"
@@ -454,7 +454,7 @@
   vars:
     host_name: "openhab"
     host_ip_address: "127.0.0.1"
-  import_tasks: roles/network/tasks/add_to_hosts.yml
+  import_tasks: roles/_shared/tasks/add_to_hosts.yml
 
 # ***** MYSQL DATABASE ****
 - name: create database
@@ -562,6 +562,7 @@
   vars:
     container_name: "openhab"
     container_after: [ "mysql", "influxdb", "mosquitto" ]
+    container_post_exec: "nohup /bin/sh -c \"(sleep 30 && touch {{projects_path}}openhab_config/conf/transform/*) &\""
   import_tasks: roles/container/tasks/add_docker_service.yml
   
 - name: register openhab update notifier

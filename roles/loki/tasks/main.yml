@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    loki_version: '2.6.1'
+    loki_version: '2.7.0'
   tags: [ 'update_notifier_config' ]    
 
 - name: prepare needed folder
@@ -76,7 +76,7 @@
   vars:
     host_name: "loki"
     host_ip_address: "{{docker_loki_ip}}"
-  import_tasks: roles/network/tasks/add_to_hosts.yml
+  import_tasks: roles/_shared/tasks/add_to_hosts.yml
 
 # ***** FINALIZE *****
 - name: register webui

@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    mysql_version: "10.9.3"
+    mysql_version: "10.10.2"
   tags: [ 'update_notifier_config' ]
   
 - name: prepare needed folder
@@ -68,7 +68,7 @@
   vars:
     host_name: "mysql"
     host_ip_address: "{{docker_mysql_ip}}"
-  import_tasks: roles/network/tasks/add_to_hosts.yml
+  import_tasks: roles/_shared/tasks/add_to_hosts.yml
 
 # ***** FINALIZE *****
 - name: create cron job

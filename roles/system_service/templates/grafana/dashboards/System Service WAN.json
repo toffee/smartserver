@@ -663,7 +663,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "<iframe \nallowtransparency=\"true\" width=\"100%\" height=\"90%\" frameBorder=\"0\"\nsrc=\"//smartmarvin.de/system_service/speedtest.php\"></iframe>\n",
+        "content": "<iframe \nallowtransparency=\"true\" width=\"100%\" height=\"90%\" frameBorder=\"0\" id=\"buttonFrame\"\nsrc=\"about:blank\"></iframe>\n<script>\ndomain = document.location.hostname.substr(document.location.hostname.indexOf(\".\")+1); \ndocument.getElementById('buttonFrame').setAttribute(\"src\",\"https://\" + domain + \"/system_service/speedtest.php\");\n</script>\n",
         "mode": "html"
       },
       "pluginVersion": "9.2.3",
@@ -743,7 +743,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 13,
+        "h": 12,
         "w": 12,
         "x": 0,
         "y": 5
@@ -920,7 +920,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 13,
+        "h": 12,
         "w": 12,
         "x": 12,
         "y": 5
@@ -1002,7 +1002,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 17
       },
       "id": 10,
       "panels": [],
@@ -1038,8 +1038,9 @@
                   "text": "ONLINE"
                 },
                 "-1": {
+                  "color": "#808080",
                   "index": 3,
-                  "text": "UNINITIALIZED"
+                  "text": "UNKNOWN"
                 }
               },
               "type": "value"
@@ -1063,10 +1064,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 9,
         "x": 0,
-        "y": 19
+        "y": 18
       },
       "id": 16,
       "options": {
@@ -1133,8 +1134,9 @@
                   "text": "OK"
                 },
                 "-1": {
+                  "color": "#808080",
                   "index": 2,
-                  "text": "UNINITIALIZED"
+                  "text": "UNKNOWN"
                 }
               },
               "type": "value"
@@ -1158,10 +1160,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 8,
         "x": 9,
-        "y": 19
+        "y": 18
       },
       "id": 15,
       "options": {
@@ -1228,8 +1230,9 @@
                   "text": "OK"
                 },
                 "-1": {
+                  "color": "#808080",
                   "index": 2,
-                  "text": "UNINITIALIZED"
+                  "text": "UNKNOWN"
                 }
               },
               "type": "value"
@@ -1253,10 +1256,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 7,
         "x": 17,
-        "y": 19
+        "y": 18
       },
       "id": 14,
       "options": {
@@ -1328,8 +1331,9 @@
                   "text": "ONLINE"
                 },
                 "-1": {
+                  "color": "#808080",
                   "index": 3,
-                  "text": "UNINITIALIZED"
+                  "text": "UNKNOWN"
                 }
               },
               "type": "value"
@@ -1353,10 +1357,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 22
       },
       "id": 12,
       "options": {
@@ -1415,6 +1419,6 @@
   "timezone": "",
   "title": "System Service WAN",
   "uid": "system-service-wan",
-  "version": 3,
+  "version": 7,
   "weekStart": ""
 }
