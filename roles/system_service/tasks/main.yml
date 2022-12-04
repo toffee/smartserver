@@ -85,7 +85,7 @@
   import_tasks: roles/influxdb/tasks/add_bucket.yml
 
 # ***** FINALIZE *****
-- name: register prometheus metrics
+- name: register prometheus rules & metrics
   vars:
     name: "system_service"
     rules_file: "templates/prometheus/rules.yml"
@@ -152,7 +152,6 @@
   vars:
     container_name: "system_service"
     container_after: [ "network-online.target", "mosquitto", "influxdb" ]
-    container_wants: [ "network-online.target" ]
   import_tasks: roles/container/tasks/add_docker_service.yml
 
 - name: trigger device_ping handler

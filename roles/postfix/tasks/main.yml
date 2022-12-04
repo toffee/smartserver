@@ -54,6 +54,14 @@
       - "25/tcp"
   notify: "restart postfix"
 
+- name: connect postfix with prometheus network
+  vars:
+    network_name: "prometheus"
+    network_container:
+      - postfix
+  import_tasks: roles/container/tasks/connect_docker_network.yml
+  tags: [ 'prometheus', 'alpine' ]
+
 - name: add container name
   vars:
     host_name: "postfix"
@@ -125,6 +133,20 @@
     mode: 0644
 
 # ***** FINALIZE *****
+- name: register prometheus rules & metrics
+  vars:
+    name: "postfix"
+    rules_file: "templates/prometheus/rules.yml"
+    scrape_file: "templates/prometheus/scrape.yml"
+  import_tasks: roles/prometheus/tasks/add_config.yml
+
+- name: register loki rules
+  vars:
+    name: "postfix"
+    rules_file: "templates/loki/rules.yml"
+  import_tasks: roles/loki/tasks/add_config.yml
+  when: mdraid.stat.exists
+
 - name: allow postfix service
   vars:
     name: "postfix"
@@ -136,9 +158,16 @@
 - name: create systemd service
   vars:
     container_name: "postfix"
-    container_routes:
-      - { "subnet": "default", "gateway": "{{docker_postfix_ip.split('.')[:3] | join('.')}}.1"}
   import_tasks: roles/container/tasks/add_docker_service.yml
+
+- name: create cron 'ping' job
+  vars:
+    name: "Daily Ping"
+    cmd: "printf \"Subject: Daily test message\\nThis is just a test message to confirm that mail delivery is working\" | /usr/sbin/sendmail root"
+    file: "ansible_postfix"
+    hour: "1"
+    minute: "0"
+  import_tasks: roles/cron/tasks/add_cronjob.yml
 
 - name: register systemd service watcher
   vars:

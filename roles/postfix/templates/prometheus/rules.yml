@@ -1,0 +1,29 @@
+groups:
+- name: postfix
+  rules:
+  - alert: Mailserver availability
+    expr: 'postfix_up{job="postfix"} != 1'
+    for: 0m
+    labels:
+      notifyGroup: "postfix"
+      severity: critical
+    annotations:
+      summary: "Postfix down"
+
+  - alert: Mailserver not sending mails
+    expr: 'max( postfix_showq_message_age_seconds_sum{job="postfix", queue=~"deferred|hold|maildrop"} ) by (instance,job) > 900'
+    for: 0m
+    labels:
+      notifyGroup: "postfix"
+      severity: critical
+    annotations:
+      summary: "Postfix not able to send mails for more then 15 minutes. Check SNMP Server."
+
+#  - alert: Mailserver got no new mails
+#    expr: 'sum( sum_over_time(postfix_showq_message_size_bytes_count{job="postfix"}[24h]) ) by (instance,job) == 0'
+#    for: 0m
+#    labels:
+#      notifyGroup: "postfix"
+#      severity: critical
+#    annotations:
+#      summary: "Postfix handled no mails during the last 24 hours. Check postfix deployment."

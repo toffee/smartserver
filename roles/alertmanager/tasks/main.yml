@@ -36,12 +36,7 @@
     network_name: "alertmanager"
     network_ip: "{{docker_alertmanager_ip}}"
     network_internal: yes
-    network_container:
-      - postfix
-    notify_dependenies:
-      - "restart postfix"
-  import_tasks: roles/container/tasks/add_docker_network.yml
-  tags: [ 'postfix', 'alpine' ]
+  import_tasks: roles/container/tasks/create_docker_network.yml
 
 - name: create docker container
   docker_container:
@@ -66,18 +61,27 @@
         ipv4_address: "{{docker_alertmanager_ip}}"
     networks_cli_compatible: yes
     volumes:
-      - '{{ global_etc }}alertmanager:/etc/alertmanager:z'
+      - '{{global_etc}}networks/alertmanager:/etc/hosts:z'
+      - '{{global_etc}}alertmanager:/etc/alertmanager:z'
     exposed_ports:
      - "9093"
   notify: "restart alertmanager"
   
-- name: attach to prometheus docker network
+- name: connect postfix with alertmanager network
+  vars:
+    network_name: "alertmanager"
+    network_container:
+      - postfix
+  import_tasks: roles/container/tasks/connect_docker_network.yml
+  tags: [ 'postfix', 'alpine' ]
+
+- name: connect alertmanager with prometheus network
   vars:
     network_name: "prometheus"
     network_container:
       - alertmanager
-  import_tasks: roles/container/tasks/attach_docker_network.yml
-  tags: [ 'prometheus' ]  
+  import_tasks: roles/container/tasks/connect_docker_network.yml
+  tags: [ 'prometheus', 'alpine' ]
 
 - name: add container name
   vars:
@@ -94,6 +98,13 @@
     icons: [ 'templates/webui/icons/alertmanager_logo.svg' ]
   import_tasks: roles/apache_webui/tasks/add_webui.yml
 
+- name: register grafana configs
+  vars:
+    name: "alertmanager"
+    datasources: 
+      - "templates/grafana/datasources/alertmanager.yaml"
+  import_tasks: roles/grafana/tasks/add_datasource.yml
+  
 - name: copy apache vhost
   vars:
     sub_domain: "alertmanager"

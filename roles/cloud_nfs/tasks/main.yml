@@ -112,11 +112,21 @@
 #  import_tasks: roles/_shared/tasks/add_to_hosts.yml
 
 # ***** FINALIZE *****
+- name: register loki rules
+  vars:
+    name: "cloud_nfs"
+    rules_file: "templates/loki/rules.yml"
+  import_tasks: roles/loki/tasks/add_config.yml
+
 - name: create systemd service
   vars:
     container_name: "cloud_nfs"
     container_routes:
       - { "subnet": "{{vpn_cloud_subnet}}.0.0/16", "gateway": "{{vpn_cloud_services.local.gateway}}"}
+    container_after:
+      - "wireguard_cloud"
+    container_binds:
+      - "wireguard_cloud"
   import_tasks: roles/container/tasks/add_docker_service.yml
 
 - name: trigger cloud_nfs handler

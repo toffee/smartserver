@@ -59,8 +59,6 @@
   tasks:
     - { import_role: { name: base }, tags: [ 'base' ] }                                          # basic setup like global folders and some often used basic packages
 
-    - { import_role: { name: alpine }, tags: [ 'alpine' ] }                                      # registers update notifier for alpine based container images
-
     - { import_role: { name: firewall }, tags: [ 'firewall', 'macvlan' ] }                       # firewall configuration
 
     # ************ FLUSH HANDLER ***********    
@@ -69,15 +67,20 @@
 
     - { import_role: { name: cron }, tags: [ 'cron' ] }                                          # basic cron configuration + common cron jobs
 
+    - { import_role: { name: shared_libs }, tags: [ 'shared_libs' ] }                            # php & python libs
+
     - { import_role: { name: systemd_watcher }, tags: [ 'systemd_watcher' ] }                    # checking for failed service starts
 
-    - { import_role: { name: mdadm }, tags: [ 'mdadm' ] }                                        # raid monitor + weekly check cron job
-    - { import_role: { name: smartd }, tags: [ 'smartd' ] }                                      # disk monitoring
-    - { import_role: { name: sensors }, tags: [ 'sensors' ] }                                    # sensors monitoring
+    - { import_role: { name: hardware_mdadm }, tags: [ 'hardware_mdadm' ] }                      # raid weekly check cron job
+    - { import_role: { name: hardware_smartd }, tags: [ 'hardware_smartd' ] }                    # disk monitoring & checks
+    - { import_role: { name: hardware_sensors }, tags: [ 'hardware_sensors' ] }                  # sensors setups
 
     - { import_role: { name: container }, tags: [ 'container', 'macvlan' ] }                     # installs and initializes the container infrastructure (docker & podman)
+    - { import_role: { name: container, tasks_from: register_alpine, handlers_from: empty }, tags: [ 'alpine' ] } # registers update notifier for alpine based container images
 
     - { import_role: { name: ssh }, tags: [ 'ssh' ] }                                            # setup allowed ssh user
+
+    - { import_role: { name: prometheus }, tags: [ 'prometheus' ] }                              # prometheus => needed by all service providing metrics             [docker,user:root]
 
     - { import_role: { name: dns }, tags: [ 'dns', 'alpine' ] }                                  # dns server                                                        [docker,user:root]
 
@@ -87,18 +90,16 @@
 
     - { import_role: { name: postfix }, tags: [ 'postfix', 'alpine' ] }                          # mail server to forward root mails                                 [docker,user:root]
 
+    - { import_role: { name: alertmanager }, tags: [ 'alertmanager' ] }                          # alertmanager => depends on postfix                                [docker,user:root]
+
     - { import_role: { name: samba }, tags: [ 'samba', 'alpine' ] }                              # smb file server                                                   [docker,user:root]
 
     - { import_role: { name: ftp }, tags: [ 'ftp', 'alpine' ], when: "vault_ftp_username != 'None'" } # ftp file server for camera picture upload and cleanup        [docker,user:ftp]
 
     - { import_role: { name: mysql }, tags: [ 'mysql' ] }                                        # mysql db => needed by nextcloud and openhab                       [docker,user:999]
 
-    - { import_role: { name: influxdb }, tags: [ 'influxdb' ] }                                  # influxdb => needed by openhab                                     [docker,user:root]
-    - { import_role: { name: telegraf }, tags: [ 'telegraf' ] }                                  # telegraf => needed by netdata                                     [docker,user:root]
+    - { import_role: { name: influxdb }, tags: [ 'influxdb' ] }                                  # influxdb => needed by openhab & system_info                       [docker,user:root]
     
-    - { import_role: { name: prometheus }, tags: [ 'prometheus' ] }                              # prometheus => needed by openhab                                   [docker,user:root]
-    - { import_role: { name: alertmanager }, tags: [ 'alertmanager' ] }                          # alertmanager => needed by loki alerts                             [docker,user:root]
-
     - { import_role: { name: loki }, tags: [ 'loki' ] }                                          # grafana logstore                                                  [docker,user:10001|10001]
 
     - { import_role: { name: redis }, tags: [ 'redis' ] }                                        # redis db => needed by nextcloud                                   [docker,user:999]
@@ -115,8 +116,6 @@
     - { meta: flush_handlers }                                                                   # Previous roles are independent from upcoming roles, But lot of upcoming roles are depending from previous roles
     # **************************************
 
-    - { import_role: { name: shared_libs }, tags: [ 'shared_libs' ] }                            # php & python libs                                                           
-    
     - { import_role: { name: user }, tags: [ 'user' ] }                                          # default users and permissions (linux, samba, web ...)
     
     - { import_role: { name: netdata }, tags: [ 'netdata' ] }                                    # server monitoring
@@ -143,7 +142,7 @@
     - { import_role: { name: openhab }, tags: [ 'openhab' ] }                                    # openhab iot server                                                [docker,user:openhab|openhab]
     - { import_role: { name: openhab_toolbox }, tags: [ 'openhab_toolbox' ] }                    # admin scripts and tools
 
-    - { import_role: { name: rsync_backup }, tags: [ 'rsync_backup' ] }                          # rsync copy of {{data_path}} to {{backup_path}}dataDisk/
+    - { import_role: { name: backup_rsync }, tags: [ 'backup_rsync' ] }                          # rsync copy of {{data_path}} to {{backup_path}}dataDisk/
 
     - { import_role: { name: deployment }, tags: [ 'deployment' ] }                              # ansible deployment project + backup collector
 

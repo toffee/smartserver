@@ -22,15 +22,7 @@
     network_name: "weather_forecast"
     network_ip: "{{docker_weather_forecast_ip}}"
     network_internal: no
-    network_container:
-      - cloud_mosquitto
-      - prometheus
-      - mysql
-    notify_dependenies:
-      - "restart prometheus"
-      - "restart cloud_mosquitto"
-  import_tasks: roles/container/tasks/add_docker_network.yml
-  tags: [ 'mysql', 'prometheus', 'cloud_mosquitto', 'alpine' ]
+  import_tasks: roles/container/tasks/create_docker_network.yml
 
 - name: create docker container
   docker_container:
@@ -50,8 +42,26 @@
         ipv4_address: "{{docker_weather_forecast_ip}}"
     networks_cli_compatible: yes
     volumes:
+      - '{{global_etc}}networks/weather_forecast:/etc/hosts:z'
       - '{{global_etc}}weather_forecast/:/etc/weather_forecast:ro,z'
   notify: "restart weather_forecast"
+
+- name: connect cloud_mosquitto & mysql with weather_forecast network
+  vars:
+    network_name: "weather_forecast"
+    network_container:
+      - cloud_mosquitto
+      - mysql
+  import_tasks: roles/container/tasks/connect_docker_network.yml
+  tags: [ 'mysql', 'cloud_mosquitto', 'alpine' ]
+
+- name: connect weather_forecast with prometheus network
+  vars:
+    network_name: "prometheus"
+    network_container:
+      - weather_forecast
+  import_tasks: roles/container/tasks/connect_docker_network.yml
+  tags: [ 'prometheus', 'alpine' ]
 
 - name: check mysql service
   import_tasks: roles/mysql/tasks/wait_until_ready.yml
@@ -134,7 +144,7 @@
   import_tasks: roles/apache_webui/tasks/add_webui.yml
   
 # ***** FINALIZE *****
-- name: register prometheus metrics
+- name: register prometheus rules & metrics
   vars:
     name: "weatcher_forecast"
     rules_file: "templates/prometheus/rules.yml"
