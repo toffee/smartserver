@@ -55,7 +55,7 @@
   vars:
     host_name: "unifi"
     host_ip_address: "127.0.0.1"
-  import_tasks: roles/network/tasks/add_to_hosts.yml
+  import_tasks: roles/_shared/tasks/add_to_hosts.yml
   
 # ***** FINALIZE *****    
 - name: create systemd service
