@@ -174,3 +174,24 @@
     state: restarted
     daemon_reload: yes
     name: named 
+    
+- name: collect vpn other ip
+  set_fact: 
+    vpn_other_ips: "[ {{userdata['costache'].vpn_gates['tablet']}}, {{userdata['costache'].vpn_gates['phone']}} ]"
+  tags: [ 'firewall_config' ] 
+
+- name: prepare mobile vpn other ip rules
+  set_fact:
+    vpn_other_ip_rules: "{{ (vpn_other_ip_rules | default([])) + [ 'saddr ' + item ] }}"
+  with_items:
+    - "{{userdata['costache'].vpn_gates['tablet']}}"
+    - "{{userdata['costache'].vpn_gates['phone']}}"
+  tags: [ 'firewall_config' ] 
+
+- name: allow mobile vpn to some ips
+  vars:
+    name: "wireguard.mobile_vpn_other"
+    rules: "{{vpn_other_ip_rules}}"
+    is_docker: True
+  import_tasks: roles/firewall/tasks/allow_service.yml
+  tags: [ 'firewall_config' ] 
