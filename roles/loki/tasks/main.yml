@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    loki_version: '2.7.0'
+    loki_version: '2.7.1'
   tags: [ 'update_notifier_config' ]    
 
 - name: prepare needed folder
@@ -11,9 +11,6 @@
     group: "10001"
     mode: 0750
   with_items:
-    - "{{ global_etc }}loki/"
-    - "{{ global_etc }}loki/rules"
-    - "{{ global_etc }}loki/rules/fake"
     - "{{ global_lib }}loki/"
   
 - name: copy config
