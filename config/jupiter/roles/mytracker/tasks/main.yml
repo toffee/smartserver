@@ -20,7 +20,7 @@
     image_version: "{{alpine_version}}-{{mytracker_version}}"
     files:
       - "{{config_path}}/roles/mytracker/templates/container/Dockerfile"
-  import_tasks: roles/container/tasks/build_docker_image.yml
+  import_tasks: roles/container/shared/build_docker_image.yml
 
 - name: create docker network
   vars:
@@ -29,7 +29,7 @@
     network_internal: yes
     network_container:
       - mosquitto
-  import_tasks: roles/container/tasks/create_docker_network.yml
+  import_tasks: roles/container/shared/create_docker_network.yml
   tags: [ 'mosquitto' ]  
 
 - name: create docker container
@@ -61,7 +61,7 @@
   vars:
     host_name: "mytracker"
     host_ip_address: "{{docker_mytracker_ip}}"
-  import_tasks: roles/_shared/tasks/add_to_hosts.yml
+  import_tasks: roles/_shared/add_to_hosts.yml
 
 # ***** FINALIZE *****
 - name: register webui
@@ -69,26 +69,26 @@
     name: "mytracker"
     js_file: "templates/webui/mytracker.js"
     icons: [ 'templates/webui/icons/mytracker_logo.svg' ]
-  import_tasks: roles/apache_webui/tasks/add_webui.yml
+  import_tasks: roles/apache_webui/shared/add_webui.yml
 
 - name: copy apache config
   vars:
     config_file: "templates/etc/apache2/_.ansible.conf.d/mytracker.conf"
-  import_tasks: roles/apache/tasks/add_config.yml
+  import_tasks: roles/apache/shared/add_config.yml
  
 #- name: copy fluentd config
 #  vars:
 #    config_file: "templates/etc/fluent/_.ansible.d/mytracker.conf"
-#  import_tasks: roles/fluentd/tasks/add_config.yml
+#  import_tasks: roles/fluentd/shared/add_config.yml
       
 - name: create systemd service
   vars:
     container_name: "mytracker"
     container_after: [ "mosquitto" ]
-  import_tasks: roles/container/tasks/add_docker_service.yml
+  import_tasks: roles/container/shared/add_docker_service.yml
 
 - name: trigger mytracker handler
   vars:
     notify: "restart mytracker"
     service: "mytracker.service"
-  import_tasks: roles/_shared/tasks/service_check.yml
+  import_tasks: roles/_shared/service_check.yml

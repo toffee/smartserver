@@ -2,7 +2,7 @@
   vars:
     user: { name: "unifi", system: true, home: "{{global_etc}}unifi" }
     group: { name: "unifi", system: true }
-  import_tasks: roles/user/tasks/add_system_user.yml
+  import_tasks: roles/user/shared/add_system_user.yml
 
 - name: set unifi version
   set_fact:
@@ -55,18 +55,18 @@
   vars:
     host_name: "unifi"
     host_ip_address: "127.0.0.1"
-  import_tasks: roles/_shared/tasks/add_to_hosts.yml
+  import_tasks: roles/_shared/add_to_hosts.yml
   
 # ***** FINALIZE *****    
 - name: create systemd service
   vars:
     container_name: "unifi"
-  import_tasks: roles/container/tasks/add_docker_service.yml
+  import_tasks: roles/container/shared/add_docker_service.yml
   
 - name: register service watcher
   vars:
     name: "unifi"
-  import_tasks: roles/systemd_watcher/tasks/add_watcher.yml
+  import_tasks: roles/systemd_watcher/shared/add_watcher.yml
 
 - name: register unifi update notifier
   vars:
@@ -77,10 +77,10 @@
       repository: "linuxserver/unifi-controller",
       pattern: "^([0-9\\.]+)-ls([0-9]+)$"
     }
-  import_tasks: roles/update_service/tasks/add_software.yml
+  import_tasks: roles/update_service/shared/add_software.yml
 
 - name: trigger unifi handler
   vars:
     notify: "restart unifi"
     service: "unifi.service"
-  import_tasks: roles/_shared/tasks/service_check.yml
+  import_tasks: roles/_shared/service_check.yml

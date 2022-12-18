@@ -32,7 +32,7 @@
     image_version: "{{zigbee2mqtt_version}}"
     files:
       - "{{config_path}}roles/zigbee2mqtt/templates/container/Dockerfile"
-  import_tasks: roles/container/tasks/build_docker_image.yml
+  import_tasks: roles/container/shared/build_docker_image.yml
 
 - name: create docker network
   vars:
@@ -41,7 +41,7 @@
     network_internal: yes
     network_container:
       - mosquitto
-  import_tasks: roles/container/tasks/create_docker_network.yml
+  import_tasks: roles/container/shared/create_docker_network.yml
   tags: [ 'mosquitto' ]
   
 - name: create docker container
@@ -74,7 +74,7 @@
   vars:
     host_name: "zigbee2mqtt"
     host_ip_address: "{{docker_zigbee2mqtt_ip}}"
-  import_tasks: roles/_shared/tasks/add_to_hosts.yml
+  import_tasks: roles/_shared/add_to_hosts.yml
 
   # ***** FINALIZE *****
 - name: register webui
@@ -82,14 +82,14 @@
     name: "zigbee2mqtt"
     js_file: "templates/webui/zigbee2mqtt.js"
     icons: [ 'templates/webui/icons/zigbee2mqtt_logo.svg' ]
-  import_tasks: roles/apache_webui/tasks/add_webui.yml
+  import_tasks: roles/apache_webui/shared/add_webui.yml
 
 #This does not work - location in default vhost
 #See: https://stackoverflow.com/questions/11468154/tunneling-secure-websocket-connections-with-apache
 - name: copy apache config
   vars:
     config_file: "templates/etc/apache2/_.ansible.conf.d/zigbee2mqtt.conf"
-  import_tasks: roles/apache/tasks/add_config.yml
+  import_tasks: roles/apache/shared/add_config.yml
 
 #This works - new virtual host
 - name: copy apache vhost
@@ -97,13 +97,13 @@
     sub_domain: "zigbee2mqtt"
     usergroup: "user"
     include: "templates/etc/apache2/_.ansible.vhost.d/zigbee2mqtt.inc"
-  import_tasks: roles/apache/tasks/add_vhost.yml
+  import_tasks: roles/apache/shared/add_vhost.yml
 
 - name: create systemd service
   vars:
     container_name: "zigbee2mqtt"
     container_after: [ "mosquitto" ] 
-  import_tasks: roles/container/tasks/add_docker_service.yml
+  import_tasks: roles/container/shared/add_docker_service.yml
 
 - name: register update notifier
   vars:
@@ -115,11 +115,11 @@
       pattern: "^([0-9\\.]+)$",
       version: "{{zigbee2mqtt_version}}" 
     }
-  import_tasks: roles/update_service/tasks/add_software.yml  
+  import_tasks: roles/update_service/shared/add_software.yml  
 
 - name: trigger zigbee2mqtt handler
   vars:
     notify: "restart zigbee2mqtt"
     service: "zigbee2mqtt.service"
-  import_tasks: roles/_shared/tasks/service_check.yml
+  import_tasks: roles/_shared/service_check.yml
 
