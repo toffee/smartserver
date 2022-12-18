@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    redis_version: '7.0.5'
+    redis_version: '7.0.6'
   tags: [ 'update_notifier_config' ]
   
 - name: check started docker
@@ -37,7 +37,7 @@
 - name: create systemd service
   vars:
     container_name: "redis"
-  import_tasks: roles/container/tasks/add_docker_service.yml
+  import_tasks: roles/container/shared/add_docker_service.yml
 
 - name: register update notifier
   vars:
@@ -48,10 +48,10 @@
       repository: "redis",
       pattern: "^([0-9\\.]+)-alpine$"
     }
-  import_tasks: roles/update_service/tasks/add_software.yml
+  import_tasks: roles/update_service/shared/add_software.yml
 
 - name: trigger redis handler
   vars:
     notify: "restart redis"
     service: "redis.service"
-  import_tasks: roles/_shared/tasks/service_check.yml
+  import_tasks: roles/_shared/service_check.yml

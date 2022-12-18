@@ -67,10 +67,10 @@ class Speedtest(threading.Thread):
         self.resultPing = -1
 
     def triggerSpeedtest(self):
-        t = threading.Thread(target=self.startSpeedtest, args=(), kwargs={})
+        t = threading.Thread(target=self.startSpeedtest, args=(0), kwargs={})
         t.start()
 
-    def startSpeedtest(self):
+    def startSpeedtest(self, retry = 3):
         if self.is_testing == True:
             return
 
@@ -84,7 +84,12 @@ class Speedtest(threading.Thread):
             self.mqtt.publish("speedtest/time", "{:02d}:{:02d}".format(datetime.now().hour,datetime.now().minute))
             self.mqtt.publish("speedtest/location", "Aktiv")
 
-            result = command.exec([ "/build/speedtest","-f", "json", "--accept-gdpr", "--accept-license", "2>/dev/null" ] )
+            cmd = [ "/build/speedtest","-f", "json", "--accept-gdpr", "--accept-license" ]
+            if self.config.speedtest_server_id != "auto":
+                cmd.append("-s")
+                cmd.append(self.config.speedtest_server_id)
+            cmd.append("2>/dev/null")
+            result = command.exec(cmd)
             json_string = result.stdout.decode("utf-8").strip()
             #json_string = '{"type":"result","timestamp":"2022-11-04T11:33:59Z","ping":{"jitter":0.059,"latency":1.356,"low":1.324,"high":1.425},"download":{"bandwidth":84670091,"bytes":415605496,"elapsed":4907,"latency":{"iqm":10.881,"low":1.791,"high":19.838,"jitter":2.385}},"upload":{"bandwidth":78355241,"bytes":684294663,"elapsed":8806,"latency":{"iqm":15.576,"low":2.088,"high":31.205,"jitter":1.839}},"packetLoss":0,"isp":"Internet bolaget Sverige AB","interface":{"internalIp":"192.168.0.50","name":"eth0","macAddr":"70:85:C2:F3:8A:30","isVpn":false,"externalIp":"185.89.36.59"},"server":{"id":30593,"host":"speed1.syseleven.net","port":8080,"name":"Inter.link GmbH","location":"Berlin","country":"Germany","ip":"37.49.159.242"},"result":{"id":"88ba990a-fb6f-44fa-bf64-5da183688778","url":"https://www.speedtest.net/result/c/88ba990a-fb6f-44fa-bf64-5da183688778","persisted":true}}'
 
@@ -127,14 +132,20 @@ class Speedtest(threading.Thread):
             except json.decoder.JSONDecodeError:
                 self.resetMetrics()
 
-                location = "Fehler"
+                location = "Error"
                 logging.error(u"Data error: {}".format(result))
         except Exception as e:
             self.resetMetrics()
 
-            location = "Fehler"
+            location = "Error"
             logging.error(traceback.format_exc())
         finally:
+            if self.resultUp == -1 and retry > 0:
+                if not self.event.is_set():
+                    self.event.wait(60 - (retry * 15))
+                    self.startSpeedtest(retry - 1)
+                return
+
             self.mqtt.publish("speedtest/time", "{:02d}:{:02d}".format(datetime.now().hour,datetime.now().minute))
             self.mqtt.publish("speedtest/location", location)
 
@@ -154,7 +165,7 @@ class Speedtest(threading.Thread):
 
             self.is_testing = False
 
-        self.handler.notifySpeedtestData()
+            self.handler.notifySpeedtestData()
 
     def getMetrics(self, is_prometheus):
         metrics = []
