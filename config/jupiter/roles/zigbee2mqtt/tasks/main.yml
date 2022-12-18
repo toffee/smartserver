@@ -1,6 +1,6 @@
 - name: set zigbee2mqtt version
   set_fact:
-    zigbee2mqtt_version: "1.28.2"
+    zigbee2mqtt_version: "1.28.4"
  
 - name: prepare needed folder
   file:
@@ -41,7 +41,7 @@
     network_internal: yes
     network_container:
       - mosquitto
-  import_tasks: roles/container/tasks/add_docker_network.yml
+  import_tasks: roles/container/tasks/create_docker_network.yml
   tags: [ 'mosquitto' ]
   
 - name: create docker container
