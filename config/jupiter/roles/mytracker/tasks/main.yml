@@ -27,10 +27,7 @@
     network_name: "mytracker"
     network_ip: "{{docker_mytracker_ip}}"
     network_internal: yes
-    network_container:
-      - mosquitto
   import_tasks: roles/container/shared/create_docker_network.yml
-  tags: [ 'mosquitto' ]  
 
 - name: create docker container
   docker_container:
@@ -56,6 +53,14 @@
     published_ports:
       - "5000:5000"
   notify: "restart mytracker"
+
+- name: connect mosquitto with mytracker network
+  vars:
+    network_name: "mytracker"
+    network_container:
+      - mosquitto
+  import_tasks: roles/container/shared/connect_docker_network.yml
+  tags: [ 'mosquitto' ]
 
 - name: add container name
   vars:

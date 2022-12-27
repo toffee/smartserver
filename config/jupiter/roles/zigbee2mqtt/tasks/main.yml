@@ -39,10 +39,7 @@
     network_name: "zigbee2mqtt"
     network_ip: "{{docker_zigbee2mqtt_ip}}"
     network_internal: yes
-    network_container:
-      - mosquitto
   import_tasks: roles/container/shared/create_docker_network.yml
-  tags: [ 'mosquitto' ]
   
 - name: create docker container
   docker_container:
@@ -69,6 +66,14 @@
     published_ports:
       - "8084:8084"
   notify: "restart zigbee2mqtt"
+
+- name: connect mosquitto with zigbee2mqtt network
+  vars:
+    network_name: "zigbee2mqtt"
+    network_container:
+      - mosquitto
+  import_tasks: roles/container/shared/connect_docker_network.yml
+  tags: [ 'mosquitto' ]
 
 - name: add container name
   vars:
