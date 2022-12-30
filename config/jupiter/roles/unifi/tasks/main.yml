@@ -37,7 +37,7 @@
       TZ: "{{timezone}}"
       PUID: "{{unifi_uid}}"
       PGID: "{{unifi_gid}}"
-      MEM_LIMIT: "1024M"
+      MEM_LIMIT: "1024"
     network_mode: host
     log_driver: journald
     log_options:
