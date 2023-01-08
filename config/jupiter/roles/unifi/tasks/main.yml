@@ -38,10 +38,15 @@
       PUID: "{{unifi_uid}}"
       PGID: "{{unifi_gid}}"
       MEM_LIMIT: "1024"
-    network_mode: host
     log_driver: journald
     log_options:
       tag: unifi
+    container_default_behavior: "compatibility"
+    network_mode: "default"
+    networks:
+      - name: "isolated"
+        ipv4_address: "{{docker_unifi_ip}}"
+    networks_cli_compatible: yes
     volumes:
       - '{{global_etc}}unifi/:/config:z'
     exposed_ports:
@@ -84,3 +89,4 @@
     notify: "restart unifi"
     service: "unifi.service"
   import_tasks: roles/_shared/service_check.yml
+

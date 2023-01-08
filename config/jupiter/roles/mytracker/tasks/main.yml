@@ -22,13 +22,6 @@
       - "{{config_path}}/roles/mytracker/templates/container/Dockerfile"
   import_tasks: roles/container/shared/build_docker_image.yml
 
-- name: create docker network
-  vars:
-    network_name: "mytracker"
-    network_ip: "{{docker_mytracker_ip}}"
-    network_internal: yes
-  import_tasks: roles/container/shared/create_docker_network.yml
-
 - name: create docker container
   docker_container:
     name: mytracker
@@ -45,7 +38,7 @@
     container_default_behavior: "compatibility"
     network_mode: "default"
     networks:
-      - name: "mytracker"
+      - name: "isolated"
         ipv4_address: "{{docker_mytracker_ip}}"
     networks_cli_compatible: yes
     volumes:
@@ -54,13 +47,13 @@
       - "5000:5000"
   notify: "restart mytracker"
 
-- name: connect mosquitto with mytracker network
+- name: allow mytracker service
   vars:
-    network_name: "mytracker"
-    network_container:
-      - mosquitto
-  import_tasks: roles/container/shared/connect_docker_network.yml
-  tags: [ 'mosquitto' ]
+    name: "mytracker"
+    rules:
+      - "saddr {{docker_mytracker_ip}} daddr {{docker_mosquitto_ip}}"
+  import_tasks: roles/firewall/shared/allow_service.yml
+  tags: [ 'firewall_config' ]
 
 - name: add container name
   vars:

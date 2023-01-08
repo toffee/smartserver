@@ -34,13 +34,6 @@
       - "{{config_path}}roles/zigbee2mqtt/templates/container/Dockerfile"
   import_tasks: roles/container/shared/build_docker_image.yml
 
-- name: create docker network
-  vars:
-    network_name: "zigbee2mqtt"
-    network_ip: "{{docker_zigbee2mqtt_ip}}"
-    network_internal: yes
-  import_tasks: roles/container/shared/create_docker_network.yml
-  
 - name: create docker container
   docker_container:
     name: zigbee2mqtt
@@ -55,7 +48,7 @@
     container_default_behavior: "compatibility"
     network_mode: "default"
     networks:
-      - name: "zigbee2mqtt"
+      - name: "isolated"
         ipv4_address: "{{docker_zigbee2mqtt_ip}}"
     networks_cli_compatible: yes 
     volumes:
@@ -67,13 +60,13 @@
       - "8084:8084"
   notify: "restart zigbee2mqtt"
 
-- name: connect mosquitto with zigbee2mqtt network
+- name: allow zigbee2mqtt service
   vars:
-    network_name: "zigbee2mqtt"
-    network_container:
-      - mosquitto
-  import_tasks: roles/container/shared/connect_docker_network.yml
-  tags: [ 'mosquitto' ]
+    name: "zigbee2mqtt"
+    rules:
+      - "saddr {{docker_zigbee2mqtt_ip}} daddr {{docker_mosquitto_ip}}"
+  import_tasks: roles/firewall/shared/allow_service.yml
+  tags: [ 'firewall_config' ]
 
 - name: add container name
   vars:
