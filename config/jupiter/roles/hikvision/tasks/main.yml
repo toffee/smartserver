@@ -1,0 +1,60 @@
+- name: install required packages => is_suse
+  zypper:
+    name: [
+         python3-systemd
+    ]
+    state: present
+  when: is_suse|bool 
+  
+- name: prepare needed folder
+  file:
+    path: "{{item.path}}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{item.mode}}"
+  with_items:
+    - { mode: "u=rwx,g=rx,o=", path: "/opt/hikvision" }
+    
+- name: synchronize lib dir
+  synchronize:
+    src: "templates/opt/hikvision/{{item.path}}"
+    dest: "/opt/hikvision/"
+    archive: no
+    checksum: yes
+    group: yes
+    owner: yes
+    perms: yes
+    recursive: yes
+    rsync_opts:
+      - "--chown=root:root"
+      - "--chmod={{item.chmod}}"
+  with_items:
+    - { "chmod": "D750,F640", "path": "lib" }
+    
+- name: copy files
+  template:
+    src: "templates{{item.path}}"
+    dest: "{{item.path}}"
+    owner: root
+    group: root
+    mode: "{{item.mode}}"
+  with_items:
+    - { mode: "u=rwx,g=rx,o=rx", path: "/opt/hikvision/hik.py" }
+    - { mode: "u=rwx,g=rx,o=rx", path: "/opt/hikvision/hcnetsdk.py" }
+    - { mode: "u=rw,g=r,o=r", path: "/etc/systemd/system/hikvision.service" }
+  notify: "restart hikvision"
+  
+# ***** FINALIZE *****
+- name: register systemd service watcher
+  vars:
+    name: "hikvision"
+  import_tasks: roles/systemd_watcher/shared/add_watcher.yml
+  when: "is_production|bool" # restart handler is also disabled if no production
+
+- name: trigger hikvision handler
+  vars:
+    notify: "restart hikvision"
+    service: "hikvision.service"
+  import_tasks: roles/_shared/service_check.yml
+  when: "is_production|bool" # restart handler is also disabled if no production

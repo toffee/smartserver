@@ -49,7 +49,7 @@
     networks_cli_compatible: yes
     volumes:
       - '{{global_etc}}unifi/:/config:z'
-    exposed_ports:
+    published_ports:
       - "3478:3478/udp"
       - "10001:10001/udp"  
       - "28080:28080"
