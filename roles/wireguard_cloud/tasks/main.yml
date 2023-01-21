@@ -35,7 +35,7 @@
     group: root
     mode: 0700
   notify: "restart wireguard_cloud"
-  
+
 - name: generate server keys if not exists
   shell: "cd {{global_etc}}wireguard_cloud/keys/ && ([ ! -f ./server_privatekey ] || [ ! -f ./server_publickey ]) && wg genkey | tee ./server_privatekey | wg pubkey > ./server_publickey"
   register: stat_server_key_result
@@ -173,6 +173,7 @@
   vars:
     container_name: "wireguard_cloud"
     trigger_name: "wireguard_cloud"
+    container_post_exec: "/opt/docker/add_gateway {{vpn_cloud_subnet}}.0.0/16 {{vpn_cloud_services.local.gateway}}"
   import_tasks: roles/container/shared/add_docker_service.yml
 
 - name: trigger wireguard_cloud handler

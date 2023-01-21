@@ -1,5 +1,5 @@
 #!/bin/sh
-cd /etc/cloud_samba
+cd /etc/samba
 
 source ./peers
 
@@ -114,7 +114,7 @@ trap "stop" SIGTERM SIGINT
 
 exportLocalShares
 
-mountRemoteShares
+#mountRemoteShares
 
 # wait forever or until we get SIGTERM or SIGINT
 while :; do sleep 360 & wait; done

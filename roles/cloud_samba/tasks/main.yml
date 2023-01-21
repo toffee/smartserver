@@ -84,12 +84,13 @@
     log_driver: journald
     log_options:
       tag: "cloud_samba"
-    #capabilities:
+    capabilities:
     #  - NET_ADMIN
     #  - SYS_MODULE
-    #  - SYS_ADMIN
+      - SYS_ADMIN
+      - DAC_READ_SEARCH
     #  - SETPCAP
-    privileged: yes
+    #privileged: yes
     #domainname : "cloud"
     #hostname: "nfsd"
     container_default_behavior: "compatibility"
@@ -99,8 +100,7 @@
         ipv4_address: "{{vpn_cloud_services.local.samba}}"
     networks_cli_compatible: yes
     volumes:
-      - '{{global_etc}}cloud_samba:/etc/cloud_samba:z'
-      - '{{global_etc}}cloud_samba/smb.conf:/etc/smb.conf:z'
+      - '{{global_etc}}cloud_samba:/etc/samba:z'
       - '{{global_etc}}cloud_samba/fstab:/etc/fstab:z'
       - '{{cloud_smb_path}}:/cloud:z,rshared'
   notify: "restart cloud_samba"

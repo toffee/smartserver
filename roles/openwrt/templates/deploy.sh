@@ -80,7 +80,7 @@ echo "Refresh package lists ..."
 sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg update > /dev/null"
 
 echo "Install core packages ..."
-sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg install mc htop strace tcpdump openssh-sftp-server > /dev/null"
+sshpass -f <(printf '%s\n' $PASSWORD) ssh root@$IP "opkg install mc htop strace tcpdump ntpclient openssh-sftp-server > /dev/null"
 
 if [[ "$ADDITIONAL_PACKAGES" != "" ]]; then
   echo "Install custom packages ..."
