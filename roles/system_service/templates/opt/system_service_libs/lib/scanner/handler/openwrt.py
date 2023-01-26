@@ -1,10 +1,11 @@
 import threading
 from datetime import datetime, timedelta
-import re
+import time
 import requests
 from urllib3.exceptions import InsecureRequestWarning
 import json
 import logging
+import re
 #import cProfile, pstats
 #from pstats import SortKey
 
@@ -175,8 +176,9 @@ class OpenWRT(_handler.Handler):
             _device = device_result[device_name]
 
             if is_gateway:
-                if device_name[0:3] == "br-" and "speed" in _device:
-                #if "bridge-members" in _device and ("wan" in _device["bridge-members"] or "lan" in _device["bridge-members"]):
+                if device_name[0:3] == "br-" and not re.match(".*\.[0-9]+$", device_name) and "speed" in _device:
+                    #logging.info("LANCHECK {}".format(device_name))
+
                     is_wan = True if device_name == "br-wan" else False
                     _ref = wan_stats if is_wan else lan_stats
 
@@ -468,12 +470,22 @@ class OpenWRT(_handler.Handler):
         #logging.warning("OpenWRT {} - {} - got unexpected device result '{}'".format(ip, type, _json))
         #return None
     
-    def _post(self, ip, json):
+    def _post(self, ip, json, retry=1):
         try:
             return requests.post( "https://{}/ubus".format(ip), json=json, verify=False)
         except requests.exceptions.ConnectionError as e:
-            #logging.error(str(e))
-            raise NetworkException("OpenWRT {} currently not available".format(ip), self.config.remote_suspend_timeout)
+            msg = "OpenWRT {} currently not available".format(ip)
+            if retry > 0: 
+                self.log.info(msg)
+                for i in range(3):
+                    if Helper.ping(ip, 5): # ubus calls are sometimes (~ones every 2 days) answered with a 500
+                        logging.info(str(e))
+                        logging.info("Retry connecting {}".format(ip))
+                        return self._post(ip, json, retry - 1)
+                    else:
+                        self.log.info("{}. retry connecting {} in 5 seconds.".format(i + 1, ip))
+                        time.sleep(5)
+            raise NetworkException(msg, self.config.remote_suspend_timeout)
         
     def _getSession(self, ip, username, password ):
         json = { "jsonrpc": "2.0", "id": 1, "method": "call", "params": [ "00000000000000000000000000000000", "session", "login", { "username": username, "password": password } ] }
