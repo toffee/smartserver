@@ -7,167 +7,167 @@
     mode: 0644
   notify: "restart screenoff"
 
-- name: add host router name
-  vars:
-    host_name: "router"
-    host_ip_address: "{{router_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: add host router name
+  # vars:
+    # host_name: "router"
+    # host_ip_address: "{{router_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
  
-- name: add host switch name
-  vars:
-    host_name: "switch"
-    host_ip_address: "{{switch_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml 
+# - name: add host switch name
+  # vars:
+    # host_name: "switch"
+    # host_ip_address: "{{switch_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml 
  
-- name: add host ds name
-  vars:
-    host_name: "ds"
-    host_ip_address: "{{ds_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml  
+# - name: add host ds name
+  # vars:
+    # host_name: "ds"
+    # host_ip_address: "{{ds_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml  
  
-- name: add host ap1 name
-  vars:
-    host_name: "ap1"
-    host_ip_address: "{{ap1_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml 
+# - name: add host ap1 name
+  # vars:
+    # host_name: "ap1"
+    # host_ip_address: "{{ap1_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml 
  
-- name: add host ap2 name
-  vars:
-    host_name: "ap2"
-    host_ip_address: "{{ap2_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml  
+# - name: add host ap2 name
+  # vars:
+    # host_name: "ap2"
+    # host_ip_address: "{{ap2_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml  
 
-- name: add host lares name
-  vars:
-    host_name: "lares"
-    host_ip_address: "{{lares_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml 
+# - name: add host lares name
+  # vars:
+    # host_name: "lares"
+    # host_ip_address: "{{lares_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml 
 
-- name: add host securitas name
-  vars:
-    host_name: "securitas"
-    host_ip_address: "{{securitas_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml 
+# - name: add host securitas name
+  # vars:
+    # host_name: "securitas"
+    # host_ip_address: "{{securitas_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml 
 
-- name: add host cam01 name
-  vars:
-    host_name: "cam01"
-    host_ip_address: "{{camera_01_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: add host cam01 name
+  # vars:
+    # host_name: "cam01"
+    # host_ip_address: "{{camera_01_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
 
-- name: add host cam02 name
-  vars:
-    host_name: "cam02"
-    host_ip_address: "{{camera_02_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: add host cam02 name
+  # vars:
+    # host_name: "cam02"
+    # host_ip_address: "{{camera_02_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
 
-- name: add host cam03 name
-  vars:
-    host_name: "cam03"
-    host_ip_address: "{{camera_03_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: add host cam03 name
+  # vars:
+    # host_name: "cam03"
+    # host_ip_address: "{{camera_03_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
 
-- name: add host cam04 name
-  vars:
-    host_name: "cam04"
-    host_ip_address: "{{camera_04_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: add host cam04 name
+  # vars:
+    # host_name: "cam04"
+    # host_ip_address: "{{camera_04_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
 
-- name: add host cam07 name
-  vars:
-    host_name: "cam07"
-    host_ip_address: "{{camera_07_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: add host cam07 name
+  # vars:
+    # host_name: "cam07"
+    # host_ip_address: "{{camera_07_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
   
-- name: add host gate name
-  vars:
-    host_name: "gate"
-    host_ip_address: "{{camera_09_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: add host gate name
+  # vars:
+    # host_name: "gate"
+    # host_ip_address: "{{camera_09_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
 
-- name: add host nodemcu name
-  vars:
-    host_name: "nodemcu"
-    host_ip_address: "{{nodemcu_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: add host nodemcu name
+  # vars:
+    # host_name: "nodemcu"
+    # host_ip_address: "{{nodemcu_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
   
-- name: add host roborock name
-  vars:
-    host_name: "roborock"
-    host_ip_address: "{{roborock_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: add host roborock name
+  # vars:
+    # host_name: "roborock"
+    # host_ip_address: "{{roborock_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
 
-- name: add host dishwasher name
-  vars:
-    host_name: "dishwasher"
-    host_ip_address: "{{dishwasher_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: add host dishwasher name
+  # vars:
+    # host_name: "dishwasher"
+    # host_ip_address: "{{dishwasher_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
 
-- name: add host oven name
-  vars:
-    host_name: "oven"
-    host_ip_address: "{{oven_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: add host oven name
+  # vars:
+    # host_name: "oven"
+    # host_ip_address: "{{oven_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
 
-- name: add host weather name
-  vars:
-    host_name: "weather"
-    host_ip_address: "{{weather_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: add host weather name
+  # vars:
+    # host_name: "weather"
+    # host_ip_address: "{{weather_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
 
-- name: add host moode01 name
-  vars:
-    host_name: "moode01"
-    host_ip_address: "{{moode_01_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: add host moode01 name
+  # vars:
+    # host_name: "moode01"
+    # host_ip_address: "{{moode_01_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
 
-- name: add host moode02 name
-  vars:
-    host_name: "moode02"
-    host_ip_address: "{{moode_02_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: add host moode02 name
+  # vars:
+    # host_name: "moode02"
+    # host_ip_address: "{{moode_02_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
 
-- name: add host livingroom-tv name
-  vars:
-    host_name: "livingroom-tv"
-    host_ip_address: "{{livingroom_tv_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: add host livingroom-tv name
+  # vars:
+    # host_name: "livingroom-tv"
+    # host_ip_address: "{{livingroom_tv_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
 
-- name: add host tudor-tv name
-  vars:
-    host_name: "tudor-tv"
-    host_ip_address: "{{tudor_tv_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: add host tudor-tv name
+  # vars:
+    # host_name: "tudor-tv"
+    # host_ip_address: "{{tudor_tv_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
 
-- name: add host victor-tv name
-  vars:
-    host_name: "victor-tv"
-    host_ip_address: "{{victor_tv_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: add host victor-tv name
+  # vars:
+    # host_name: "victor-tv"
+    # host_ip_address: "{{victor_tv_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
 
-- name: "add host daniel-phone name"
-  vars:
-    host_name: "daniel-phone"
-    host_ip_address: "{{daniel_phone_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: "add host daniel-phone name"
+  # vars:
+    # host_name: "daniel-phone"
+    # host_ip_address: "{{daniel_phone_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
   
-- name: "add host alina-phone name"
-  vars:
-    host_name: "alina-phone"
-    host_ip_address: "{{alina_phone_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: "add host alina-phone name"
+  # vars:
+    # host_name: "alina-phone"
+    # host_ip_address: "{{alina_phone_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
   
-- name: "add host tudor-phone name"
-  vars:
-    host_name: "tudor-phone"
-    host_ip_address: "{{tudor_phone_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: "add host tudor-phone name"
+  # vars:
+    # host_name: "tudor-phone"
+    # host_ip_address: "{{tudor_phone_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
   
-- name: "add host victor-phone name"
-  vars:
-    host_name: "victor-phone"
-    host_ip_address: "{{victor_phone_ip}}"
-  import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
+# - name: "add host victor-phone name"
+  # vars:
+    # host_name: "victor-phone"
+    # host_ip_address: "{{victor_phone_ip}}"
+  # import_tasks: config/jupiter/roles/hosts/tasks/add_to_dnsmasq_hosts.yml
 
 - name: force dns restart
   systemd:

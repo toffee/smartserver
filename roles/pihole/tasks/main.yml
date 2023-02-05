@@ -30,8 +30,8 @@
       WEBPASSWORD: "{{vault_pihole_password}}"
       DNS1: "127.0.0.11"
       DNS2: "no"
-    #capabilities:
-    #  - NET_ADMIN
+    capabilities:
+      - net_admin
     log_driver: journald
     log_options:
       tag: pihole
