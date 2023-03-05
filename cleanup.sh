@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#systemctl stop unifi.service
+systemctl stop unifi.service
 systemctl stop zigbee2mqtt.service
 systemctl stop vcontrold.service
 systemctl stop php.service
@@ -13,7 +13,7 @@ systemctl stop librenms.service
 systemctl stop fluentd.service
 systemctl stop alertmanager.service
 systemctl stop postfix.service
-#systemctl stop pihole.service
+systemctl stop pihole.service
 systemctl stop mytracker.service
 #systemctl stop minidlna.service
 systemctl stop openhab.service
@@ -30,6 +30,6 @@ systemctl stop mosquitto.service
 #systemctl stop device_ping.service
 systemctl stop speedtest.service
 
-docker container prune
-docker network prune
-docker image prune -a
+#docker container prune
+#docker network prune
+#docker image prune -a

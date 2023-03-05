@@ -6,7 +6,7 @@
 
 - name: set unifi version
   set_fact:
-    unifi_version: "7.3.76-ls171"
+    unifi_version: "7.3.83-ls179"
     unifi_uid: "{{system_users['unifi'].id}}"
     unifi_user: "{{system_users['unifi'].name}}"
     unifi_gid: "{{system_groups['unifi'].id}}"
@@ -52,14 +52,14 @@
     published_ports:
       - "3478:3478/udp"
       - "10001:10001/udp"  
-      - "28080:28080"
-      - "28443:28443"
+      - "28080:8080"
+      - "28443:8443"
   notify: "restart unifi"
 
 - name: add container name
   vars:
     host_name: "unifi"
-    host_ip_address: "127.0.0.1"
+    host_ip_address: "{{docker_unifi_ip}}"
   import_tasks: roles/_shared/add_to_hosts.yml
   
 # ***** FINALIZE *****    
