@@ -5,6 +5,13 @@
     ]
     state: present
   when: is_suse|bool 
+
+- name: install required python pip modules
+  pip:
+    name: [
+        paho-mqtt
+    ]
+    executable: "pip3"
   
 - name: prepare needed folder
   file:
