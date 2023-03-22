@@ -62,6 +62,7 @@
     name: "libreoffice"
     rules:
       - "saddr {{docker_libreoffice_ip}} daddr {{default_server_ip}} proto tcp dport 443"
+      - "saddr {{docker_libreoffice_ip}} proto tcp dport 443"
   import_tasks: roles/firewall/shared/allow_service.yml
   tags: [ 'firewall_config' ]
 

@@ -1,6 +1,6 @@
 - name: set zigbee2mqtt version
   set_fact:
-    zigbee2mqtt_version: "1.29.2"
+    zigbee2mqtt_version: "1.30.2"
  
 - name: prepare needed folder
   file:
@@ -65,6 +65,7 @@
     name: "zigbee2mqtt"
     rules:
       - "saddr {{docker_zigbee2mqtt_ip}} daddr {{docker_mosquitto_ip}}"
+      - "saddr {{docker_zigbee2mqtt_ip}} proto tcp dport 443"
   import_tasks: roles/firewall/shared/allow_service.yml
   tags: [ 'firewall_config' ]
 

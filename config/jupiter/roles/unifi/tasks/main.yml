@@ -6,7 +6,7 @@
 
 - name: set unifi version
   set_fact:
-    unifi_version: "7.3.83-ls179"
+    unifi_version: "7.3.83-ls184"
     unifi_uid: "{{system_users['unifi'].id}}"
     unifi_user: "{{system_users['unifi'].name}}"
     unifi_gid: "{{system_groups['unifi'].id}}"
@@ -55,6 +55,14 @@
       - "28080:8080"
       - "28443:8443"
   notify: "restart unifi"
+
+- name: allow unifi service
+  vars:
+    name: "unifi"
+    rules:      
+      - "saddr {{docker_unifi_ip}} proto tcp dport 443"
+  import_tasks: roles/firewall/shared/allow_service.yml
+  tags: [ 'firewall_config' ]
 
 - name: add container name
   vars:
