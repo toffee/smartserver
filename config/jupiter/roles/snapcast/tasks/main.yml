@@ -1,0 +1,82 @@
+- name: set snapcats version
+  set_fact:
+    snapcast_version: "0.27.0"
+  tags: [ 'update_notifier_config' ]
+
+- name: prepare needed folder
+  file:
+    path:  "{{item}}"
+    state: directory
+    owner: "root"
+    group: "root"
+    mode: 0750
+  with_items:
+    - "{{global_build}}snapcast"
+    
+- name: install required packages => is_suse
+  zypper:
+    name: [
+        gcc12-c++
+      , libboost_headers1_75_0-devel
+      , soxr-devel
+      , alsa-devel
+      , libpulse-devel
+      , libvorbis-devel
+      , flac-devel
+      , libopus-devel
+      , libavahi-devel
+      , alsa-utils  
+    ]
+    state: present
+  when: is_suse|bool
+  
+- name: "clone snapcast git"
+  git:
+    repo: 'https://github.com/badaix/snapcast'
+    dest: '{{global_build}}snapcast'
+    version: 'v{{snapcast_version}}'  
+  register: snapcast_git
+  
+- name: "build snapcast client"
+  shell: |
+    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 50
+    make
+    make installfiles
+  args:
+    chdir: "{{global_build}}snapcast/client"
+  when: "snapcast_git.changed"
+  
+- name: copy files
+  template:
+    src: "templates{{item.path}}"
+    dest: "{{item.path}}"
+    owner: root
+    group: root
+    mode: "{{item.mode}}"
+  with_items:
+    - { mode: "u=rw,g=r,o=r", path: "/etc/systemd/system/snapclient.service" }
+    - { mode: "u=rw,g=r,o=r", path: "/etc/default/snapclient.default" }
+
+- name: "systemctl housekeeping"
+  shell: |
+    systemctl daemon-reload
+    systemctl enable snapclient
+    systemctl start snapclient  
+
+# ***** FINALIZE *****
+- name: register systemd service watcher
+  vars:
+    name: "snapclient"
+  import_tasks: roles/systemd_watcher/shared/add_watcher.yml
+
+- name: register update notifier
+  vars:
+    name: "snapcast"
+    type: "github"
+    url: "https://github.com/badaix/snapcast/releases"
+    config: { 
+      project: "badaix/snapcast", 
+      pattern: "^v([0-9\\.]+)$",
+      version: "v{{snapcast_version}}" 
+    }
+  import_tasks: roles/update_service/shared/add_software.yml
