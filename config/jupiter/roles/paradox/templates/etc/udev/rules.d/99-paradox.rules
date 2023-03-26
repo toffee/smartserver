@@ -1,2 +1,0 @@
-ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", ATTRS{serial}=="a4008957", SYMLINK+="ttyOpenHabParadox", GROUP="dialout", MODE="0660"
-
