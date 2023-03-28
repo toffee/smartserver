@@ -1,6 +1,7 @@
 [Unit]
 Description=Hikvision intercome to mqtt
 Requires=mosquitto.service
+After=network-online.target mosquitto.service
 
 [Service]
 ExecStart=/usr/bin/python3 /opt/hikvision/hik.py
