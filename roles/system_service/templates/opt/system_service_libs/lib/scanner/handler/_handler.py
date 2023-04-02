@@ -19,11 +19,11 @@ class Handler:
         
         self.is_suspended = {}
 
-        self.is_running = with_worker
+        self.is_running = False
 
         if with_worker:
             self.event = threading.Event()
-            self.thread = threading.Thread(target=self._run, args=())
+            self.thread = threading.Thread(target=self.run, args=())
         else:
             self.event = None
             self.thread = None
@@ -38,6 +38,9 @@ class Handler:
 
         for service in self.service_metric_states:
             metrics.append("system_service_state{{type=\"{}\"}} {}".format(service, self.service_metric_states[service]))
+
+        if self.thread is not None:
+            metrics.append("system_service_process{{type=\"scanner_{}\",}} {}".format(self.__class__.__name__.lower(), "1" if self.is_running else "0"))
         return metrics
 
     def _setDeviceMetricState(self, hostname, value):
@@ -48,10 +51,21 @@ class Handler:
 
     def start(self):
         if self.thread is not None:
+            self.is_running = True
             self.thread.start()
+
+    def run(self):
+        try:
+            logging.info("{} started".format(self.__class__.__name__.lower().title()))
+            self._run()
+            logging.info("{} stopped".format(self.__class__.__name__.lower().title()))
+        except Exception:
+            logging.error(traceback.format_exc())
+            self.is_running = False
 
     def terminate(self):
         if self.event is not None:
+            #logging.info("Shutdown {}".format(self.__class__.__name__.lower()))
             self.is_running = False
             self.event.set()
         
