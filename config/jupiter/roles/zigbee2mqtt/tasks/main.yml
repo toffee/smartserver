@@ -1,6 +1,6 @@
 - name: set zigbee2mqtt version
   set_fact:
-    zigbee2mqtt_version: "1.30.2"
+    zigbee2mqtt_version: "1.30.3"
  
 - name: prepare needed folder
   file:
