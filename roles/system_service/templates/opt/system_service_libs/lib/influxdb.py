@@ -89,15 +89,18 @@ class InfluxDB(threading.Thread):
             return None
 
     def submit(self, messurements):
+        return self._submit(messurements, self.config.influxdb_database)
+
+    def _submit(self, messurements, db):
         try:
             if len(messurements) == 0:
                 return 1
 
             logging.info("Submit {} messurements".format(len(messurements)))
 
-            headers = {'Authorization': "Token {}".format(self.config.influxdb_token)}
-            url = "{}/write?db={}&rp=autogen&precision=ms&consistency=one".format(self.config.influxdb_rest,self.config.influxdb_database)
-            r = requests.post( url, headers=headers, data="\n".join(messurements))
+            headers = {'Authorization': "Token {}".format(self.config.influxdb_token), 'Content-type': 'application/json; charset=utf-8' }
+            url = "{}/write?db={}&rp=autogen&precision=ms&consistency=one".format(self.config.influxdb_rest,db)
+            r = requests.post( url, headers=headers, data="\n".join(messurements).encode("utf-8") )
             if r.status_code != 204:
                 msg = "Wrong status code {} for query {}".format(r.status_code, url)
                 logging.error(msg)
@@ -112,3 +115,7 @@ class InfluxDB(threading.Thread):
             logging.error("Got unexpected exception. Will retry in {} seconds".format(self.config.influxdb_publish_interval))
             logging.error(traceback.format_exc())
             return -1
+
+    @staticmethod
+    def escapeValue(value):
+        return value.replace(" ","\\ ").replace(",","\\,")

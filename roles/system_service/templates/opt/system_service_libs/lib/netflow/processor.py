@@ -17,6 +17,8 @@ from pstats import SortKey
 from .collector import ThreadedNetFlowListener
 from .cache import Cache
 
+from lib.influxdb import InfluxDB
+
 IP_PROTOCOLS = {
     1: "icmp",
     2: "igmp",
@@ -35,6 +37,8 @@ METRIC_TIMESHIFT = 60
 PROMETHEUS_INTERVAL = 60
 
 class Helper():
+    __base32 = '0123456789bcdefghjkmnpqrstuvwxyz'
+
     @staticmethod
     def getService(dest_port, protocol):
         if ( protocol == 6 or protocol == 17 ) and dest_port is not None and dest_port < 1024:
@@ -57,22 +61,54 @@ class Helper():
 
     @staticmethod
     def shouldSwapDirection(connection, config):
-        if config.netflow_incoming_traffic:
-            return connection.src.is_global and Helper.getServiceKey(connection.dest, connection.dest_port) not in config.netflow_incoming_traffic
+        if ( \
+            ( connection.protocol in PING_PROTOCOLS and connection.src.is_global ) \
+            or \
+            ( \
+                connection.src_port is not None and connection.dest_port is not None \
+                and \
+                connection.src_port < 1024 and connection.dest_port >= 1024 \
+            ) \
+        ):
+            return True
 
-        return ( connection.protocol in PING_PROTOCOLS and connection.src.is_global ) \
-               or \
-               ( \
-                   connection.src_port is not None and connection.dest_port is not None \
-                   and \
-                   ( \
-                       ( connection.src_port < 1024 and connection.dest_port >= 1024 ) \
-                       or \
-                       ( connection.src_port < 9999 and connection.dest_port >= 9999 ) \
-                       or \
-                       ( connection.src_port < 49151 and connection.dest_port >= 49151 ) \
-                   ) \
-               )
+        if connection.src.is_global and config.netflow_incoming_traffic and Helper.getServiceKey(connection.dest, connection.dest_port) not in config.netflow_incoming_traffic:
+            return True
+
+        return False
+
+
+    @staticmethod
+    def encodeGeohash(latitude, longitude, precision=12):
+        lat_interval, lon_interval = (-90.0, 90.0), (-180.0, 180.0)
+        geohash = []
+        bits = [ 16, 8, 4, 2, 1 ]
+        bit = 0
+        ch = 0
+        even = True
+        while len(geohash) < precision:
+            if even:
+                mid = (lon_interval[0] + lon_interval[1]) / 2
+                if longitude > mid:
+                    ch |= bits[bit]
+                    lon_interval = (mid, lon_interval[1])
+                else:
+                    lon_interval = (lon_interval[0], mid)
+            else:
+                mid = (lat_interval[0] + lat_interval[1]) / 2
+                if latitude > mid:
+                    ch |= bits[bit]
+                    lat_interval = (mid, lat_interval[1])
+                else:
+                    lat_interval = (lat_interval[0], mid)
+            even = not even
+            if bit < 4:
+                bit += 1
+            else:
+                geohash += Helper.__base32[ch]
+                bit = 0
+                ch = 0
+        return ''.join(geohash)
 
 
 class Connection:
@@ -397,6 +433,30 @@ class Processor(threading.Thread):
             #    timestamp = int(self.last_metric_end + 1)
 
             _location = con.location
+            if _location["type"] == Cache.TYPE_LOCATION:
+                location_country_name = _location["country_name"] if _location["country_name"] else "Unknown"
+                location_country_code = _location["country_code"] if _location["country_code"] else "xx"
+                location_zip = _location["zip"] if _location["zip"] else "0"
+                location_city = _location["city"] if _location["city"] else "Unknown"
+                #location_district = _location["district"] if _location["district"] else None
+                location_geohash = Helper.encodeGeohash(_location["lat"], _location["lon"], 5) if _location["lat"] and _location["lon"] else None
+                location_org = _location["org"] if _location["org"] else None
+            elif _location["type"] == Cache.TYPE_UNKNOWN:
+                location_country_name = "Unknown"
+                location_country_code = "xx"
+                location_zip = "0"
+                location_city = "Unknown"
+                #location_district = None
+                location_geohash = None
+                location_org = None
+            elif _location["type"] == Cache.TYPE_PRIVATE:
+                location_country_name = "Private"
+                location_country_code = "xx"
+                location_zip = "0"
+                location_city = "Private"
+                #location_district = None
+                location_geohash = None
+                location_org = None
 
             label = []
 
@@ -429,12 +489,16 @@ class Processor(threading.Thread):
             #label.append("duration={}".format(con.duration))
             #label.append("packets={}".format(con.packages))
 
-            label.append("location_country_name={}".format(_location["location_country_name"]))
-            label.append("location_country_code={}".format(_location["location_country_code"]))
-            label.append("location_city={}".format(_location["location_city"]))
-            label.append("location_zip={}".format(_location["location_zip"]))
-            label.append("location_lat={}".format(_location["location_lat"]))
-            label.append("location_lon={}".format(_location["location_lon"]))
+            label.append("location_country_name={}".format(InfluxDB.escapeValue(location_country_name)))
+            label.append("location_country_code={}".format(location_country_code))
+            label.append("location_zip={}".format(InfluxDB.escapeValue(location_zip)))
+            label.append("location_city={}".format(InfluxDB.escapeValue(location_city)))
+            #if location_district:
+            #    label.append("location_district={}".format(InfluxDB.escapeValue(location_district)))
+            if location_geohash:
+                label.append("location_geohash={}".format(location_geohash))
+            if location_org:
+                label.append("location_org={}".format(InfluxDB.escapeValue(location_org)))
 
             label.append("ip_type={}".format(con.ip_type))
             #label.append("oneway={}".format(1 if con.is_one_direction else 0))
