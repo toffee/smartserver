@@ -358,6 +358,7 @@
         "x": 8,
         "y": 0
       },
+      "hideTimeOverride": true,
       "id": 14,
       "options": {
         "footer": {
@@ -386,7 +387,7 @@
           "groupBy": [
             {
               "params": [
-                "country_name"
+                "location_country_name"
               ],
               "type": "tag"
             }
@@ -415,6 +416,7 @@
           "tags": []
         }
       ],
+      "timeShift": "2m",
       "title": "Country",
       "transformations": [
         {
@@ -425,12 +427,13 @@
             },
             "indexByName": {
               "Time": 0,
-              "country_name": 1,
+              "location_country_name": 1,
               "sum": 2
             },
             "renameByName": {
               "country_name": "Name",
               "dest_country_name": "Country",
+              "location_country_name": "Name",
               "src_country_name": "Source",
               "sum": "Traffic"
             }
@@ -504,7 +507,7 @@
           "groupBy": [
             {
               "params": [
-                "country_name"
+                "location_country_name"
               ],
               "type": "tag"
             }
@@ -530,7 +533,7 @@
           ],
           "tags": [
             {
-              "key": "country_code",
+              "key": "location_country_code",
               "operator": "!=",
               "value": "xx"
             },
@@ -853,7 +856,7 @@
               },
               {
                 "id": "unit",
-                "value": "binBps"
+                "value": "bytes"
               }
             ]
           },
@@ -964,7 +967,7 @@
             },
             {
               "params": [
-                "country_name"
+                "location_country_name"
               ],
               "type": "tag"
             }
@@ -1032,6 +1035,10 @@
                 "aggregations": [],
                 "operation": "groupby"
               },
+              "location_country_name": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
               "service": {
                 "aggregations": [],
                 "operation": "groupby"
@@ -1057,15 +1064,12 @@
               "Time (lastNotNull)": false
             },
             "indexByName": {
-              "Time (firstNotNull)": 1,
-              "Time (lastNotNull)": 0,
-              "Time (range)": 2,
-              "country_name": 6,
-              "direction": 5,
-              "extern_group": 4,
-              "intern_host": 3,
-              "service": 7,
-              "value (sum)": 8
+              "Time (firstNotNull)": 0,
+              "extern_group": 2,
+              "intern_host": 1,
+              "location_country_name": 3,
+              "service": 4,
+              "value (sum)": 5
             },
             "renameByName": {
               "Time": "Time",
@@ -1079,6 +1083,7 @@
               "extern_group": "Extern",
               "intern_host": "Intern",
               "last": "Traffic",
+              "location_country_name": "Country",
               "service": "Service",
               "src_host": "Source",
               "sum": "Traffic",
@@ -1239,7 +1244,7 @@
               },
               {
                 "id": "unit",
-                "value": "binBps"
+                "value": "bytes"
               }
             ]
           },
@@ -1350,7 +1355,7 @@
             },
             {
               "params": [
-                "country_name"
+                "location_country_name"
               ],
               "type": "tag"
             }
@@ -1418,6 +1423,10 @@
                 "aggregations": [],
                 "operation": "groupby"
               },
+              "location_country_name": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
               "service": {
                 "aggregations": [],
                 "operation": "groupby"
@@ -1443,15 +1452,12 @@
               "Time (lastNotNull)": false
             },
             "indexByName": {
-              "Time (firstNotNull)": 1,
-              "Time (lastNotNull)": 0,
-              "Time (range)": 2,
-              "country_name": 6,
-              "direction": 5,
-              "extern_group": 4,
-              "intern_host": 3,
-              "service": 7,
-              "value (sum)": 8
+              "Time (firstNotNull)": 0,
+              "extern_group": 2,
+              "intern_host": 1,
+              "location_country_name": 3,
+              "service": 4,
+              "value (sum)": 5
             },
             "renameByName": {
               "Time": "Time",
@@ -1465,6 +1471,7 @@
               "extern_group": "Extern",
               "intern_host": "Intern",
               "last": "Traffic",
+              "location_country_name": "Country",
               "service": "Service",
               "src_host": "Source",
               "sum": "Traffic",
@@ -1624,6 +1631,6 @@
   "timezone": "",
   "title": "System Service Netflow",
   "uid": "system-service-netflow",
-  "version": 53,
+  "version": 56,
   "weekStart": ""
 }
