@@ -31,7 +31,7 @@ class Cache(threading.Thread):
 
         self.dump_path = "/var/lib/system_service/netflow_cache.json"
 
-        self.ip2location_url = "http://ip-api.com/json/{}?fields=continent,continentCode,country,countryCode,region,regionName,city,district,zip,lat,lon,org,status,message"
+        self.ip2location_url = "http://ip-api.com/json/{}?fields=continent,continentCode,country,countryCode,region,regionName,city,district,zip,lat,lon,org,isp,status,message"
         #self.ip2location_url = "https://api.hostip.info/get_json.php?ip={}"
         self.ip2location_state = True
         self.ip2location_throttled_until = 0
@@ -42,7 +42,9 @@ class Cache(threading.Thread):
         self.ip2location_map = {}
         self.hostname_map = {}
 
-        self.version = 2
+        self.version = 3
+
+        self.valid_cache_file = True
 
     def start(self):
         self.is_running = True
@@ -59,23 +61,25 @@ class Cache(threading.Thread):
                     if "version" in data and data["version"] == self.version:
                         self.ip2location_map = data["ip2location_map"]
                         self.hostname_map = data["hostname_map"]
-                        logging.info("{} locations and {} hostnames loaded".format(len(self.ip2location_map),len(self.hostname_map)))
+                        logging.info("Cache data loaded ({} locations and {} hostnames)".format(len(self.ip2location_map),len(self.hostname_map)))
                     else:
-                        logging.info("No locations or hostnames loaded [wrong version]")
+                        logging.info("No cache data loaded (wrong version)")
                 #for ip in self.ip2location_map:
                 #    if self.ip2location_map[ip] is None:
                 #        logging.info(ip)
                 return
             else:
-                logging.info("No locations or hostnames loaded [empty file]")
+                logging.info("No cache data loaded (empty file)")
+            self.valid_cache_file = True
         except Exception:
-            logging.info("No locations or hostnames loaded [invalid file]")
+            logging.info("No cache data loaded (invalid file)")
+            self.valid_cache_file = False
 
     def dump(self):
-        with open(self.dump_path, 'w') as f:
-            with self.location_lock and self.hostname_lock:
+        if self.valid_cache_file and len(self.ip2location_map) > 0 and len(self.hostname_map) > 0:
+            with self.location_lock and self.hostname_lock and open(self.dump_path, 'w') as f:
                 json.dump( { "version": self.version, "ip2location_map": self.ip2location_map, "hostname_map": self.hostname_map }, f, ensure_ascii=False)
-                logging.info("{} locations and {} hostnames saved".format(len(self.ip2location_map),len(self.hostname_map)))
+                logging.info("Cache data saved ({} locations and {} hostnames)".format(len(self.ip2location_map),len(self.hostname_map)))
 
     def cleanup(self):
         _now = time.time()
@@ -92,7 +96,7 @@ class Cache(threading.Thread):
                 if _now - self.hostname_map[_ip]["time"] > self.max_hostname_cache_age:
                     del self.hostname_map[_ip]
                     hostname_count += 1
-        logging.info("Cleanup {} locations and {} hostnames".format(location_count, hostname_count))
+        logging.info("Cache data cleaned ({} locations and {} hostnames)".format(location_count, hostname_count))
 
     def terminate(self):
         if self.is_running:
@@ -129,8 +133,11 @@ class Cache(threading.Thread):
     def isRunning(self):
         return self.is_running
 
-    def getState(self):
+    def getLocationState(self):
         return self.ip2location_state
+
+    def getCacheFileState(self):
+        return self.valid_cache_file
 
     def getLocationSize(self):
         return len(self.ip2location_map)
@@ -186,7 +193,6 @@ class Cache(threading.Thread):
                     response = requests.get(self.ip2location_url.format(_ip))
                 except:
                     logging.error("Error fetching ip {}".format(_ip))
-                    logging.error(":{}:".format(response.content))
                     logging.error(traceback.format_exc())
                     return None
 
@@ -219,7 +225,8 @@ class Cache(threading.Thread):
                                 "district": data["district"], # optional, default = ""
                                 "lat": data["lat"],
                                 "lon": data["lon"],
-                                "org": data["org"]
+                                "org": data["org"],
+                                "isp": data["isp"]
                                 }, "time": _now }
                         elif data["status"] == "fail":
                             if "private" in data["message"] or "reserved" in data["message"]:

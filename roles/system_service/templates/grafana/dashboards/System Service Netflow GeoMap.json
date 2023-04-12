@@ -60,7 +60,7 @@
             }
           },
           "mappings": [],
-          "max": 50,
+          "max": 500,
           "min": 0,
           "thresholds": {
             "mode": "absolute",
@@ -193,7 +193,7 @@
                 "size": {
                   "field": "count",
                   "fixed": 5,
-                  "max": 15,
+                  "max": 12,
                   "min": 3
                 },
                 "symbol": {
@@ -244,8 +244,8 @@
                 "size": {
                   "field": "count",
                   "fixed": 5,
-                  "max": 15,
-                  "min": 2
+                  "max": 12,
+                  "min": 3
                 },
                 "symbol": {
                   "fixed": "img/icons/marker/circle.svg",
@@ -442,6 +442,6 @@
   "timezone": "",
   "title": "System Service Netflow GeoMap",
   "uid": "system-service-netflow-geopmap",
-  "version": 8,
+  "version": 12,
   "weekStart": ""
 }

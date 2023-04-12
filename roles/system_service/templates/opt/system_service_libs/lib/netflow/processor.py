@@ -6,6 +6,7 @@ import traceback
 #import ipaddress
 import time
 from datetime import datetime
+import re
 
 import socket
 import ipaddress
@@ -440,7 +441,7 @@ class Processor(threading.Thread):
                 location_city = _location["city"] if _location["city"] else "Unknown"
                 #location_district = _location["district"] if _location["district"] else None
                 location_geohash = Helper.encodeGeohash(_location["lat"], _location["lon"], 5) if _location["lat"] and _location["lon"] else None
-                location_org = _location["org"] if _location["org"] else None
+                location_org = _location["org"] if _location["org"] else ( _location["isp"] if _location["isp"] else "Unknown" )
             elif _location["type"] == Cache.TYPE_UNKNOWN:
                 location_country_name = "Unknown"
                 location_country_code = "xx"
@@ -448,7 +449,7 @@ class Processor(threading.Thread):
                 location_city = "Unknown"
                 #location_district = None
                 location_geohash = None
-                location_org = None
+                location_org = "Unknown"
             elif _location["type"] == Cache.TYPE_PRIVATE:
                 location_country_name = "Private"
                 location_country_code = "xx"
@@ -456,7 +457,7 @@ class Processor(threading.Thread):
                 location_city = "Private"
                 #location_district = None
                 location_geohash = None
-                location_org = None
+                location_org = "Unknown"
 
             label = []
 
@@ -471,10 +472,13 @@ class Processor(threading.Thread):
             label.append("extern_ip={}".format(extern_ip))
             label.append("extern_host={}".format(extern_hostname))
             extern_group = extern_hostname
-            for provider in ["amazonaws.com","awsglobalaccelerator.com","cloudfront.net","akamaitechnologies.com","googleusercontent.com"]:
-                if provider in extern_hostname:
-                    extern_group = "*.{}".format(provider)
-                    break
+            m = re.search('^.*?([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+|[a-z0-9-]+\.[a-z0-9]+)$', extern_group)
+            if m and m.group(1) != extern_group:
+                extern_group = "*.{}".format(m.group(1))
+            #for provider in ["amazonaws.com","awsglobalaccelerator.com","cloudfront.net","akamaitechnologies.com","googleusercontent.com"]:
+            #    if provider in extern_hostname:
+            #        extern_group = "*.{}".format(provider)
+            #        break
             label.append("extern_group={}".format(extern_group))
 
             label.append("direction={}".format("incoming" if con.src.is_global else "outgoing"))
@@ -543,7 +547,7 @@ class Processor(threading.Thread):
         #logging.info(s.getvalue())
 
         counter_values = self.cache.getCountStats()
-        logging.info("Cache: LOCATION [fetch: {}, cache {}/{}], HOSTNAME [fetch: {}, cache {}/{}]".format(counter_values["location_fetch"], counter_values["location_cache"], self.cache.getLocationSize(), counter_values["hostname_fetch"], counter_values["hostname_cache"], self.cache.getHostnameSize()))
+        logging.info("Cache statistic - LOCATION [fetch: {}, cache {}/{}], HOSTNAME [fetch: {}, cache {}/{}]".format(counter_values["location_fetch"], counter_values["location_cache"], self.cache.getLocationSize(), counter_values["hostname_fetch"], counter_values["hostname_cache"], self.cache.getHostnameSize()))
 
         #logging.info(messurements)
 
@@ -555,5 +559,6 @@ class Processor(threading.Thread):
         return [
             "system_service_process{{type=\"netflow_processor\",}} {}".format("1" if self.is_running else "0"),
             "system_service_process{{type=\"netflow_cache\",}} {}".format("1" if self.cache.isRunning() else "0"),
-            "system_service_state{{type=\"netflow_ip2location\",}} {}".format("1" if self.cache.getState() else "0"),
+            "system_service_state{{type=\"netflow_ip2location\",}} {}".format("1" if self.cache.getLocationState() else "0"),
+            "system_service_state{{type=\"netflow_cache_file\",}} {}".format("1" if self.cache.getCacheFileState() else "0")
         ]
