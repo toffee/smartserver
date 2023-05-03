@@ -6,9 +6,9 @@ config/*
 !config/post_shared.yml
 !config/default.yml
 ansible.cfg
+/*.retry
 !config/jupiter/
 config/jupiter/vault/vault.yml
 config/jupiter/vault/wireguard_mobile/
 config/jupiter/vault/wireguard_cloud/
 config/jupiter/vault/letsencrypt.tgz
-*.retry
