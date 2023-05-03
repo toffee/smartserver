@@ -6,3 +6,13 @@
     enabled: yes
     masked: no
   listen: "restart screenoff"
+  
+- name: restart pihole
+  systemd:
+    name: pihole
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    masked: no
+  listen: "restart pihole"
+
