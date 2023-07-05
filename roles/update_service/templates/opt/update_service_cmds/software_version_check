@@ -18,6 +18,21 @@ from config import config
 from smartserver.argsparser import ArgsParser
 from smartserver import command
 
+def checkParameter(name, args_values, last_states, current_states):
+    if args_values["limit"] != None and args_values["limit"] != name:
+        return False
+
+    if args_values["confirm"]:
+        last_state = last_states.get(name, None)
+        if last_state is None:
+            print("  - '{}' skipped".format(name))
+            return False
+        elif len(last_state["updates"]) == 0:
+            current_states['states'].append(last_state)
+            print("  - '{}' skipped".format(name))
+            return False
+        #print(last_state)
+    return True
 
 args_cfg = { "limit": None, "notification": not (sys.stdin and sys.stdin.isatty()), "confirm": False }
 args_values = ArgsParser.parse(args_cfg,sys.argv)
@@ -42,19 +57,6 @@ for config_file in files:
     with open(config_file) as json_data:
         job_config = json.load(json_data)
         
-        if args_values["limit"] != None and args_values["limit"] != job_config['name']:
-            continue
-          
-        if args_values["confirm"]:
-            last_state = last_states.get(job_config['name'], None)
-            if len(last_state["updates"]) == 0:
-                current_states['states'].append(last_state)
-                print("  - '{}' skipped".format(job_config['name']))
-                continue
-            #print(last_state)
-
-        print("  - '{}'".format(job_config['name']), end='')
-
         try:
             plugin = importlib.import_module("plugins.repo.{}".format(job_config['type']))
         except ModuleNotFoundError:
@@ -62,59 +64,69 @@ for config_file in files:
             print("")
             continue
         
-        repo = plugin.Repository(job_config['config'], config.global_config)
-        
-        last_state = last_states.get(job_config['name'], None)
+        repo = plugin.Repository(job_config, config.global_config)
+        applications = repo.getApplications()
+        if len(applications) == 0:
+            if not checkParameter(app.getName(), args_values, last_states, current_states):
+                continue
 
-        try:
-            last_updates = last_state['updates'] if last_state != None else None
+            print("  - '{}'".format(job_config['name']), end='')
+            print( " \033[0;32mis updatet\033[0m")
+        else:
+            for app in applications:
+                if not checkParameter(app.getName(), args_values, last_states, current_states):
+                    continue
 
-            current_version = last_state['current'] if last_state != None else None
-            if current_version == None or current_version == 0 or current_version['version'] != repo.getCurrentVersionString():
-                current_version = repo.getCurrentVersion()
+                app.checkForUpdates()
 
-            current_state = { 'name': job_config['name'], 'type': job_config['type'], 'url': job_config['url'], 'current': current_version, 'updates': [] }
-            
-            new_versions = repo.getUpdates(last_updates)
-            for branch in new_versions:
-                current_state['updates'].append(new_versions[branch])
-                
-            if job_config['type'] == config.os_type:
-                system_updates = repo.getUpdateDetails()
-                
-            new_updates = []
-            if last_updates != None:
-                
-                for current_update in current_state['updates']:
-                    found = False
-                    for last_update in last_updates:
-                        if last_update['version'] == current_update['version']:
-                            found = True
-                    
-                    if not found:
-                        new_updates.append(current_update['version'])
+                print("  - '{}'".format(app.getName()), end='')
 
-            if len(new_updates) > 0:
-                print( " \033[0;31mhas new updates {}\033[0m".format(new_updates))
-                update_message_r.append("{}: versions {} are available".format(current_state['name'], new_updates))
-            elif len(current_state['updates']) > 0:
-                print( " \033[1;33mhas updates\033[0m")
-            else:
-                print( " \033[0;32mis updatet\033[0m")
-        except Exception as e:
-            print( " \033[0;31mhas failed\033[0m")
-            
-            print("Traceback (most recent call last):",file=sys.stderr)
-            traceback.print_tb(e.__traceback__)
-            print("Exception:  {}".format(e),file=sys.stderr)
-            print("----",file=sys.stderr)
+                last_state = last_states.get(app.getName(), None)
 
-            if  last_state == None:
-                current_state = { 'name': job_config['name'], 'type': job_config['type'], 'url': job_config['url'], 'current': 0, 'updates': [] }
-            else:
-                current_state = last_state
-            
-        current_states['states'].append(current_state)
+                try:
+                    last_updates = last_state['updates'] if last_state != None else None
+
+                    current_version = last_state['current'] if last_state != None else None
+                    if current_version == None or current_version == 0 or current_version['version'] != app.getCurrentVersionString():
+                        current_version = app.getCurrentVersion()
+
+                    current_state = { 'name': app.getName(), 'type': app.getType(), 'url': app.getUrl(), 'current': current_version, 'updates': [] }
+
+                    new_versions = app.getUpdates(last_updates)
+                    for branch in new_versions:
+                        current_state['updates'].append(new_versions[branch])
+
+                    new_updates = []
+                    for current_update in current_state['updates']:
+                        found = False
+                        if last_updates != None:
+                            for last_update in last_updates:
+                                if last_update['version'] == current_update['version']:
+                                    found = True
+                        if not found:
+                            new_updates.append(current_update['version'])
+
+                    if len(new_updates) > 0:
+                        print( " \033[0;31mhas new updates {}\033[0m".format(new_updates))
+                        update_message_r.append("{}: versions {} are available".format(current_state['name'], new_updates))
+                    elif len(current_state['updates']) > 0:
+                        print( " \033[1;33mhas updates\033[0m")
+                    else:
+                        print( " \033[0;32mis updatet\033[0m")
+                except Exception as e:
+                    print( " \033[0;31mhas failed\033[0m")
+
+                    print("Traceback (most recent call last):",file=sys.stderr)
+                    traceback.print_tb(e.__traceback__)
+                    print("Exception:  {}".format(e),file=sys.stderr)
+                    print("----",file=sys.stderr)
+
+                    if  last_state == None:
+                        current_state = { 'name': app.getName(), 'type': app.getType(), 'url': app.getUrl(), 'current': 0, 'updates': [] }
+                    else:
+                        current_state = last_state
+
+                current_states['states'].append(current_state)
             
 if args_values["limit"] == None:
     if args_values["notification"] and config.software_check_email and len(update_message_r) > 0:
