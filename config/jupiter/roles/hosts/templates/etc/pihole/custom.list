@@ -2,12 +2,13 @@
 192.168.120.3 switch
 192.168.120.4 ds
 192.168.120.5 jupiter
-192.168.120.6 ap1
-192.168.120.7 ap2
-192.168.120.8 mybook
+192.168.120.6 ap-groundfloor
+192.168.120.7 ap-firstfloor
+192.168.120.8 ap-outdoor
 192.168.120.9 tl-sg108e
 192.168.120.10 lares
 192.168.120.11 tablet-entrance
+192.168.120.12 mybook
 192.168.120.20 securitas
 192.168.120.51 cam01
 192.168.120.52 cam02
@@ -23,8 +24,8 @@
 192.168.120.65 dishwasher
 192.168.120.66 oven
 192.168.120.67 weather
-192.168.120.71 moodle-one
-192.168.120.72 moodle-two
+192.168.120.71 moode-one
+192.168.120.72 moode-two
 192.168.120.81 tablet-huawei
 192.168.120.83 tv-livingroom
 192.168.120.85 tv-tudor-wired
