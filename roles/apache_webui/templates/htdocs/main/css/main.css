@@ -540,9 +540,12 @@ body.dark #background {
     opacity: 1;
 }
 #submenu .service.home .outer_widgets_box {
-    margin-top: -5vh;
+    margin-top: calc(-4.4vh - 4px);
     overflow-x: hidden;
     max-width: 100%;
+}
+body.phone #submenu .service.home .outer_widgets_box {
+    margin-top: -5vh;
 }
 #submenu .service.home .widgets {
     display: flex;
@@ -559,8 +562,12 @@ body.dark #background {
 #submenu .service.home .widgets .widget {
     width: 0;
     overflow: hidden;
+    padding: 12px 0;
+    margin: -10px 0;
     transition: width 0.5s;
     white-space: nowrap;
+    text-shadow: var(--submenu-shadow-home-info);
+    font-size: 106.25%;
 }
 #submenu .service.home .widgets .widget.clickable {
     cursor: pointer;

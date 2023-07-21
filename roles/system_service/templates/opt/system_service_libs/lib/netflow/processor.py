@@ -28,6 +28,17 @@ IP_PROTOCOLS = {
     58: "icmpv6"
 }
 
+TCP_FLAGS = {
+    1: "FIN",  # Finish
+    2: "SYN",  # Synchronization
+    4: "RST",  # Reset
+    8: "PSH",  # Push
+    16: "ACK", # Acknowledge
+    32: "URG", # Urgent
+    64: "ECN", # Echo
+    128: "CWR" # Congestion Window Reduced
+}
+
 PING_PROTOCOLS = [1,58]
 
 #MDNS_IP4 = ipaddress.IPv4Address("224.0.0.251")
@@ -146,15 +157,24 @@ class Connection:
         self.src_port = self.request_flow['L4_SRC_PORT'] if 'L4_SRC_PORT' in self.request_flow else None
         self.dest_port = self.request_flow['L4_DST_PORT'] if 'L4_DST_PORT' in self.request_flow else None
 
+        self.request_flags = self.request_flow['TCP_FLAGS'] if 'TCP_FLAGS' in self.request_flow else 0
+        self.answer_flags = self.answer_flow['TCP_FLAGS'] if self.answer_flow is not None and 'TCP_FLAGS' in self.answer_flow else 0
+
         # swap direction
         if Helper.shouldSwapDirection(self, config, cache):
            #or not self.src.is_private:
             _ = self.dest_port
             self.dest_port = self.src_port
             self.src_port = _
+
             _ = self.dest
             self.dest = self.src
             self.src = _
+
+            _ = self.request_flags
+            self.request_flags = self.answer_flags
+            self.answer_flags = _
+
             self.is_swapped = True
         else:
             self.is_swapped = False
@@ -191,6 +211,11 @@ class Connection:
 #Apr 03 15:10:49 marvin system_service[3445]: [INFO] - [lib.netflow.processor:122] - False
 
         #logging.info(self.duration)
+    def getRequestFlow(self):
+        return self.request_flow
+
+    def getAnswerFlow(self):
+        return self.answer_flow
 
     @property
     def protocol_name(self):
@@ -258,8 +283,6 @@ class Processor(threading.Thread):
 
         influxdb.register(self.getMessurements)
 
-        self._initTrafficState()
-
         self.allowed_isp_pattern = {}
         for target, data in config.netflow_incoming_traffic.items():
             self.allowed_isp_pattern[target] = {}
@@ -277,6 +300,15 @@ class Processor(threading.Thread):
     def run(self):
         if self.config.netflow_bind_ip is None:
             return
+
+        logging.info("Init traffic state")
+        while True:
+            try:
+                self._initTrafficState()
+                break
+            except Exception:
+                logging.info("InfluxDB not ready. Will retry in 15 seconds.")
+                time.sleep(15)
 
         logging.info("Netflow processor started")
 
@@ -402,8 +434,6 @@ class Processor(threading.Thread):
             self.listener.join()
 
     def getMessurements(self):
-        messurements = []
-
         # ******
         start = time.time()
         pr = cProfile.Profile()
@@ -411,6 +441,8 @@ class Processor(threading.Thread):
 
         registry = {}
         for con in list(self.connections):
+            self.connections.remove(con)
+
             if con.skipped:
                 continue
 
@@ -492,7 +524,9 @@ class Processor(threading.Thread):
                         allowed = True
                 if not allowed:
                     traffic_group = "observed"
-            label.append("direction={}".format("incoming" if _srcIsExternal else "outgoing"))
+
+            direction = "incoming" if _srcIsExternal else "outgoing"
+            label.append("direction={}".format(direction))
             label.append("group={}".format(traffic_group))
             label.append("protocol={}".format(con.protocol_name))
 
@@ -502,6 +536,15 @@ class Processor(threading.Thread):
             if service == "unknown" and "speedtest" in extern_hostname:
                 service = "speedtest"
             label.append("service={}".format(service))
+
+            flags = []
+            _flags = con.request_flags # | con.answer_flags
+            for flag,name in TCP_FLAGS.items():
+                if flag & _flags == flag:
+                    flags.append(name)
+            if len(flags) == 0:
+                flags.append("NONE")
+            label.append("tcp_flags={}".format("|".join(flags)))
 
             label.append("destination_port={}".format(con.dest_port))
             label.append("source_port={}".format(con.src_port))
@@ -535,12 +578,21 @@ class Processor(threading.Thread):
 
             registry[key][1] += con.size
 
-            self.connections.remove(con)
-
             #logging.info("INIT {}".format(datetime.fromtimestamp(timestamp)))
             #logging.info("{} {}".format(timestamp, influx_timestamp))
             if traffic_group != "normal":
                 self._addTrafficState(traffic_group, timestamp)
+
+                #if traffic_group == "intruded":
+                data = {
+                    "extern_ip": str(extern_ip),
+                    "intern_ip": str(intern_ip),
+                    "direction": direction,
+                    "type": traffic_group,
+                    "request": con.getRequestFlow(),
+                    "response": con.getAnswerFlow()
+                }
+                logging.info("SUSPICIOUS TRAFFIC: {}".format(data))
 
         # old values with same timestamp should be summerized
         for _key in self.last_registry:
@@ -558,7 +610,7 @@ class Processor(threading.Thread):
         end = time.time()
         logging.info("METRIC PROCESSING FINISHED in {} seconds".format(round(end-start,1)))
         pr.disable()
-        if end-start > end-start > 0.5:
+        if (end-start) > 0.5:
             s = io.StringIO()
             sortby = SortKey.CUMULATIVE
             ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
@@ -589,11 +641,11 @@ class Processor(threading.Thread):
         offset = datetime.now().timestamp() - datetime.utcnow().timestamp()
         #logging.info(offset)
         # 362 min => 6h - 2 min
-        data = self.influxdb.query(['SELECT "group","value" FROM "netflow_size" WHERE time >= now() - 358m AND "group"::tag != \'normal\''])
-        #logging.info(data)
+        results = self.influxdb.query(['SELECT "group","value" FROM "netflow_size" WHERE time >= now() - 358m AND "group"::tag != \'normal\''])
+        #logging.info(results)
         self.traffic_stats = {}
-        if data is not None:
-            for value in data["results"][0]["series"][0]["values"]:
+        if results is not None and results[0] is not None:
+            for value in results[0]["values"]:
                 # 2023-07-13T23:45:29.511Z
                 # 2023-07-13T23:45:29.511000Z
                 #logging.info("{}000Z".format(value[0][:-1]))
@@ -606,13 +658,32 @@ class Processor(threading.Thread):
             self.traffic_stats[group] = []
         self.traffic_stats[group].append(time)
 
+    def _fillTrafficStates(self, states):
+        if "observed" not in states:
+            states["observed"] = 0
+        if "scanning" not in states:
+            states["scanning"] = 0
+        if "intruded" not in states:
+            states["intruded"] = 0
+
     def getTrafficState(self):
         count_values = {}
         for group in self.traffic_stats:
             count_values[group] = len(self.traffic_stats[group])
+        self._fillTrafficStates(count_values)
         return count_values
 
     def getStateMetrics(self):
-        return [
-            "system_service_process{{type=\"netflow_processor\",}} {}".format("1" if self.is_running else "0")
-        ]
+        metrics = [ "system_service_process{{type=\"netflow_processor\",}} {}".format("1" if self.is_running else "0") ]
+
+        min_time = datetime.now().timestamp() - 60
+        count_values = {}
+        for group in list(self.traffic_stats.keys()):
+            values = [time for time in self.traffic_stats[group] if time > min_time]
+            count_values[group] = len(values)
+        self._fillTrafficStates(count_values)
+
+        for group, count in count_values.items():
+            metrics.append( "system_service_netflow{{type=\"{}\",}} {}".format( group, count ) )
+
+        return metrics
