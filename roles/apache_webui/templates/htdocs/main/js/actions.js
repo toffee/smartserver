@@ -280,19 +280,13 @@ mx.Actions = (function( ret ) {
         window.setTimeout( function(){
             mx.Core.waitForTransitionEnd(submenu,function()
             {
-                if( callbacks.length > 0 ) 
-                {
-                    callbacks.forEach(function(callback)
-                    {
-                        callback();
-                    });
-                }
+                callbacks.forEach( (callback) => callback() );
             },"setSubMenu2");
-            submenu.style.opacity = "";
+            submenu.style.opacity = "1.0";
         },0);
     }
 
-    function showMenuContent(content, callbacks, title)
+    function showMenuContent(content, callbacks, title )
     {
         setTitle(title);
         
@@ -315,12 +309,24 @@ mx.Actions = (function( ret ) {
 
         var submenu = mx.$('#content #submenu');
 
-        if( isIFrameVisible() )
+        if( Array.isArray(callbacks) )
+        {
+            var post_callbacks = callbacks;
+            var init_callbacks = [];
+        }
+        else
+        {
+            var post_callbacks = callbacks["post"] != undefined ? callbacks["post"] : [];
+            var init_callbacks = callbacks["init"] != undefined ? callbacks["init"] : [];
+        }
+
+        if( isIFrameVisible() || submenu.innerHTML.length == 0 )
         //mx.History.getActiveNavigation() == null || mx.History.getActiveNavigation().getType() == "entry" )
         {
             submenu.style.opacity = "0";
             submenu.innerHTML = content;
-            _fadeInMenu(submenu, callbacks);
+            init_callbacks.forEach( (callback) => callback() );
+            _fadeInMenu(submenu, post_callbacks);
         }
         else
         {
@@ -330,7 +336,8 @@ mx.Actions = (function( ret ) {
                 mx.Core.waitForTransitionEnd(submenu,function()
                 {
                     submenu.innerHTML = content;
-                    _fadeInMenu(submenu, callbacks);
+                    init_callbacks.forEach( (callback) => callback() );
+                    _fadeInMenu(submenu, post_callbacks);
                     
                 },"setSubMenu1");
                 submenu.style.opacity = "0";
@@ -462,29 +469,31 @@ mx.Actions = (function( ret ) {
         content += '<div class="bottom"><div class="image"><div class="imageCopyright">' + mx.MainImage.getCopyright() + '</div><div class="imageTitle">' + mx.MainImage.getTitle() + '</div></div></div>';
         content += '</div>';
 
-        if( !isActive || isIFrameVisible() )
-        {
-            showMenuContent( content, [ function(){ mx.Widgets.init(mx.$(".service.home .widgets"), mx.$(".outer_widgets_box")); }, mx.Actions.refreshHome ], subGroup.getTitle());
-            
-            mx.History.addMenu(subGroup);
+        mx.Widgets.preload(function(){
+            if( !isActive || isIFrameVisible() )
+            {
+                showMenuContent( content, {"init": [ function(){ mx.Widgets.init(mx.$(".service.home .widgets"), mx.$(".outer_widgets_box")); }, mx.Actions.refreshHome ] }, subGroup.getTitle());
 
-            mx.Menu.activateMenu(null); // collapse open submenu
-        }
-        else
-        {
-            mx.$('#content #submenu').innerHTML = content;
-            mx.Widgets.init(mx.$(".service.home .widgets"), mx.$(".outer_widgets_box"));
-            mx.Actions.refreshHome();
-        }
+                mx.History.addMenu(subGroup);
 
-        if( !isActive ) 
-        {           
-            if( visualisationType != "desktop" ) menuPanel.close();
-        }
-        else 
-        {
-            if( typeof event != "undefined" && visualisationType != "desktop" ) menuPanel.close();
-        }
+                mx.Menu.activateMenu(null); // collapse open submenu
+            }
+            else
+            {
+                mx.$('#content #submenu').innerHTML = content;
+                mx.Widgets.init(mx.$(".service.home .widgets"), mx.$(".outer_widgets_box"));
+                mx.Actions.refreshHome();
+            }
+
+            if( !isActive )
+            {
+                if( visualisationType != "desktop" ) menuPanel.close();
+            }
+            else
+            {
+                if( typeof event != "undefined" && visualisationType != "desktop" ) menuPanel.close();
+            }
+        });
     };
 
     ret.refreshHome = function(event)
