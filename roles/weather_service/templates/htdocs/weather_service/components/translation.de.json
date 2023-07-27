@@ -1,0 +1,16 @@
+{
+  "index": {
+    "Service Error": "Service Fehler",
+    "Service is currently not available": "Service ist aktuell nicht verfügbar",
+    "Current": "Aktuell",
+    "Day": "Tag",
+    "Week": "Woche",
+    "Close": "Schliessen",
+    "Radar": "Radar",
+    "No forecasts available": "Keine Vorhersagen verfügbar",
+    "Temperature": "Temperatur",
+    "Perceived": "Gefühlt",
+    "Wind": "Wind",
+    "Rain": "Regen"
+  }
+}
