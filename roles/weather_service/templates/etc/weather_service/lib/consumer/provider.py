@@ -179,12 +179,24 @@ class ProviderConsumer():
                     #logging.info(data)
                     block = WeatherBlock(data['datetime'])
                     block.apply(data)
+                    #logging.info("{}".format(block.getPrecipitationAmountInMillimeter()))
 
-                    currentRain = self.station_consumer.getValue("rainCurrentInMillimeter")
-                    if currentRain > block.getPrecipitationAmountInMillimeter():
-                        block.setPrecipitationAmountInMillimeter(currentRain)
+                    currentRainLevel = self.station_consumer.getValue("rainCurrentLevel")
+                    currentRain = 0.1 if currentRainLevel > 2 else 0
+
+                    currentRain15Min = self.station_consumer.getValue("rainCurrent15MinInMillimeter")
+                    if currentRain15Min * 4 > currentRain:
+                        currentRain = currentRain15Min * 4
+
+                    currentRain1Hour = self.station_consumer.getValue("rainCurrentInMillimeter")
+                    if currentRain1Hour > currentRain:
+                        currentRain = currentRain1Hour
+
+                    #if currentRain > block.getPrecipitationAmountInMillimeter():
+                    block.setPrecipitationAmountInMillimeter(currentRain)
 
                     icon_name = WeatherHelper.convertOctaToSVG(self.latitude, self.longitude, block)
+
                     result["currentCloudsAsSVG"] = self.getCachedIcon(icon_name)
 
         return [ result, last_modified ]
