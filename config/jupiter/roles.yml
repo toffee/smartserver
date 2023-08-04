@@ -17,7 +17,7 @@
 
 - { import_role: { name: "config/jupiter/roles/apache_proxy" }, tags: [ 'apache_proxy' ] }  # proxy and redirect configs for custom devices
 
-#- { import_role: { name: ci_service }, tags: [ 'ci_service' ] }                         # continues integration test service
+- { import_role: { name: ci_service }, tags: [ 'ci_service' ] }                         # continues integration test service
 
 #- { import_role: { name: update_notifier }, tags: [ 'update_notifier' ] }               # update check for installed software
 - { import_role: { name: "config/jupiter/roles/hosts" }, tags: [ 'hosts' ] }                # add local host names/IPs to DNS 
@@ -32,3 +32,5 @@
 - { import_role: { name: "config/jupiter/roles/mytracker" }, tags: [ 'mytracker' ] }
 - { import_role: { name: "config/jupiter/roles/hikvision" }, tags: [ 'hikvision' ] }
 - { import_role: { name: "config/jupiter/roles/snapcast" }, tags: [ 'snapcast' ] }
+#- { import_role: { name: "config/jupiter/roles/homeassistant" }, tags: [ 'homeassistant' ] }
+- { import_role: { name: "config/jupiter/roles/mimic3" }, tags: [ 'mimic3' ] }

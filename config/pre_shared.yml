@@ -58,6 +58,7 @@ docker_zigbee2mqtt_ip:            "172.16.0.210"
 docker_recorder_ip:               "172.16.0.211"
 docker_mytracker_ip:              "172.16.0.212"
 docker_unifi_ip:                  "172.16.0.213"
+docker_mimic3_ip:                 "172.16.0.214"
 
 docker_vcontrold_ip:              "172.16.0.230"
 

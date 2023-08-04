@@ -1,0 +1,8 @@
+- name: restart mimic3
+  systemd:
+    name: mimic3
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    masked: no
+  listen: "restart mimic3"
