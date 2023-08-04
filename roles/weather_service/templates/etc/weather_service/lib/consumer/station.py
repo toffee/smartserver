@@ -62,6 +62,7 @@ class StationConsumer():
         result = {}
         _last_modified = last_modified
         for key, data in self.station_values.items():
+            key = "current{}{}".format(key[0].upper(),key[1:])
             if requested_fields is not None and key not in requested_fields:
                 continue
             if last_modified < data["time"]:
@@ -70,12 +71,24 @@ class StationConsumer():
                     _last_modified = data["time"]
         return [result, _last_modified]
 
+    def getLastModified(self, last_modified, requested_fields = None ):
+        _last_modified = last_modified
+        for key, data in self.station_values.items():
+            if requested_fields is not None and key not in requested_fields:
+                continue
+            if last_modified < data["time"] and _last_modified < data["time"]:
+                _last_modified = data["time"]
+        return _last_modified
+
     def getStateMetrics(self):
         has_any_update = False
         now = time.time()
         for key, item in self.station_values.items():
-            if now - item["time"] < 60 * 60:
+            if now - item["time"] < 60 * 60 * 2:
                 has_any_update = True
                 break
 
-        return ["weather_service_state{{type=\"consumer_station\"}} {}".format(1 if has_any_update else 0)]
+        state_metrics = []
+        state_metrics.append("weather_service_state{{type=\"consumer_station\",group=\"data\"}} {}".format(1 if has_any_update else 0))
+        state_metrics.append("weather_service_state{{type=\"consumer_station\",group=\"running\"}} {}".format(1 if self.is_running else 0))
+        return state_metrics
