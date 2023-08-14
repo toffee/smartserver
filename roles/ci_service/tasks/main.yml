@@ -109,11 +109,6 @@
     icons: [ 'templates/webui/icons/ci_service_logo.svg' ]
   import_tasks: roles/apache_webui/shared/add_webui.yml
 
-- name: copy apache api config
-  vars:
-    config_file: "templates/etc/apache2/_.ansible.conf.d/ci_service.conf"
-  import_tasks: roles/apache/shared/add_config.yml
-
 - name: create check cron job
   vars:
     name: "Continues integration job"
@@ -133,10 +128,17 @@
   import_tasks: roles/cron/shared/add_cronjob.yml
 
 # ***** FINALIZE *****
-- name: copy fluentd config
+- name: copy service apache config
   vars:
-    config_file: "templates/etc/fluent/_.ansible.d/ci_service.conf"
-  import_tasks: roles/fluentd/shared/add_config.yml
+    service_name: "ci_service"
+    service_host: "127.0.0.1:8506"
+  import_tasks: roles/shared_libs/shared/add_apache_service_config.yml
+
+- name: copy service fluentd config
+  vars:
+    service_name: "ci_service"
+    service_is_container: no
+  import_tasks: roles/shared_libs/shared/add_fluentd_service_config.yml
 
 - name: "create systemd service"
   template:

@@ -156,7 +156,7 @@ class WeatherHelper():
         ref_datetime = ref_datetime.replace(year=now.year,month=now.month,day=now.day)
         isNight = ( ref_datetime < sunrise or ref_datetime > sunset )
 
-        if block.precipitationProbabilityInPercent >= 30 and block.maxPrecipitationAmountInMillimeter > 0:
+        if ( block.precipitationProbabilityInPercent >= 30 and block.maxPrecipitationAmountInMillimeter > 0 ) or ( block.precipitationProbabilityInPercent >= 25 and block.maxPrecipitationAmountInMillimeter > 0.5 ):
             if block.maxPrecipitationAmountInMillimeter >= 1.3:
                 amount = 4
             elif block.maxPrecipitationAmountInMillimeter >= 0.9:
@@ -171,12 +171,13 @@ class WeatherHelper():
         else:
             rain_type = 'none'
 
-        if block.thunderstormProbabilityInPercent >= 5:
+        if block.thunderstormProbabilityInPercent >= 15:
             thunder_type = "thunder"
-            if cloudIndex == 0:
-                cloudIndex = 1
         else:
             thunder_type = 'none'
+
+        if cloudIndex == 0 and ( rain_type != "none" or thunder_type != "none" ):
+            cloudIndex = 1
 
         icon = WeatherHelper.sunConfig[ 'night' if isNight else 'day' ][cloudIndex];
 

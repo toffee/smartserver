@@ -19,9 +19,6 @@ from smartserver.argsparser import ArgsParser
 from smartserver import command
 
 def checkParameter(name, args_values, last_states, current_states):
-    if args_values["limit"] != None and args_values["limit"] != name:
-        return False
-
     if args_values["confirm"]:
         last_state = last_states.get(name, None)
         if last_state is None:
@@ -48,6 +45,9 @@ update_time = "{}".format(datetime.now().astimezone().isoformat())
             
 current_states = { 'last_update': update_time, 'states': [] }
 
+os_plugin = importlib.import_module("plugins.os.{}".format(config.os_type))
+operating_system = os_plugin.OperatingSystem()
+
 print("Processing projects")
 
 update_message_r = []
@@ -64,12 +64,12 @@ for config_file in files:
             print("")
             continue
         
-        repo = plugin.Repository(job_config, config.global_config)
-        applications = repo.getApplications()
-        if len(applications) == 0:
-            if not checkParameter(app.getName(), args_values, last_states, current_states):
-                continue
+        repo = plugin.Repository(job_config, config.global_config, operating_system)
+        applications = repo.getApplications(args_values["limit"])
+        if applications is None:
+            continue
 
+        if len(applications) == 0:
             print("  - '{}'".format(job_config['name']), end='')
             print( " \033[0;32mis updatet\033[0m")
         else:

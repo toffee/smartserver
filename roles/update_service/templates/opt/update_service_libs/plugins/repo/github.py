@@ -6,29 +6,38 @@ from helper.version import Version
 from plugins.repo.app import App
 
 class Repository(object):
-    def __init__(self,job_config,global_config):
-        self.apps = [ Application(job_config,global_config) ]
+    def __init__(self, job_config, global_config, operating_system):
+        self.job_config = job_config
+        self.global_config = global_config
+        self.operating_system = operating_system
 
-    def getApplications(self):
-        return self.apps
-
+    def getApplications(self, limit):
+        app = Application(self.job_config, self.global_config, self.operating_system)
+        if limit is None or limit == app.getName():
+            return [app]
+        return None
 
 class Application(App):
     API_BASE = "https://api.github.com/repos/"
     WEB_BASE = "https://github.com/"
 
-    def __init__(self,job_config,global_config):
+    def __init__(self, job_config, global_config, operating_system):
         super().__init__(job_config)
 
         self.plugin_config = job_config["config"]
         self.access_token = global_config['github_access_token']
+        self.operating_system = operating_system
 
     def checkForUpdates(self):
         self.project = self.plugin_config['project']
         self.pattern = self.plugin_config['pattern'] if 'pattern' in self.plugin_config else None
         
         if self.pattern != None:
-            version = Version.parseVersionString(self.plugin_config['version'],self.pattern)
+            if self.plugin_config['version'].startswith("package"):
+                version = self.operating_system.getInstalledVersion(self.plugin_config['version'].split(":")[1])
+                version = Version(version)
+            else:
+                version = Version.parseVersionString(self.plugin_config['version'],self.pattern)
             if version != None:
                 self.tag = self.plugin_config['version']
                 self.current_version = version.getVersionString()
