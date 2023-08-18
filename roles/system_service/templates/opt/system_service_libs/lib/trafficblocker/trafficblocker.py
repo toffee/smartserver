@@ -5,6 +5,7 @@ import time
 import schedule
 import os
 import math
+import datetime
 
 from smartserver.confighelper import ConfigHelper
 
@@ -12,7 +13,7 @@ from lib.trafficblocker.helper import Helper
 
 
 class TrafficBlocker(threading.Thread):
-    def __init__(self, config, handler, netflow):
+    def __init__(self, config, handler, influxdb, netflow):
         threading.Thread.__init__(self)
 
         self.config = config
@@ -31,11 +32,16 @@ class TrafficBlocker(threading.Thread):
 
         self.blocked_ips = []
 
+        self.influxdb = influxdb
+
     def start(self):
         self.is_running = True
+        self._restore()
+
         schedule.every().day.at("01:00").do(self._dump)
         schedule.every().hour.at("00:00").do(self._cleanup)
-        self._restore()
+        self.influxdb.register(self.getMessurements)
+
         super().start()
 
     def terminate(self):
@@ -45,7 +51,7 @@ class TrafficBlocker(threading.Thread):
         self.event.set()
 
     def run(self):
-        logging.info("IP attack blocker started")
+        logging.info("IP traffic blocker started")
         try:
             if self.config_map is None:
                 self.config_map = {"observed_ips": {}}
@@ -67,33 +73,44 @@ class TrafficBlocker(threading.Thread):
 
                         treshold = self.config.traffic_blocker_treshold[attacker["group"]]
                         if ip in self.config_map["observed_ips"]:
-                            if self.config_map["observed_ips"][ip]["status"] == "blocked": # restore state
+                            if self.config_map["observed_ips"][ip]["state"] == "approved": # unblock validated ip
+                                if ip in blocked_ips:
+                                    Helper.unblockIp(ip)
+                                    blocked_ips.remove(ip)
+                                    logging.info("UNBLOCK IP {} forced".format(ip))
+                                continue
+
+                            self.config_map["observed_ips"][ip]["updated"] = now
+                            if self.config_map["observed_ips"][ip]["state"] == "blocked": # restore state
                                 if ip not in blocked_ips:
+                                    logging.info("BLOCK IP {} restored".format(ip))
                                     Helper.blockIp(ip)
                                     blocked_ips.append(ip)
                                 continue
-                            treshold = math.ceil( treshold / self.config_map["observed_ips"][ip]["count"] ) # calculate treshhold based on number of blocked periods
+                            treshold = math.ceil( treshold / ( self.config_map["observed_ips"][ip]["count"] + 1 ) ) # calculate treshhold based on number of blocked periods
 
                         if attacker["count"] > treshold or ip in blocked_ips:
+                            if ip in self.config_map["observed_ips"]:
+                                self.config_map["observed_ips"][ip]["state"] = "blocked"
+                                self.config_map["observed_ips"][ip]["count"] += 1
+                            else:
+                                self.config_map["observed_ips"][ip] = { "created": now, "updated": now, "count": 1, "state": "blocked" }
+
                             if ip not in blocked_ips:
                                 logging.info("BLOCK IP {} after {} requests".format(ip, treshold))
                                 Helper.blockIp(ip)
                                 blocked_ips.append(ip)
-                            if ip not in self.config_map["observed_ips"]:
-                                self.config_map["observed_ips"][ip] = { "created": now, "updated": now, "count": 1, "status": "blocked" }
-                            else:
-                                self.config_map["observed_ips"][ip]["updated"] = now
-                                self.config_map["observed_ips"][ip]["status"] = "blocked"
-                                self.config_map["observed_ips"][ip]["count"] += 1
 
                     for ip in [ip for ip in blocked_ips if ip not in attacking_ips]:
                         if ip in self.config_map["observed_ips"]:
                             data = self.config_map["observed_ips"][ip]
-                            if now < data["updated"] + ( self.config.traffic_blocker_unblock_timeout * data["count"] ):
+                            factor = 0 if data["count"] <= 1 else pow(2,data["count"] - 2)
+                            time_offset = data["updated"] + ( self.config.traffic_blocker_unblock_timeout * factor )
+                            if now <= time_offset:
                                 continue
+                            logging.info("UNBLOCK IP {} after {}".format(ip, datetime.timedelta(seconds=(now - time_offset))))
                             data["updated"] = now
-                            data["status"] = "unblocked"
-                            logging.info("UNBLOCK IP {} after {} seconds".format(ip, now - data["updated"]))
+                            data["state"] = "unblocked"
                         else:
                             logging.info("UNBLOCK IP {}".format(ip))
                         Helper.unblockIp(ip)
@@ -103,7 +120,7 @@ class TrafficBlocker(threading.Thread):
 
                 self.event.wait(60)
 
-            logging.info("IP attack blocker stopped")
+            logging.info("IP traffic blocker stopped")
         except Exception:
             logging.error(traceback.format_exc())
             self.is_running = False
@@ -124,15 +141,26 @@ class TrafficBlocker(threading.Thread):
         cleaned = 0
         for ip in list(self.config_map["observed_ips"].keys()):
             data = self.config_map["observed_ips"][ip]
-            if data["state"] == "blocked" or now < data["updated"] + self.config.traffic_blocker_clean_known_ips_timeout:
+            if data["state"] != "unblocked" or now < data["updated"] + self.config.traffic_blocker_clean_known_ips_timeout:
                 continue
             del self.config_map["observed_ips"][ip]
             cleaned = cleaned + 1
         if cleaned > 0:
             logging.info("Cleaned {} ip(s)".format(cleaned))
 
+    def getApprovedIPs(self):
+        return [ip for ip, data in self.config_map["observed_ips"].items() if data["state"] == "approved"]
+
     def getBlockedIPs(self):
         return list(self.blocked_ips)
+
+    def getMessurements(self):
+        messurements = []
+        if self.config_map is not None:
+            with self.config_lock:
+                for ip, data in self.config_map["observed_ips"].items():
+                    messurements.append("trafficblocker,extern_ip={},blocked_state={}  value=\"{}\"".format(ip, data["state"], data["count"]))
+        return messurements
 
     def getStateMetrics(self):
         return [

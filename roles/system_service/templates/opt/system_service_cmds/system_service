@@ -54,9 +54,12 @@ class Handler(Server):
         self.speedtest = Speedtest(config, self, self.mqtt, self.influxdb, self.info )
         self.fping = FPing(config, self, self.influxdb )
 
-        self.trafficblocker = TrafficBlocker(config, self, self.netflow)
+        self.trafficblocker = TrafficBlocker(config, self, self.influxdb, self.netflow)
 
         self.scheduler = Scheduler()
+
+    def getTrafficBlocker(self): # used by netflow
+        return self.trafficblocker
 
     def start(self, callback):
         self.mqtt.start()
