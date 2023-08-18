@@ -798,7 +798,7 @@ class Processor(threading.Thread):
         results = self.influxdb.query('SELECT "group","value" FROM "netflow_size" WHERE time >= now() - 358m AND "group"::tag != \'normal\'')
         #logging.info(results)
         self.traffic_stats = {}
-        if results is not None and results[0] is not None:
+        if results is not None and results and results[0] is not None:
             for value in results[0]["values"]:
                 # 2023-07-13T23:45:29.511Z
                 # 2023-07-13T23:45:29.511000Z
