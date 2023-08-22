@@ -281,26 +281,6 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Type"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 20
-              },
-              {
-                "id": "filterable",
-                "value": true
-              },
-              {
-                "id": "displayName",
-                "value": "T"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
               "options": "City"
             },
             "properties": [
@@ -345,45 +325,9 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Protocol"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 40
-              },
-              {
-                "id": "displayName",
-                "value": "P"
-              },
-              {
-                "id": "filterable",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
               "options": "Extern Host"
             },
             "properties": [
-              {
-                "id": "filterable",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Zip"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 80
-              },
               {
                 "id": "filterable",
                 "value": true
@@ -584,12 +528,6 @@
             },
             {
               "params": [
-                "location_country_code::tag"
-              ],
-              "type": "tag"
-            },
-            {
-              "params": [
                 "location_country_name::tag"
               ],
               "type": "tag"
@@ -602,20 +540,14 @@
             },
             {
               "params": [
-                "location_zip::tag"
-              ],
-              "type": "tag"
-            },
-            {
-              "params": [
                 "service::tag"
               ],
               "type": "tag"
             }
           ],
-          "measurement": "netflow_size",
+          "measurement": "netflow",
           "orderByTime": "DESC",
-          "policy": "default",
+          "policy": "autogen",
           "query": "SELECT \"value\" FROM \"default\".\"netflow_size\" WHERE (\"direction\" = 'incoming') AND $timeFilter GROUP BY \"destination_port\"::tag, \"direction\"::tag, \"extern_group\"::tag, \"extern_host\"::tag, \"extern_ip\"::tag, \"group\"::tag, \"intern_host\"::tag, \"intern_ip\"::tag, \"ip_type\"::tag, \"location_city\"::tag, \"location_country_code\"::tag, \"location_country_name\"::tag, \"location_org\"::tag, \"location_zip\"::tag, \"protocol\"::tag, \"service\"::tag, \"suspicious\"::tag, \"source_port\"::tag ORDER BY time DESC",
           "rawQuery": false,
           "refId": "A",
@@ -624,7 +556,7 @@
             [
               {
                 "params": [
-                  "value"
+                  "count"
                 ],
                 "type": "field"
               }
@@ -642,7 +574,6 @@
             "fields": {
               "Time": {
                 "aggregations": [
-                  "count",
                   "firstNotNull",
                   "lastNotNull",
                   "range"
@@ -650,7 +581,10 @@
                 "operation": "aggregate"
               },
               "count": {
-                "aggregations": []
+                "aggregations": [
+                  "sum"
+                ],
+                "operation": "aggregate"
               },
               "destination_port": {
                 "aggregations": [],
@@ -711,6 +645,10 @@
                 "aggregations": [],
                 "operation": "groupby"
               },
+              "malware": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
               "protocol": {
                 "aggregations": []
               },
@@ -723,7 +661,10 @@
                 "operation": "groupby"
               },
               "sum": {
-                "aggregations": []
+                "aggregations": [
+                  "sum"
+                ],
+                "operation": "aggregate"
               },
               "suspicious": {
                 "aggregations": [],
@@ -754,23 +695,20 @@
               "source_port": true
             },
             "indexByName": {
-              "Time (count)": 0,
               "Time (firstNotNull)": 2,
               "Time (lastNotNull)": 1,
               "Time (range)": 3,
-              "destination_port": 12,
-              "direction": 5,
+              "count (sum)": 0,
+              "direction": 4,
               "extern_group": 9,
               "extern_host": 11,
               "extern_ip": 10,
-              "group": 4,
+              "group": 5,
               "intern_host": 8,
               "intern_ip": 7,
-              "location_city": 17,
-              "location_country_code": 14,
-              "location_country_name": 15,
-              "location_org": 13,
-              "location_zip": 16,
+              "location_city": 14,
+              "location_country_name": 13,
+              "location_org": 12,
               "service": 6
             },
             "renameByName": {
@@ -780,6 +718,7 @@
               "Time (lastNotNull)": "Start",
               "Time (range)": "Duration",
               "count": "Events",
+              "count (sum)": "Events",
               "destination_port": "Port",
               "direction": "Direction",
               "extern_group": "Extern Group",
@@ -795,10 +734,12 @@
               "location_country_name": "Country",
               "location_org": "ISP",
               "location_zip": "Zip",
+              "malware": "Malware",
               "protocol": "Protocol",
               "service": "Service",
               "source_port": "",
               "sum": "Traffic",
+              "sum (sum)": "Events",
               "tcp_flags": "Flags",
               "value": "",
               "value (count)": "Req",
@@ -824,14 +765,7 @@
           "type": "influxdb",
           "uid": "system_info_influxdb"
         },
-        "filters": [
-          {
-            "condition": "",
-            "key": "group",
-            "operator": "!=",
-            "value": "normal"
-          }
-        ],
+        "filters": [],
         "hide": 0,
         "name": "Filters",
         "skipUrlSync": false,
@@ -847,6 +781,6 @@
   "timezone": "",
   "title": "System Service Netflow Summary",
   "uid": "system-service-netflow-summary",
-  "version": 2,
+  "version": 7,
   "weekStart": ""
 }

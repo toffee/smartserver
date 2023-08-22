@@ -76,12 +76,6 @@ class TrafficGroup():
     SCANNING = 'scanning'
     INTRUDED = 'intruded'
 
-    HIERARCHY = {
-        SCANNING: [INTRUDED],
-        OBSERVED: [SCANNING, INTRUDED],
-    }
-
-
 class Helper():
     __base32 = '0123456789bcdefghjkmnpqrstuvwxyz'
 
@@ -343,15 +337,17 @@ class Processor(threading.Thread):
     def __init__(self, config, handler, influxdb, ipcache, malware ):
         threading.Thread.__init__(self)
 
-        self.is_running = True
+        self.is_running = False
 
         self.config = config
 
         self.is_enabled = True
 
+        self.ip_stats = []
         self.traffic_stats = {}
         self.last_traffic_stats = 0
         self.last_processed_traffic_stats = 0
+        self.stats_lock = threading.Lock()
 
         self.connections = []
         self.last_registry = {}
@@ -376,6 +372,8 @@ class Processor(threading.Thread):
         self.is_running = False
 
     def start(self):
+        self.is_running = True
+
         schedule.every().minute.at(":00").do(self._cleanTrafficState)
         self.influxdb.register(self.getMessurements)
 
@@ -391,6 +389,7 @@ class Processor(threading.Thread):
                 self._initTrafficState()
                 break
             except Exception as e:
+                logging.info(e)
                 logging.info("InfluxDB not ready. Will retry in 15 seconds.")
                 time.sleep(15)
 
@@ -546,6 +545,8 @@ class Processor(threading.Thread):
 
         wireguard_peers = None
         approved_ips = self.handler.getTrafficBlocker().getApprovedIPs()
+        blocked_ips = self.handler.getTrafficBlocker().getBlockedIPs()
+
         registry = {}
         for con in list(self.connections):
             self.connections.remove(con)
@@ -557,7 +558,7 @@ class Processor(threading.Thread):
 
             # most flows are already 60 seconds old when they are delivered (flow expire config in softflowd)
             timestamp -= METRIC_TIMESHIFT
-            influx_timestamp = int(timestamp * 1000)
+            influx_timestamp = int(int(timestamp) * 1000)
 
             _location = con.location
             if _location["type"] == IPCache.TYPE_LOCATION:
@@ -586,11 +587,12 @@ class Processor(threading.Thread):
                 location_org = "Unknown"
 
             label = []
+            values = {}
 
             _srcIsExternal = self.cache.isExternal(con.src)
-            extern_ip = con.src if _srcIsExternal else con.dest
+            extern_ip = str((con.src if _srcIsExternal else con.dest).compressed)
             extern_hostname = con.src_hostname if _srcIsExternal else con.dest_hostname
-            intern_ip = con.dest if _srcIsExternal else con.src
+            intern_ip = str((con.dest if _srcIsExternal else con.src).compressed)
             intern_hostname = con.dest_hostname if _srcIsExternal else con.src_hostname
 
             label.append("intern_ip={}".format(intern_ip))
@@ -611,63 +613,43 @@ class Processor(threading.Thread):
             service = con.service
             label.append("service={}".format(service))
 
-            traffic_group = None
+            traffic_group = TrafficGroup.NORMAL
             if extern_ip not in approved_ips:
-                #if extern_ip in self.suspicious_ips:
-                #    self.suspicious_ips[extern_ip]["update"] = now
-                #    traffic_group = self.suspicious_ips[extern_ip]["group"]
-                #else:
-                service_key = Helper.getServiceKey(con.dest, con.dest_port) if _srcIsExternal else None
-                malware_blacklist_count = self.malware.check(extern_ip)
-                #if _srcIsExternal and Helper.isExpectedTraffic(service_key, self.config)
-
-                if malware_blacklist_count > 0:
+                malware_type = self.malware.check(extern_ip)
+                if malware_type:
                     if _srcIsExternal:
                         traffic_group = TrafficGroup.SCANNING
-                    elif malware_blacklist_count > 1:
+                    else:
                         traffic_group = TrafficGroup.OBSERVED if service == "icmp" else TrafficGroup.INTRUDED
-
-                if traffic_group is None:
-                    if _srcIsExternal:
-                        if len(self.allowed_isp_pattern) > 0:
-                            allowed = False
-                            if service_key in self.allowed_isp_pattern:
-                                if location_org and "org" in self.allowed_isp_pattern[service_key] and self.allowed_isp_pattern[service_key]["org"].match(location_org):
-                                    allowed = True
-                                elif extern_hostname and "hostname" in self.allowed_isp_pattern[service_key] and self.allowed_isp_pattern[service_key]["hostname"].match(extern_hostname):
-                                    allowed = True
-                                elif extern_ip:
-                                    if "ip" in self.allowed_isp_pattern[service_key] and self.allowed_isp_pattern[service_key]["ip"].match(extern_ip):
-                                        allowed = True
-                                    elif "wireguard_peers" in self.allowed_isp_pattern[service_key] and ( wireguard_peers is not None or ( wireguard_peers := self.getWireguardPeers() ) ) and str(extern_ip) in wireguard_peers:
-                                        allowed = True
-                                        #logging.info("wireguard >>>>>>>>>>> {}".format(extern_ip))
-                            if not allowed:
-                                traffic_group = TrafficGroup.OBSERVED
-
-                #if traffic_group is not None:
-                #    self.suspicious_ips[extern_ip] = { "update": now, "group": traffic_group]
-            if traffic_group is None:
-                traffic_group = TrafficGroup.NORMAL
+                elif _srcIsExternal and len(self.allowed_isp_pattern) > 0:
+                    allowed = False
+                    service_key = Helper.getServiceKey(con.dest, con.dest_port) if _srcIsExternal else None
+                    if service_key in self.allowed_isp_pattern:
+                        if location_org and "org" in self.allowed_isp_pattern[service_key] and self.allowed_isp_pattern[service_key]["org"].match(location_org):
+                            allowed = True
+                        elif extern_hostname and "hostname" in self.allowed_isp_pattern[service_key] and self.allowed_isp_pattern[service_key]["hostname"].match(extern_hostname):
+                            allowed = True
+                        elif extern_ip:
+                            if "ip" in self.allowed_isp_pattern[service_key] and self.allowed_isp_pattern[service_key]["ip"].match(extern_ip):
+                                allowed = True
+                            elif "wireguard_peers" in self.allowed_isp_pattern[service_key] and ( wireguard_peers is not None or ( wireguard_peers := self.getWireguardPeers() ) ) and extern_ip in wireguard_peers:
+                                allowed = True
+                                #logging.info("wireguard >>>>>>>>>>> {}".format(extern_ip))
+                    if not allowed:
+                        traffic_group = TrafficGroup.OBSERVED
+                        malware_type = "unknown"
+            else:
+                malware_type = None
+            label.append("group={}".format(traffic_group))
 
             direction = "incoming" if _srcIsExternal else "outgoing"
             label.append("direction={}".format(direction))
-            label.append("group={}".format(traffic_group))
             label.append("protocol={}".format(con.protocol_name))
 
             label.append("ip_type={}".format(con.ip_type))
 
-            flags = []
-            if con.request_tcp_flags is not None:
-                for flag, name in TCP_FLAGS.items():
-                    if flag & con.request_tcp_flags == flag:
-                        flags.append(name)
-            if len(flags) == 0:
-                flags.append("NONE")
-            label.append("tcp_flags={}".format("|".join(flags)))
-
             label.append("destination_port={}".format(con.dest_port))
-            label.append("source_port={}".format(con.src_port))
+            #label.append("source_port={}".format(con.src_port)) # => should be a field, because it is changing every time
             #label.append("size={}".format(con.size))
             #label.append("duration={}".format(con.duration))
             #label.append("packets={}".format(con.packages))
@@ -676,10 +658,6 @@ class Processor(threading.Thread):
             label.append("location_country_code={}".format(location_country_code))
             label.append("location_zip={}".format(InfluxDB.escapeValue(location_zip)))
             label.append("location_city={}".format(InfluxDB.escapeValue(location_city)))
-            #if location_district:
-            #    label.append("location_district={}".format(InfluxDB.escapeValue(location_district)))
-            if location_geohash:
-                label.append("location_geohash={}".format(location_geohash))
             if location_org:
                 label.append("location_org={}".format(InfluxDB.escapeValue(location_org)))
 
@@ -688,31 +666,49 @@ class Processor(threading.Thread):
             #logging.info("SRC: {} {} {}".format(con.src, con.src_hostname,src_location))
             #logging.info("DEST: {} {} {}".format(con.dest, con.dest_hostname,dest_location))
 
+            if location_geohash:
+                values["location_geohash"] = location_geohash
+                label.append("location_geohash=1")
+
+            values["tcp_flags"] = con.request_tcp_flags if con.request_tcp_flags is not None else 0
+            values["size"] = con.size
+            values["count"] = 1
+
             label_str = ",".join(label)
             key = "{}-{}".format(label_str, influx_timestamp)
             if key not in registry:
                 #logging.info("new")
-                registry[key] = [label_str, 0, influx_timestamp]
-            #else:
-            #    logging.info("doublicate")
+                registry[key] = [label_str, values, influx_timestamp]
 
-            registry[key][1] += con.size
+                #logging.info("timestamp: {}, influx_timestamp: {}".format(timestamp, influx_timestamp))
+
+                # old values with same timestamp should be summerized
+                if key in self.last_registry:
+                    registry[key][1]["tcp_flags"] |= self.last_registry[key][1]["tcp_flags"]
+                    registry[key][1]["size"] += self.last_registry[key][1]["size"]
+                    registry[key][1]["count"] += self.last_registry[key][1]["count"]
+            else:
+                registry[key][1]["tcp_flags"] |= values["tcp_flags"]
+                registry[key][1]["size"] += values["size"]
+                registry[key][1]["count"] += 1
 
             #logging.info("INIT {}".format(datetime.fromtimestamp(timestamp)))
             #logging.info("{} {}".format(timestamp, influx_timestamp))
             if traffic_group != "normal":
-                self._addTrafficState(traffic_group, timestamp)
+                with self.stats_lock:
+                    self._addTrafficState(extern_ip, traffic_group, malware_type, timestamp)
 
-                #if traffic_group == "intruded":
-                data = {
-                    "extern_ip": str(extern_ip),
-                    "intern_ip": str(intern_ip),
-                    "direction": direction,
-                    "type": traffic_group,
-                    "request": con.getRequestFlow(),
-                    "response": con.getAnswerFlow()
-                }
-                logging.info("SUSPICIOUS TRAFFIC: {}".format(data))
+                if extern_ip not in blocked_ips:
+                    #if traffic_group == "intruded":
+                    data = {
+                        "extern_ip": extern_ip,
+                        "intern_ip": intern_ip,
+                        "direction": direction,
+                        "type": traffic_group,
+                        "request": con.getRequestFlow(),
+                        "response": con.getAnswerFlow()
+                    }
+                    logging.info("SUSPICIOUS TRAFFIC: {}".format(data))
 
             #if con.protocol in IP_PING_PROTOCOLS:
             #    data = {
@@ -725,18 +721,36 @@ class Processor(threading.Thread):
             #    }
             #    logging.info(data)
 
-        # old values with same timestamp should be summerized
-        for _key in self.last_registry:
-            if _key in registry:
-                registry[_key][1] += self.last_registry[_key][1]
-                #logging.info("last value")
-
         self.last_registry = registry
 
         messurements = []
         sorted_registry = sorted(registry.values(), key=lambda x: x[2])
         for data in sorted_registry:
-            messurements.append("netflow_size,{} value={} {}".format(data[0], data[1], data[2]))
+
+            label_str, values, timestamp = data
+
+            flags = []
+            if values["tcp_flags"] > 0:
+                for flag, name in TCP_FLAGS.items():
+                    if flag & values["tcp_flags"] == flag:
+                        flags.append(name)
+            if len(flags) == 0:
+                flags.append("NONE")
+
+            values_str = []
+            values_str.append("tcp_flags=\"{}\"".format("|".join(flags)))
+            for name,value in values.items():
+                if name == "tcp_flags":
+                    continue
+                elif isinstance(value, str):
+                    values_str.append("{}=\"{}\"".format(name,InfluxDB.escapeValue(value)))
+                else:
+                    values_str.append("{}={}".format(name,value))
+            values_str = ",".join(values_str)
+
+            #logging.info("netflow,{} {} {}".format(label_str, values_str, timestamp))
+
+            messurements.append("netflow,{} {} {}".format(label_str, values_str, timestamp))
 
         #end = time.time()
         #logging.info("METRIC PROCESSING FINISHED in {} seconds".format(round(end-start,1)))
@@ -757,75 +771,46 @@ class Processor(threading.Thread):
 
         return messurements
 
-    def getAttackers(self):
-        results = self.influxdb.query('SELECT COUNT("value") AS "cnt" FROM "netflow_size" WHERE time >= now() - 358m AND "group"::tag != \'normal\' GROUP BY "group","extern_ip"')
-        attackers = {}
-        post_processing_data = {}
-        if results is not None and results[0] is not None:
-            for result in results:
-                ip = result["tags"]["extern_ip"]
-                if ip not in attackers:
-                    attackers[ip] = {}
-                else:
-                    post_processing_data[ip] = attackers[ip]
-                attackers[ip][result["tags"]["group"]] = result["values"][0][1]
-
-        for ip, group_data in post_processing_data.keys():
-            for group in group_data.key():
-                if group not in TrafficGroup.HIERARCHY:
-                    continue
-                for sub_group in TrafficGroup.HIERARCHY[group]:
-                    if sub_group in group_data:
-                        group_data[group] += group_data[sub_group]
-
-        return attackers
-
     def _cleanTrafficState(self):
-        min_time = datetime.now().timestamp() - 60 * 60 * 6
-        for group in list(self.traffic_stats.keys()):
-            values = [time for time in self.traffic_stats[group] if time > min_time]
-            if len(values) == 0:
-                del self.traffic_stats[group]
-            else:
-                self.traffic_stats[group] = values
+        with self.stats_lock:
+            min_time = datetime.now().timestamp() - 60 * 60 * 6
+
+            for group in list(self.traffic_stats.keys()):
+                values = [time for time in self.traffic_stats[group] if time > min_time]
+                if len(values) == 0:
+                    del self.traffic_stats[group]
+                else:
+                    self.traffic_stats[group] = values
+
+            self.ip_stats = [data for data in self.ip_stats if data["time"] > min_time]
 
     def _initTrafficState(self):
-        #ref_time = datetime.utcnow().timestamp()
-        #logging.info("ref_time {}".format(datetime.fromtimestamp(ref_time)))
-        offset = datetime.now().timestamp() - datetime.utcnow().timestamp()
-        #logging.info(offset)
-        # 362 min => 6h - 2 min
-        results = self.influxdb.query('SELECT "group","value" FROM "netflow_size" WHERE time >= now() - 358m AND "group"::tag != \'normal\'')
-        #logging.info(results)
-        self.traffic_stats = {}
-        if results is not None and results and results[0] is not None:
-            for value in results[0]["values"]:
-                # 2023-07-13T23:45:29.511Z
-                # 2023-07-13T23:45:29.511000Z
-                #logging.info("{}000Z".format(value[0][:-1]))
+        with self.stats_lock:
+            # 362 min => 6h - 2 min
+            results = self.influxdb.query('SELECT "extern_ip","group","count" FROM "netflow" WHERE time >= now() - 358m AND "group"::tag != \'normal\'')
+            self.traffic_stats = {}
+            if results is not None:
+                for result in results:
+                    for value in result["values"]:
+                        #if value[3] > 1:
+                        #    logging.info("{} {} {}".format(value[1], value[2], value[3]))
+                        value_time = InfluxDB.parseDatetime(value[0])
+                        malware_type = self.malware.check(value[1])
+                        for n in range(value[3]):
+                            self._addTrafficState(value[1], value[2], malware_type if malware_type else "unknown", value_time.timestamp())
+            self.last_processed_traffic_stats = self.last_traffic_stats
 
-                value[0] = value[0][:-1] # remove "Z" timezone
+    def _addTrafficState(self, ip, traffic_group, malware_type, time):
+        # lock is called in place where this function is called
 
-                pos = value[0].find(".")
-                if pos == -1:
-                    value[0] = "{}.000000".format(value[0])
-                else:
-                    # 2023-08-16T00:26:26.915000
-                    needed_characters = 26 - len(value[0])
-                    value[0] = "{}{}".format(value[0], "0" * needed_characters)
-                    #logging.info("{}".format(needed_characters))
-
-                value_time = datetime.strptime(value[0], "%Y-%m-%dT%H:%M:%S.%f")
-                self._addTrafficState(value[1], value_time.timestamp() + offset)
-        self.last_processed_traffic_stats = self.last_traffic_stats
-
-    def _addTrafficState(self, group, time):
         #logging.info("ADD {}".format(datetime.fromtimestamp(time)))
-        if group not in self.traffic_stats:
-            self.traffic_stats[group] = []
-        self.traffic_stats[group].append(time)
+        if traffic_group not in self.traffic_stats:
+            self.traffic_stats[traffic_group] = []
+        self.traffic_stats[traffic_group].append(time)
         if time > self.last_traffic_stats:
             self.last_traffic_stats = time
+
+        self.ip_stats.append({"ip": ip, "traffic_group": traffic_group, "malware_type": malware_type, "time": time})
 
     def _fillTrafficStates(self, states):
         if "observed" not in states:
@@ -835,10 +820,30 @@ class Processor(threading.Thread):
         if "intruded" not in states:
             states["intruded"] = 0
 
+    def getIPTrafficState(self):
+        ipstate = {}
+        with self.stats_lock:
+            for data in self.ip_stats:
+                ip = data["ip"]
+                traffic_group = data["traffic_group"]
+
+                key = "netflow_{}".format(traffic_group)
+
+                if ip not in ipstate:
+                    ipstate[ip] = {}
+                if key not in ipstate[ip]:
+                    ipstate[ip][key] = {"count": 0, "reason": "netflow", "type": data["malware_type"], "details": data["traffic_group"], "last": 0}
+                ipstate[ip][key]["count"] += 1
+                if data["time"] > ipstate[ip][key]["last"]:
+                    ipstate[ip][key]["last"] = data["time"]
+
+        return ipstate
+
     def getTrafficState(self):
         count_values = {}
-        for group in self.traffic_stats:
-            count_values[group] = len(self.traffic_stats[group])
+        with self.stats_lock:
+            for group in self.traffic_stats:
+                count_values[group] = len(self.traffic_stats[group])
         self._fillTrafficStates(count_values)
         return count_values
 
@@ -848,10 +853,11 @@ class Processor(threading.Thread):
         min_time = self.last_processed_traffic_stats
         self.last_processed_traffic_stats = self.last_traffic_stats
         count_values = {}
-        for group in list(self.traffic_stats.keys()):
-            values = [time for time in self.traffic_stats[group] if time > min_time]
-            count_values[group] = len(values)
-        self._fillTrafficStates(count_values)
+        with self.stats_lock:
+            for group in list(self.traffic_stats.keys()):
+                values = [time for time in self.traffic_stats[group] if time > min_time]
+                count_values[group] = len(values)
+            self._fillTrafficStates(count_values)
 
         for group, count in count_values.items():
             metrics.append( "system_service_netflow{{type=\"{}\",}} {}".format( group, count ) )

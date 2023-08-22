@@ -4,6 +4,7 @@ import threading
 import traceback
 import urllib.parse
 import json
+from datetime import datetime
 
 import logging
 
@@ -20,6 +21,24 @@ class InfluxDB(threading.Thread):
       self.callbacks = []
 
       self.state_metrics = -1
+
+    @staticmethod
+    def parseDatetime(value):
+        value = value[:-1] # remove "Z" timezone
+
+        pos = value.find(".")
+        if pos == -1:
+            value = "{}.000000".format(value)
+        else:
+            # 2023-08-16T00:26:26.915000
+            needed_characters = 26 - len(value)
+            if needed_characters < 0:
+                value = value[:needed_characters]
+            else:
+                value = "{}{}".format(value, "0" * needed_characters)
+            #logging.info("{}".format(needed_characters))
+
+        return datetime.strptime("{}+0000".format(value), "%Y-%m-%dT%H:%M:%S.%f%z").astimezone()
 
     def getStateMetrics(self):
         return ["system_service_state{{type=\"influxdb\"}} {}".format(self.state_metrics)]
@@ -71,8 +90,12 @@ class InfluxDB(threading.Thread):
     #    return values
 
     def query(self, query):
+        is_array = type(query) is list
+        if not is_array:
+            query = [query]
+
         headers = {'Authorization': "Token {}".format(self.config.influxdb_token), "Content-Type": "application/vnd.influxql"}
-        url = "{}/query?pretty=true&db={}&rp=autogen&q={}".format(self.config.influxdb_rest,self.config.influxdb_database, urllib.parse.quote(";".join([query])))
+        url = "{}/query?pretty=true&db={}&rp=autogen&q={}".format(self.config.influxdb_rest,self.config.influxdb_database, urllib.parse.quote(";".join(query)))
 
         r = requests.get( url, headers=headers)
 
@@ -82,11 +105,19 @@ class InfluxDB(threading.Thread):
 
         try:
             data = json.loads(r.text)
-            #logging.info(data)
-            if len(data["results"]) == 1:
-                if "series" in data["results"][0] and len(data["results"][0]["series"]) > 0:
-                    return data["results"][0]["series"]
-            return []
+            if is_array:
+                results = []
+                for result in data["results"]:
+                    if "series" in result and len(result["series"]) > 0:
+                        results.append(result["series"])
+                    else:
+                        results.append([])
+                return results
+            else:
+                if len(data["results"]) == 1:
+                    if "series" in data["results"][0] and len(data["results"][0]["series"]) > 0:
+                        return data["results"][0]["series"]
+                return []
 
         except Exception as e:
             logging.error("Got unexpected exception")

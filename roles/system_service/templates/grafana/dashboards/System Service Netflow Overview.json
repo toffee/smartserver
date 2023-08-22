@@ -126,9 +126,9 @@
               "type": "tag"
             }
           ],
-          "measurement": "netflow_size",
+          "measurement": "netflow",
           "orderByTime": "ASC",
-          "policy": "default",
+          "policy": "autogen",
           "query": "SELECT sum(\"value\") FROM \"netflow_size\" WHERE (\"location_org\" =~ /^$Organisation$/ AND \"location_country_name\" =~ /^$Country$/ AND \"service\" =~ /^$Service$/ AND \"intern_host\" =~ /^$InternHost$/ AND \"intern_ip\" =~ /^$InternIP$/ AND \"extern_group\" =~ /^$ExternGroup$/ AND \"extern_host\" =~ /^$ExternHost$/ AND \"extern_ip\" =~ /^$ExternIP$/ AND \"location_country_code\" != 'xx' AND \"service\" != 'speedtest') AND $timeFilter GROUP BY \"location_country_name\"",
           "rawQuery": false,
           "refId": "A",
@@ -137,7 +137,7 @@
             [
               {
                 "params": [
-                  "value"
+                  "size"
                 ],
                 "type": "field"
               },
@@ -246,16 +246,16 @@
               "type": "tag"
             }
           ],
-          "measurement": "netflow_size",
+          "measurement": "netflow",
           "orderByTime": "ASC",
-          "policy": "default",
+          "policy": "autogen",
           "refId": "A",
           "resultFormat": "table",
           "select": [
             [
               {
                 "params": [
-                  "value"
+                  "size"
                 ],
                 "type": "field"
               },
@@ -282,338 +282,6 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "system_info_influxdb"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
-          "mappings": [
-            {
-              "options": {
-                "v4": {
-                  "index": 0,
-                  "text": "IPv4"
-                },
-                "v6": {
-                  "index": 1,
-                  "text": "IPv6"
-                }
-              },
-              "type": "value"
-            }
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "bytes"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "ip_type"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 60
-              },
-              {
-                "id": "filterable",
-                "value": true
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 8,
-        "y": 1
-      },
-      "hideTimeOverride": true,
-      "id": 11,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true
-      },
-      "pluginVersion": "10.0.3",
-      "targets": [
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "system_info_influxdb"
-          },
-          "groupBy": [
-            {
-              "params": [
-                "ip_type"
-              ],
-              "type": "tag"
-            }
-          ],
-          "measurement": "netflow_size",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "refId": "A",
-          "resultFormat": "table",
-          "select": [
-            [
-              {
-                "params": [
-                  "value"
-                ],
-                "type": "field"
-              },
-              {
-                "params": [],
-                "type": "sum"
-              }
-            ]
-          ]
-        }
-      ],
-      "timeShift": "2m",
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true
-            },
-            "indexByName": {},
-            "renameByName": {
-              "ip_type": "Type",
-              "sum": "Traffic"
-            }
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "system_info_influxdb"
-      },
-      "description": "without speedtest data",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            }
-          },
-          "mappings": [
-            {
-              "options": {
-                "intruded": {
-                  "color": "#e02f44",
-                  "index": 3,
-                  "text": "Intruded"
-                },
-                "normal": {
-                  "color": "#56A64B",
-                  "index": 0,
-                  "text": "Normal"
-                },
-                "observed": {
-                  "color": "#8ca000",
-                  "index": 1,
-                  "text": "Observed"
-                },
-                "scanning": {
-                  "color": "#f2cc0c",
-                  "index": 2,
-                  "text": "Scanning"
-                }
-              },
-              "type": "value"
-            }
-          ],
-          "unit": "bytes"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Observed"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#8ca000",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Normal"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#56A64B",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Scanning"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#f2cc0c",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Intruded"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 4,
-        "x": 11,
-        "y": 1
-      },
-      "hideTimeOverride": true,
-      "id": 27,
-      "options": {
-        "displayLabels": [
-          "name",
-          "percent"
-        ],
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true,
-          "values": [
-            "percent"
-          ]
-        },
-        "pieType": "pie",
-        "reduceOptions": {
-          "calcs": [],
-          "fields": "",
-          "limit": 5000,
-          "values": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "10.0.3",
-      "targets": [
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "system_info_influxdb"
-          },
-          "groupBy": [
-            {
-              "params": [
-                "group::tag"
-              ],
-              "type": "tag"
-            }
-          ],
-          "measurement": "netflow_size",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "refId": "A",
-          "resultFormat": "table",
-          "select": [
-            [
-              {
-                "params": [
-                  "value"
-                ],
-                "type": "field"
-              },
-              {
-                "params": [],
-                "type": "count"
-              }
-            ]
-          ],
-          "tags": [
-            {
-              "condition": "AND",
-              "key": "service",
-              "operator": "!=",
-              "value": "speedtest"
-            }
-          ]
-        }
-      ],
-      "timeShift": "2m",
-      "title": "Traffic Group",
-      "transformations": [],
-      "type": "piechart"
-    },
-    {
-      "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
@@ -622,7 +290,17 @@
           "color": {
             "mode": "thresholds"
           },
-          "mappings": [],
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "index": 0,
+                  "text": "Never updated"
+                }
+              },
+              "type": "value"
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -632,14 +310,27 @@
               }
             ]
           },
-          "unit": "dateTimeAsLocalNoDateIfToday"
+          "unit": "string"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 3,
+        "h": 5,
         "w": 4,
-        "x": 15,
+        "x": 8,
         "y": 1
       },
       "id": 21,
@@ -653,7 +344,7 @@
             "lastNotNull"
           ],
           "fields": "",
-          "values": false
+          "values": true
         },
         "textMode": "auto"
       },
@@ -666,352 +357,41 @@
           },
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "system_service_malware{type=\"list_last_modified\"}",
-          "format": "time_series",
+          "expr": "system_service_malware{type=\"entries\"}",
+          "format": "table",
           "instant": true,
-          "legendFormat": "Malware DB",
+          "interval": "",
+          "legendFormat": "{{listname}}",
           "range": false,
           "refId": "A"
         }
       ],
-      "title": "Bot & Malware IP list updated",
+      "title": "Bot & Malwarelists",
       "transformations": [
-        {
-          "id": "calculateField",
-          "options": {
-            "alias": "",
-            "binary": {
-              "left": "Malware DB",
-              "operator": "*",
-              "reducer": "sum",
-              "right": "1000"
-            },
-            "mode": "binary",
-            "reduce": {
-              "include": [
-                "Malware DB"
-              ],
-              "reducer": "sum"
-            },
-            "replaceFields": true
-          }
-        }
-      ],
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "system_info_influxdb"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false,
-            "minWidth": 50
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Extern IP"
-            },
-            "properties": [
-              {
-                "id": "filterable",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "State"
-            },
-            "properties": [
-              {
-                "id": "custom.align",
-                "value": "right"
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "options": {
-                      "approved": {
-                        "color": "green",
-                        "index": 2,
-                        "text": "A"
-                      },
-                      "blocked": {
-                        "color": "red",
-                        "index": 0,
-                        "text": "B"
-                      },
-                      "unblocked": {
-                        "color": "yellow",
-                        "index": 1,
-                        "text": "U"
-                      }
-                    },
-                    "type": "value"
-                  }
-                ]
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-background"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Last"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "dateTimeAsLocalNoDateIfToday"
-              },
-              {
-                "id": "custom.align",
-                "value": "left"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "State"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 55
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Req"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 100
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 5,
-        "x": 19,
-        "y": 1
-      },
-      "hideTimeOverride": true,
-      "id": 22,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": []
-      },
-      "pluginVersion": "10.0.3",
-      "targets": [
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "system_info_influxdb"
-          },
-          "groupBy": [
-            {
-              "params": [
-                "extern_ip::tag"
-              ],
-              "type": "tag"
-            },
-            {
-              "params": [
-                "blocked_state::tag"
-              ],
-              "type": "tag"
-            }
-          ],
-          "measurement": "trafficblocker",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "refId": "A",
-          "resultFormat": "table",
-          "select": [
-            [
-              {
-                "params": [
-                  "value"
-                ],
-                "type": "field"
-              },
-              {
-                "params": [],
-                "type": "last"
-              }
-            ]
-          ],
-          "tags": []
-        },
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "system_info_influxdb"
-          },
-          "groupBy": [
-            {
-              "params": [
-                "extern_ip::tag"
-              ],
-              "type": "tag"
-            }
-          ],
-          "hide": false,
-          "measurement": "netflow_size",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "refId": "B",
-          "resultFormat": "table",
-          "select": [
-            [
-              {
-                "params": [
-                  "value"
-                ],
-                "type": "field"
-              },
-              {
-                "params": [],
-                "type": "count"
-              }
-            ]
-          ],
-          "tags": []
-        }
-      ],
-      "timeShift": "2m",
-      "title": "Traffic Blocker",
-      "transformations": [
-        {
-          "id": "joinByField",
-          "options": {
-            "byField": "extern_ip",
-            "mode": "outer"
-          }
-        },
-        {
-          "id": "filterFieldsByName",
-          "options": {
-            "include": {
-              "names": [
-                "extern_ip",
-                "blocked_state",
-                "count",
-                "last"
-              ]
-            }
-          }
-        },
-        {
-          "id": "filterByValue",
-          "options": {
-            "filters": [
-              {
-                "config": {
-                  "id": "isNotNull",
-                  "options": {}
-                },
-                "fieldName": "blocked_state"
-              }
-            ],
-            "match": "all",
-            "type": "include"
-          }
-        },
-        {
-          "id": "calculateField",
-          "options": {
-            "alias": "last_in_millies",
-            "binary": {
-              "left": "last",
-              "operator": "*",
-              "reducer": "sum",
-              "right": "1000"
-            },
-            "mode": "binary",
-            "reduce": {
-              "include": [
-                "Since"
-              ],
-              "reducer": "lastNotNull"
-            }
-          }
-        },
         {
           "id": "organize",
           "options": {
             "excludeByName": {
-              "last": true
+              "Time": true,
+              "Value": false,
+              "Value * 1000": false,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "listname": false,
+              "type": true
             },
-            "indexByName": {
-              "blocked_state": 1,
-              "count": 4,
-              "extern_ip": 3,
-              "last": 0,
-              "last_in_millies": 2
-            },
+            "indexByName": {},
             "renameByName": {
-              "Since": "Since",
-              "blocked_state": "State",
-              "count": "Req",
-              "extern_ip": "Extern IP",
-              "last": "",
-              "last_in_millies": "Last"
+              "Value": "",
+              "Value * 1000": "",
+              "listname": "Name",
+              "type": ""
             }
           }
         }
       ],
-      "type": "table"
+      "type": "stat"
     },
     {
       "datasource": {
@@ -1094,7 +474,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "count"
+              "options": "Count"
             },
             "properties": [
               {
@@ -1113,10 +493,10 @@
         ]
       },
       "gridPos": {
-        "h": 6,
+        "h": 9,
         "w": 4,
-        "x": 15,
-        "y": 4
+        "x": 12,
+        "y": 1
       },
       "hideTimeOverride": true,
       "id": 20,
@@ -1147,9 +527,223 @@
               "type": "tag"
             }
           ],
-          "measurement": "netflow_size",
+          "measurement": "netflow",
           "orderByTime": "ASC",
+          "policy": "autogen",
+          "refId": "A",
+          "resultFormat": "table",
+          "select": [
+            [
+              {
+                "params": [
+                  "count"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "sum"
+              }
+            ]
+          ],
+          "tags": []
+        }
+      ],
+      "timeShift": "2m",
+      "title": "Traffic Groups",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "count": "Count",
+              "group": "Name",
+              "sum": "Count",
+              "suspicious": "Type"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "system_info_influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false,
+            "minWidth": 50
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Extern IP"
+            },
+            "properties": [
+              {
+                "id": "filterable",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Last"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsLocalNoDateIfToday"
+              },
+              {
+                "id": "custom.align",
+                "value": "left"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Req"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Reason"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ret."
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 50
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Type"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      },
+      "hideTimeOverride": true,
+      "id": 22,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Last"
+          }
+        ]
+      },
+      "pluginVersion": "10.0.3",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "system_info_influxdb"
+          },
+          "groupBy": [
+            {
+              "params": [
+                "extern_ip::tag"
+              ],
+              "type": "tag"
+            },
+            {
+              "params": [
+                "blocking_state::tag"
+              ],
+              "type": "tag"
+            },
+            {
+              "params": [
+                "blocking_reason::tag"
+              ],
+              "type": "tag"
+            }
+          ],
+          "measurement": "trafficblocker",
+          "orderByTime": "DESC",
           "policy": "default",
+          "query": "SELECT last(\"value\") FROM \"autogen\".\"trafficblocker\" WHERE time > now() - 5m GROUP BY \"extern_ip\"::tag, \"blocking_state\"::tag, \"blocking_reason\"::tag, \"blocking_type\"::tag, \"blocking_count\"::tag ORDER BY time DESC",
+          "rawQuery": true,
           "refId": "A",
           "resultFormat": "table",
           "select": [
@@ -1162,7 +756,267 @@
               },
               {
                 "params": [],
-                "type": "count"
+                "type": "last"
+              }
+            ]
+          ],
+          "tags": []
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "system_info_influxdb"
+          },
+          "groupBy": [
+            {
+              "params": [
+                "extern_ip::tag"
+              ],
+              "type": "tag"
+            }
+          ],
+          "hide": false,
+          "measurement": "netflow",
+          "orderByTime": "ASC",
+          "policy": "autogen",
+          "refId": "B",
+          "resultFormat": "table",
+          "select": [
+            [
+              {
+                "params": [
+                  "count"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "sum"
+              }
+            ]
+          ],
+          "tags": []
+        }
+      ],
+      "timeShift": "2m",
+      "title": "Traffic Blocker",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "extern_ip",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "extern_ip",
+                "blocking_count",
+                "blocking_reason",
+                "blocking_state",
+                "blocking_type",
+                "last",
+                "sum"
+              ]
+            }
+          }
+        },
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "blocked"
+                  }
+                },
+                "fieldName": "blocking_state"
+              }
+            ],
+            "match": "all",
+            "type": "include"
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "last_in_millies",
+            "binary": {
+              "left": "last",
+              "operator": "*",
+              "reducer": "sum",
+              "right": "1000"
+            },
+            "mode": "binary",
+            "reduce": {
+              "include": [
+                "Since"
+              ],
+              "reducer": "lastNotNull"
+            },
+            "replaceFields": false
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "blocked_state": false,
+              "blocking_state": true,
+              "last": true
+            },
+            "indexByName": {
+              "blocking_count": 3,
+              "blocking_reason": 5,
+              "blocking_state": 1,
+              "blocking_type": 6,
+              "count": 7,
+              "extern_ip": 4,
+              "last": 0,
+              "last_in_millies": 2
+            },
+            "renameByName": {
+              "Since": "Since",
+              "blocked_state": "State",
+              "blocking_count": "Ret.",
+              "blocking_reason": "Reason",
+              "blocking_state": "State",
+              "blocking_type": "Type",
+              "count": "Req",
+              "extern_ip": "Extern IP",
+              "last": "",
+              "last_in_millies": "Last",
+              "state": "State",
+              "sum": "Count"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "system_info_influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false,
+            "minWidth": 50
+          },
+          "mappings": [
+            {
+              "options": {
+                "v4": {
+                  "index": 0,
+                  "text": "IPv4"
+                },
+                "v6": {
+                  "index": 1,
+                  "text": "IPv6"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ip_type"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 60
+              },
+              {
+                "id": "filterable",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 6
+      },
+      "hideTimeOverride": true,
+      "id": 11,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "10.0.3",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "system_info_influxdb"
+          },
+          "groupBy": [
+            {
+              "params": [
+                "ip_type"
+              ],
+              "type": "tag"
+            }
+          ],
+          "measurement": "netflow",
+          "orderByTime": "ASC",
+          "policy": "autogen",
+          "refId": "A",
+          "resultFormat": "table",
+          "select": [
+            [
+              {
+                "params": [
+                  "size"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "sum"
               }
             ]
           ],
@@ -1179,9 +1033,8 @@
             },
             "indexByName": {},
             "renameByName": {
-              "count": "Count",
-              "group": "Traffic group",
-              "suspicious": "Type"
+              "ip_type": "Type",
+              "sum": "Traffic"
             }
           }
         }
@@ -1289,9 +1142,9 @@
               "type": "tag"
             }
           ],
-          "measurement": "netflow_size",
+          "measurement": "netflow",
           "orderByTime": "ASC",
-          "policy": "default",
+          "policy": "autogen",
           "query": "SELECT sum(\"value\") FROM \"netflow_size\" WHERE (\"location_org\" =~ /^$Organisation$/ AND \"location_country_name\" =~ /^$Country$/ AND \"service\" =~ /^$Service$/ AND \"intern_host\" =~ /^$InternHost$/ AND \"intern_ip\" =~ /^$InternIP$/ AND \"extern_group\" =~ /^$ExternGroup$/ AND \"extern_host\" =~ /^$ExternHost$/ AND \"extern_ip\" =~ /^$ExternIP$/) AND $timeFilter GROUP BY \"location_org\"",
           "rawQuery": false,
           "refId": "A",
@@ -1300,7 +1153,7 @@
             [
               {
                 "params": [
-                  "value"
+                  "size"
                 ],
                 "type": "field"
               },
@@ -1309,7 +1162,8 @@
                 "type": "sum"
               }
             ]
-          ]
+          ],
+          "tags": []
         }
       ],
       "timeShift": "2m",
@@ -1436,9 +1290,9 @@
               "type": "tag"
             }
           ],
-          "measurement": "netflow_size",
+          "measurement": "netflow",
           "orderByTime": "ASC",
-          "policy": "default",
+          "policy": "autogen",
           "query": "SELECT sum(\"value\") FROM \"netflow_size\" WHERE (\"location_org\" =~ /^$Organisation$/ AND \"location_country_name\" =~ /^$Country$/ AND \"service\" =~ /^$Service$/ AND \"intern_host\" =~ /^$InternHost$/ AND \"intern_ip\" =~ /^$InternIP$/ AND \"extern_group\" =~ /^$ExternGroup$/ AND \"extern_host\" =~ /^$ExternHost$/ AND \"extern_ip\" =~ /^$ExternIP$/) AND $timeFilter GROUP BY \"location_country_name\"",
           "rawQuery": false,
           "refId": "A",
@@ -1447,7 +1301,7 @@
             [
               {
                 "params": [
-                  "value"
+                  "size"
                 ],
                 "type": "field"
               },
@@ -1456,7 +1310,8 @@
                 "type": "sum"
               }
             ]
-          ]
+          ],
+          "tags": []
         }
       ],
       "timeShift": "2m",
@@ -1612,9 +1467,9 @@
               "type": "tag"
             }
           ],
-          "measurement": "netflow_size",
+          "measurement": "netflow",
           "orderByTime": "ASC",
-          "policy": "default",
+          "policy": "autogen",
           "query": "SELECT sum(\"value\") FROM \"netflow_size\" WHERE (\"location_org\" =~ /^$Organisation$/ AND \"service\" =~ /^$Service$/ AND \"intern_host\" =~ /^$InternHost$/ AND \"intern_ip\" =~ /^$InternIP$/ AND \"extern_group\" =~ /^$ExternGroup$/ AND \"extern_host\" =~ /^$ExternHost$/ AND \"extern_ip\" =~ /^$ExternIP$/ AND \"location_country_name\" =~ /^$Country$/) AND $timeFilter GROUP BY \"service\", \"port\"",
           "rawQuery": false,
           "refId": "A",
@@ -1623,7 +1478,7 @@
             [
               {
                 "params": [
-                  "value"
+                  "size"
                 ],
                 "type": "field"
               },
@@ -1764,16 +1619,16 @@
               "type": "tag"
             }
           ],
-          "measurement": "netflow_size",
+          "measurement": "netflow",
           "orderByTime": "ASC",
-          "policy": "default",
+          "policy": "autogen",
           "refId": "A",
           "resultFormat": "table",
           "select": [
             [
               {
                 "params": [
-                  "value"
+                  "size"
                 ],
                 "type": "field"
               },
@@ -1782,7 +1637,8 @@
                 "type": "sum"
               }
             ]
-          ]
+          ],
+          "tags": []
         }
       ],
       "timeShift": "2m",
@@ -1906,16 +1762,16 @@
               "type": "tag"
             }
           ],
-          "measurement": "netflow_size",
+          "measurement": "netflow",
           "orderByTime": "ASC",
-          "policy": "default",
+          "policy": "autogen",
           "refId": "A",
           "resultFormat": "table",
           "select": [
             [
               {
                 "params": [
-                  "value"
+                  "size"
                 ],
                 "type": "field"
               },
@@ -1924,7 +1780,8 @@
                 "type": "sum"
               }
             ]
-          ]
+          ],
+          "tags": []
         }
       ],
       "timeShift": "2m",
@@ -2161,20 +2018,24 @@
               "type": "tag"
             }
           ],
-          "measurement": "netflow_size",
+          "measurement": "netflow",
           "orderByTime": "DESC",
-          "policy": "default",
-          "query": "SELECT last(\"value\") FROM \"netflow_size\" WHERE $timeFilter GROUP BY \"src_host\", \"dest_host\", \"service\", \"location_country_name\"",
-          "rawQuery": false,
+          "policy": "autogen",
+          "query": "SELECT \"size\",\"count\" FROM \"autogen\".\"netflow\" WHERE (\"direction\" = 'incoming') AND $timeFilter GROUP BY \"intern_host\", \"extern_group\", \"service\", \"location_country_name\" ORDER BY time DESC",
+          "rawQuery": true,
           "refId": "A",
           "resultFormat": "table",
           "select": [
             [
               {
                 "params": [
-                  "value"
+                  "size"
                 ],
                 "type": "field"
+              },
+              {
+                "params": [],
+                "type": "sum"
               }
             ]
           ],
@@ -2201,6 +2062,12 @@
                 ],
                 "operation": "aggregate"
               },
+              "count": {
+                "aggregations": [
+                  "sum"
+                ],
+                "operation": "aggregate"
+              },
               "direction": {
                 "aggregations": [],
                 "operation": "groupby"
@@ -2213,6 +2080,12 @@
                 "aggregations": [],
                 "operation": "groupby"
               },
+              "last_time": {
+                "aggregations": [
+                  "sum"
+                ],
+                "operation": "aggregate"
+              },
               "location_country_name": {
                 "aggregations": [],
                 "operation": "groupby"
@@ -2221,8 +2094,19 @@
                 "aggregations": [],
                 "operation": "groupby"
               },
+              "size": {
+                "aggregations": [
+                  "sum"
+                ],
+                "operation": "aggregate"
+              },
               "sum": {
-                "aggregations": []
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "sum_1": {
+                "aggregations": [],
+                "operation": "groupby"
               },
               "value": {
                 "aggregations": [
@@ -2243,25 +2127,28 @@
             },
             "indexByName": {
               "Time (firstNotNull)": 0,
+              "count (sum)": 6,
               "extern_group": 2,
               "intern_host": 1,
               "location_country_name": 3,
               "service": 4,
-              "value (count)": 5,
-              "value (sum)": 6
+              "size (sum)": 5
             },
             "renameByName": {
               "Time": "Time",
               "Time (firstNotNull)": "Time",
               "Time (lastNotNull)": "Time",
               "Time (range)": "Since",
+              "count (sum)": "Req",
               "direction": "Direction",
               "extern_group": "Extern Group",
               "intern_host": "Intern Hosts",
               "last": "Traffic",
               "location_country_name": "Country",
               "service": "Service",
+              "size (sum)": "Traffic",
               "sum": "Traffic",
+              "sum_1": "Req",
               "value": "",
               "value (count)": "Req",
               "value (sum)": "Traffic"
@@ -2472,20 +2359,24 @@
               "type": "tag"
             }
           ],
-          "measurement": "netflow_size",
+          "measurement": "netflow",
           "orderByTime": "DESC",
-          "policy": "default",
-          "query": "SELECT last(\"value\") FROM \"netflow_size\" WHERE (\"location_org\" =~ /^$Organisation$/ AND \"location_country_name\" =~ /^$Country$/ AND \"service\" =~ /^$Service$/ AND \"intern_host\" =~ /^$InternHost$/ AND \"intern_ip\" =~ /^$InternIP$/ AND \"extern_group\" =~ /^$ExternGroup$/ AND \"extern_host\" =~ /^$ExternHost$/ AND \"extern_ip\" =~ /^$ExternIP$/) AND $timeFilter GROUP BY \"src_host\", \"dest_host\", \"service\", \"location_country_name\"",
-          "rawQuery": false,
+          "policy": "autogen",
+          "query": "SELECT \"size\",\"count\" FROM \"autogen\".\"netflow\" WHERE (\"direction\" = 'outgoing') AND $timeFilter GROUP BY \"intern_host\", \"extern_group\", \"service\", \"location_country_name\" ORDER BY time DESC",
+          "rawQuery": true,
           "refId": "A",
           "resultFormat": "table",
           "select": [
             [
               {
                 "params": [
-                  "value"
+                  "size"
                 ],
                 "type": "field"
+              },
+              {
+                "params": [],
+                "type": "sum"
               }
             ]
           ],
@@ -2512,6 +2403,12 @@
                 ],
                 "operation": "aggregate"
               },
+              "count": {
+                "aggregations": [
+                  "sum"
+                ],
+                "operation": "aggregate"
+              },
               "direction": {
                 "aggregations": [],
                 "operation": "groupby"
@@ -2529,6 +2426,20 @@
                 "operation": "groupby"
               },
               "service": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "size": {
+                "aggregations": [
+                  "sum"
+                ],
+                "operation": "aggregate"
+              },
+              "sum": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "sum_1": {
                 "aggregations": [],
                 "operation": "groupby"
               },
@@ -2563,13 +2474,16 @@
               "Time (firstNotNull)": "Time",
               "Time (lastNotNull)": "Time",
               "Time (range)": "Since",
+              "count (sum)": "Req",
               "direction": "Direction",
               "extern_group": "Extern Group",
               "intern_host": "Intern Hosts",
               "last": "Traffic",
               "location_country_name": "Country",
               "service": "Service",
+              "size (sum)": "Traffic",
               "sum": "Traffic",
+              "sum_1": "Req",
               "value": "",
               "value (count)": "Req",
               "value (sum)": "Traffic"
@@ -2610,6 +2524,6 @@
   "timezone": "",
   "title": "System Service Netflow Overview",
   "uid": "system-service-netflow-overview",
-  "version": 45,
+  "version": 60,
   "weekStart": ""
 }

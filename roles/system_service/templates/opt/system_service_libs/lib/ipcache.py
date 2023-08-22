@@ -57,6 +57,8 @@ class IPCache(threading.Thread):
         self.ip2location_map = {}
         self.hostname_map = {}
 
+        self._restore()
+
     def isExternal(self, address):
         if address.is_global:
             if not self.public_networks:
@@ -72,20 +74,17 @@ class IPCache(threading.Thread):
         self.is_running = True
         schedule.every().day.at("01:00").do(self._dump)
         schedule.every().hour.at("00:00").do(self._cleanup)
-        self._restore()
+
         super().start()
 
     def terminate(self):
-        if self.is_running and os.path.exists(self.dump_path):
+        if self.is_running and self.valid_cache_file and os.path.exists(self.dump_path):
             self._dump()
         self.is_running = False
 
     def run(self):
         logging.info("IP cache started")
         try:
-            if not os.path.exists(self.dump_path):
-                self._dump()
-
             while self.is_running:
                 try:
                     type, ip = self.queue.get(timeout=0.5)
@@ -106,6 +105,11 @@ class IPCache(threading.Thread):
             self.ip2location_map = data["ip2location_map"]
             self.hostname_map = data["hostname_map"]
             logging.info("Loaded {} locations and {} hostnames".format(len(self.ip2location_map),len(self.hostname_map)))
+        else:
+            self.ip2location_map = {}
+            self.hostname_map = {}
+            if self.valid_cache_file:
+                self._dump()
 
     def _dump(self):
         if self.valid_cache_file:
@@ -302,6 +306,6 @@ class IPCache(threading.Thread):
     def getStateMetrics(self):
         return [
             "system_service_process{{type=\"ip_cache\",}} {}".format("1" if self.is_running else "0"),
-            "system_service_state{{type=\"ip_cache_ip2location\",}} {}".format("1" if self.ip2location_state else "0"),
-            "system_service_state{{type=\"ip_cache_dump\",}} {}".format("1" if self.valid_cache_file else "0")
+            "system_service_state{{type=\"ip_cache\",details=\"ip2location_service\"}} {}".format("1" if self.ip2location_state else "0"),
+            "system_service_state{{type=\"ip_cache\",details=\"cache_file\",}} {}".format("1" if self.valid_cache_file else "0")
         ]
