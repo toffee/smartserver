@@ -86,12 +86,12 @@
                   {
                     "options": {
                       "incoming": {
-                        "color": "light-green",
+                        "color": "text",
                         "index": 0,
                         "text": "<-"
                       },
                       "outgoing": {
-                        "color": "semi-dark-green",
+                        "color": "#8ca000",
                         "index": 1,
                         "text": "->"
                       }
@@ -107,7 +107,7 @@
               {
                 "id": "custom.cellOptions",
                 "value": {
-                  "type": "color-background"
+                  "type": "color-text"
                 }
               },
               {
@@ -247,7 +247,7 @@
                         "text": "Intruded"
                       },
                       "normal": {
-                        "color": "transparent",
+                        "color": "text",
                         "index": 0,
                         "text": "Normal"
                       },
@@ -273,28 +273,8 @@
               {
                 "id": "custom.cellOptions",
                 "value": {
-                  "type": "color-background"
+                  "type": "color-text"
                 }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Type"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 20
-              },
-              {
-                "id": "filterable",
-                "value": true
-              },
-              {
-                "id": "displayName",
-                "value": "T"
               }
             ]
           },
@@ -383,13 +363,29 @@
               {
                 "id": "custom.width",
                 "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TE"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 30
+              },
+              {
+                "id": "custom.align",
+                "value": "left"
               },
               {
                 "id": "mappings",
                 "value": [
                   {
                     "options": {
-                      "NONE": {
+                      "0": {
                         "index": 0,
                         "text": "-"
                       }
@@ -403,12 +399,178 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Events"
+              "options": "Logs"
             },
             "properties": [
               {
                 "id": "custom.width",
-                "value": 65
+                "value": 80
+              },
+              {
+                "id": "filterable",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "LE"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 30
+              },
+              {
+                "id": "custom.align",
+                "value": "left"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "index": 0,
+                        "text": "-"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "LG"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "observed": {
+                        "color": "#8ca000",
+                        "index": 0,
+                        "text": "O"
+                      },
+                      "scanning": {
+                        "color": "#F2CC0C",
+                        "index": 1,
+                        "text": "S"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 30
+              },
+              {
+                "id": "filterable",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TG"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "intruded": {
+                        "color": "red",
+                        "index": 3,
+                        "text": "I"
+                      },
+                      "normal": {
+                        "color": "text",
+                        "index": 2,
+                        "text": "N"
+                      },
+                      "observed": {
+                        "color": "#8ca000",
+                        "index": 0,
+                        "text": "O"
+                      },
+                      "scanning": {
+                        "color": "#f2cc0c",
+                        "index": 1,
+                        "text": "S"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 30
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "filterable",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "BLK"
+            },
+            "properties": [
+              {
+                "id": "custom.align",
+                "value": "left"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "index": 1,
+                        "text": "no"
+                      },
+                      "1": {
+                        "index": 0,
+                        "text": "yes"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 30
+              },
+              {
+                "id": "filterable",
+                "value": true
               }
             ]
           }
@@ -440,7 +602,7 @@
           }
         ]
       },
-      "pluginVersion": "10.0.3",
+      "pluginVersion": "10.0.4",
       "targets": [
         {
           "datasource": {
@@ -536,7 +698,7 @@
           "measurement": "netflow",
           "orderByTime": "DESC",
           "policy": "autogen",
-          "query": "SELECT \"tcp_flags\",\"count\" FROM \"autogen\".\"netflow\" WHERE $timeFilter GROUP BY \"destination_port\"::tag, \"direction\"::tag, \"extern_group\"::tag, \"extern_host\"::tag, \"extern_ip\"::tag, \"group\"::tag, \"intern_host\"::tag, \"intern_ip\"::tag, \"ip_type\"::tag, \"location_city\"::tag, \"location_country_name\"::tag, \"location_org\"::tag, \"protocol\"::tag, \"service\"::tag ORDER BY time DESC",
+          "query": "SELECT \"tcp_flags\",\"count\",\"log_count\",\"blocked\" FROM \"autogen\".\"trafficflow\" WHERE $timeFilter GROUP BY \"log_type\"::tag, \"log_group\"::tag, \"traffic_group\"::tag, \"destination_port\"::tag, \"direction\"::tag, \"extern_group\"::tag, \"extern_host\"::tag, \"extern_ip\"::tag, \"group\"::tag, \"intern_host\"::tag, \"intern_ip\"::tag, \"location_city\"::tag, \"location_country_name\"::tag, \"location_org\"::tag, \"protocol\"::tag, \"service\"::tag ORDER BY time DESC",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table",
@@ -564,6 +726,10 @@
                 "aggregations": [
                   "firstNotNull"
                 ],
+                "operation": "groupby"
+              },
+              "blocked": {
+                "aggregations": [],
                 "operation": "groupby"
               },
               "count": {
@@ -609,8 +775,7 @@
                 "operation": "groupby"
               },
               "ip_type": {
-                "aggregations": [],
-                "operation": "groupby"
+                "aggregations": []
               },
               "location_city": {
                 "aggregations": [],
@@ -629,6 +794,20 @@
                 "operation": "groupby"
               },
               "location_zip": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "log_count": {
+                "aggregations": [
+                  "sum"
+                ],
+                "operation": "aggregate"
+              },
+              "log_group": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "log_type": {
                 "aggregations": [],
                 "operation": "groupby"
               },
@@ -659,6 +838,14 @@
                 "aggregations": [],
                 "operation": "groupby"
               },
+              "traffic_group": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "type": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
               "value": {
                 "aggregations": [
                   "sum",
@@ -681,31 +868,35 @@
               "source_port": true
             },
             "indexByName": {
-              "Time": 1,
-              "count (sum)": 0,
-              "destination_port": 13,
-              "direction": 2,
-              "extern_group": 10,
-              "extern_host": 12,
-              "extern_ip": 11,
-              "group": 3,
-              "intern_host": 9,
-              "intern_ip": 8,
-              "ip_type": 5,
-              "location_city": 16,
-              "location_country_name": 15,
-              "location_org": 14,
-              "protocol": 4,
-              "service": 7,
-              "source_port": 17,
-              "tcp_flags": 6
+              "Time": 0,
+              "blocked": 3,
+              "count (sum)": 4,
+              "destination_port": 17,
+              "direction": 1,
+              "extern_group": 14,
+              "extern_host": 16,
+              "extern_ip": 15,
+              "group": 2,
+              "intern_host": 13,
+              "intern_ip": 12,
+              "location_city": 20,
+              "location_country_name": 19,
+              "location_org": 18,
+              "log_count (sum)": 6,
+              "log_group": 7,
+              "log_type": 8,
+              "protocol": 9,
+              "service": 11,
+              "tcp_flags": 10,
+              "traffic_group": 5
             },
             "renameByName": {
               "Time": "Time",
               "Time (firstNotNull)": "Time",
               "Time (lastNotNull)": "Time",
               "Time (range)": "Since",
-              "count (sum)": "Events",
+              "blocked": "BLK",
+              "count (sum)": "TE",
               "destination_port": "Port",
               "direction": "Direction",
               "extern_group": "Extern Group",
@@ -714,19 +905,24 @@
               "group": "Group",
               "intern_host": "Intern Hosts",
               "intern_ip": "Intern IP",
-              "ip_type": "Type",
+              "ip_type": "IP Type",
               "last": "Traffic",
               "location_city": "City",
               "location_country_code": "Country Code",
               "location_country_name": "Country",
               "location_org": "ISP",
               "location_zip": "Zip",
+              "log_count (sum)": "LE",
+              "log_group": "LG",
+              "log_type": "Logs",
               "malware": "Malware",
               "protocol": "Protocol",
               "service": "Service",
               "source_port": "",
               "sum": "Traffic",
               "tcp_flags": "Flags",
+              "traffic_group": "TG",
+              "type": "Type",
               "value": "",
               "value (count)": "Req",
               "value (sum)": "Traffic"
@@ -767,6 +963,6 @@
   "timezone": "",
   "title": "System Service Netflow Details",
   "uid": "system-service-netflow-details",
-  "version": 17,
+  "version": 36,
   "weekStart": ""
 }
