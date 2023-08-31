@@ -12,7 +12,7 @@ netflow_bind_ip = {{ '"0.0.0.0"' if netflow_collector else 'None' }}
 netflow_bind_port = {{ '2055' if netflow_collector else 'None' }}
 netflow_incoming_traffic = {
 {% for data in netflow_incoming_traffic %}
-  "{{data.target}}": { "name": "{{data.name}}", "allowed": { {% for key in data.allowed %} "{{key}}": "{{data.allowed[key] | join('|')}}", {% endfor %} } },
+  "{{data.target}}": { "name": "{{data.name}}", "allowed": { {% for key in data.allowed %} "{{key}}": "{{data.allowed[key] | join('|')}}", {% endfor %} }, "logs": "{{data.logs | default('')}}" },
 {% endfor %}
 }
 
@@ -39,6 +39,7 @@ loki_rest = "http://loki:3100"
 
 mqtt_host = "mosquitto"
 
+traffic_blocker_enabled = {{ 'True' if traffic_blocker and netflow_incoming_traffic | length > 0 else 'False' }}
 traffic_blocker_treshold = {
   "netflow_observed": 20,
   "netflow_scanning": 10,

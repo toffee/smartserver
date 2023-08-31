@@ -13,11 +13,11 @@ from datetime import datetime, timedelta
 from smartserver.confighelper import ConfigHelper
 
 from lib.trafficwatcher.trafficblocker.helper import Helper
-from lib.trafficwatcher.helper.trafficgroup import TrafficGroup
+from lib.trafficwatcher.helper.helper import TrafficGroup
 
 
 class TrafficBlocker(threading.Thread):
-    def __init__(self, config, watcher, influxdb):
+    def __init__(self, config, watcher, influxdb, debugging_ips):
         threading.Thread.__init__(self)
 
         self.config = config
@@ -36,25 +36,30 @@ class TrafficBlocker(threading.Thread):
 
         self.blocked_ips = []
         self.approved_ips = []
+        self.debugging_ips = debugging_ips
 
         self.influxdb = influxdb
 
         self._restore()
 
     def start(self):
-        self.is_running = True
+        if self.config.traffic_blocker_enabled:
+            self.is_running = True
 
-        schedule.every().day.at("01:00").do(self._dump)
-        schedule.every().hour.at("00:00").do(self._cleanup)
-        self.influxdb.register(self.getMessurements)
+            schedule.every().day.at("01:00").do(self._dump)
+            schedule.every().hour.at("00:00").do(self._cleanup)
+            self.influxdb.register(self.getMessurements)
 
-        super().start()
+            super().start()
+        else:
+            logging.info("IP traffic blocker disabled. Either it is completely deactivated by the variable 'traffic blocker' or no 'netflow_incoming_traffic' is configured.")
 
     def terminate(self):
-        if self.is_running and os.path.exists(self.dump_config_path):
-            self._dump()
-        self.is_running = False
-        self.event.set()
+        if self.config.traffic_blocker_enabled:
+            if self.is_running and os.path.exists(self.dump_config_path):
+                self._dump()
+            self.is_running = False
+            self.event.set()
 
     def run(self):
         logging.info("IP traffic blocker started")
@@ -246,6 +251,8 @@ class TrafficBlocker(threading.Thread):
         self.event.set()
 
     def isApprovedIPs(self, ip):
+        if ip in self.debugging_ips:
+            return True
         return ip in self.approved_ips
 
     def isBlockedIP(self, ip):
