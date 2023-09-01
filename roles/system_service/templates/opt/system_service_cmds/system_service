@@ -26,6 +26,8 @@ from lib.ipcache import IPCache
 
 from lib.trafficwatcher.trafficwatcher import TrafficWatcher
 
+logging.basicConfig(filename='/var/log/system_service.log', filemode='w', format='%(asctime)s %(message)s', level=logging.DEBUG)
+logging.debug('system_service logging is working')
 app = Flask(__name__ )
 app.logger = logging.getLogger()
 #app.config['SECRET_KEY'] = 'test!'
