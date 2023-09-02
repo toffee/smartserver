@@ -21,7 +21,7 @@ from smartserver import info
 
 import pexpect 
 
-branch = "master"
+branch = "jupiter"
 
 #deployments = [ { "config": "demo", "os": "suse" }, { "config": "demo", "os": "fedora" }, { "config": "demo", "os": "ubuntu" } ]
 deployments = [ { "config": "demo", "os": "suse" }, { "config": "demo", "os": "alma" }, { "config": "demo", "os": "ubuntu" } ]
@@ -59,7 +59,7 @@ elif cmd == "start" or cmd == "restart":
 
     processed_git_hash = service.checkRunningJob(config.status_file)
 
-    git.initRepository(config.repository_dir, config.repository_url, config.build_dir)
+    git.initRepository(config.repository_dir, config.repository_url, branch, config.build_dir)
 
     git.updateRepository(config.repository_dir,branch)
 
