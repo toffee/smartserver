@@ -76,7 +76,7 @@ if setup_os == "" then
 end
 
 $env_ip = ""
-$with_password = setup_config != 'demo'
+$with_password = false #setup_config != 'demo'
 #$is_reboot_possible = false
 $image_name = "smartserver_" + setup_config + "_" + setup_os
 
