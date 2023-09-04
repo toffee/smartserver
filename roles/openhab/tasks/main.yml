@@ -219,7 +219,11 @@
     group: "{{openhab_group}}"
     mode: 0640
   with_items: "{{addons_result.stdout_lines}}"
-  
+
+- stat:
+    path: "{{projects_path}}openhab_config/userdata/jsondb"
+  register: jsondb_dir
+
 - name: set symbolic link to jsondb files
   file:
     src: "{{projects_path}}openhab_config/userdata/{{item}}"
@@ -232,6 +236,7 @@
     - "jsondb/automation_rules.json"
     - "jsondb/uicomponents_ui_page.json"
     - "jsondb/uicomponents_ui_widget.json"
+  when: jsondb_dir.stat.stat.isdir is defined and jsondb_dir.stat.stat.isdir
   
 # SERVICES
 - name: check service folder
