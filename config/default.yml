@@ -169,6 +169,7 @@ default_variables: {
     "vault_grafana_app_username": { "default": "admin" },
 
     "vault_deployment_config_git": { "default": "https://github.com/HolgerHees/smartserver.git" },
+    "vault_deployment_branch_git": { "default": "master" },
     "vault_deployment_token_git": { "optional": yes },            # only needed if you enable "ci_service"
 
     #"vault_dockerhub_username":   { "default": "holgerhees" },
