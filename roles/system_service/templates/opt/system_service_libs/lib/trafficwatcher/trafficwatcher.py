@@ -80,7 +80,7 @@ class TrafficWatcher(threading.Thread):
     def __init__(self, config, handler, influxdb, ipcache):
         threading.Thread.__init__(self)
 
-        self.debugging_ips = []#["141.34.2.17"]
+        self.debugging_ips = []
         self.profiling_enabled = False
 
         self.influxdb = influxdb
@@ -370,12 +370,26 @@ class TrafficWatcher(threading.Thread):
             direction = "incoming" if src_is_external else "outgoing"
 
             is_blocked = self.trafficblocker.isBlockedIP(extern_ip)
+            is_suspicious_traffic = traffic_group != "normal"
 
-            if traffic_group != "normal":
+            if is_suspicious_traffic:
                 with self.stats_lock:
                     self._addTrafficEvent(con.connection_type, extern_ip, traffic_group, blocklist_name, con.start_timestamp)
 
                 messurements.append("trafficevents,connection_type={},extern_ip={},traffic_group={},blocklist_name={} value=1 {}".format(con.connection_type, extern_ip, traffic_group, blocklist_name, int(con.start_timestamp * 1000)))
+
+            # group unsuccessful syn requests
+            if con.connection_type == "netflow" and con.answer_flow is None and ( con.protocol_name == "udp" or con.tcp_flags == 2 ):# and service == "unknown":
+                base_tags["destination_port"] = 0
+                service = "scanning"
+                time_offset = 5
+                is_scanning = True
+            else:
+                base_tags["destination_port"] = con.dest_port
+                time_offset = 1
+                is_scanning = False
+            #base_tags["destination_port"] = 0 if con.connection_type == "netflow" and con.tcp_flags & 2 == 2 and con.answer_flow is None else con.dest_port
+            #base_tags["destination_port"] = con.dest_port
 
             base_tags["intern_ip"] = intern_ip
             base_tags["intern_host"] = intern_hostname
@@ -394,8 +408,6 @@ class TrafficWatcher(threading.Thread):
             base_tags["protocol"] = con.protocol_name
 
             base_tags["ip_type"] = con.ip_type
-
-            base_tags["destination_port"] = con.dest_port
 
             base_tags["location_country_name"] = location_country_name
             base_tags["location_country_code"] = location_country_code
@@ -431,9 +443,9 @@ class TrafficWatcher(threading.Thread):
                 is_debug = True
                 logging.info(key)
             else:
-                is_debug = traffic_group != "normal"
+                is_debug = is_suspicious_traffic
 
-            if ( traffic_group != "normal" and not is_blocked ) or extern_ip in self.debugging_ips:
+            if ( not is_blocked and not is_scanning and is_suspicious_traffic ) or extern_ip in self.debugging_ips:
                 data = {
                     "type": con.connection_type,
                     "start_timestamp": str(datetime.fromtimestamp(con.start_timestamp)),
@@ -450,11 +462,11 @@ class TrafficWatcher(threading.Thread):
             related_flows = []
             if key in flows:
                 for flow in list(flows[key]):
-                    start = flow["start_timestamp"] - 1
-                    end = flow["end_timestamp"] + 1
+                    start = flow["start_timestamp"] - time_offset
+                    end = flow["end_timestamp"] + time_offset
                     if ( con.start_timestamp > start and con.start_timestamp < end ) or ( con.end_timestamp > start and con.end_timestamp < end ) or ( con.start_timestamp < start and con.end_timestamp > end ):
                         if is_debug:
-                            logging.info("FOUND REGISTRY {} {}".format(str(datetime.fromtimestamp(flow["start_timestamp"])), extern_ip))
+                            logging.info("Apply to registry - Type: {}, IP: {}, Time: {}".format(con.connection_type, extern_ip, str(datetime.fromtimestamp(flow["start_timestamp"]))))
                         related_flows.append(flow)
                         flows[key].remove(flow)
             else:
@@ -463,11 +475,11 @@ class TrafficWatcher(threading.Thread):
             processed_related_flows = []
             if key in self.processed_flows:
                 for flow in list(self.processed_flows[key]):
-                    start = flow["start_timestamp"] - 1
-                    end = flow["end_timestamp"] + 1
+                    start = flow["start_timestamp"] - time_offset
+                    end = flow["end_timestamp"] + time_offset
                     if ( con.start_timestamp > start and con.start_timestamp < end ) or ( con.end_timestamp > start and con.end_timestamp < end ) or ( con.start_timestamp < start and con.end_timestamp > end ):
                         if is_debug:
-                            logging.info("FOUND LAST REGISTRY {} {}".format(str(datetime.fromtimestamp(flow["start_timestamp"])), extern_ip))
+                            logging.info("Apply to last registry - Type: {}, IP: {}, Time: {}".format(con.connection_type, extern_ip, str(datetime.fromtimestamp(flow["start_timestamp"]))))
                         processed_related_flows.append(flow)
                         self.processed_flows[key].remove(flow)
             else:
@@ -547,9 +559,6 @@ class TrafficWatcher(threading.Thread):
             self.processed_flows[flow["key"]].append(flow)
         # ******************************
 
-        end_processing = time.time()
-        logging.info("Processing of {} flows in {} seconds".format(len(messurements), round(end_processing - start_processing,3)))
-
         if self.profiling_enabled:
             prof.disable()
             s = io.StringIO()
@@ -561,7 +570,7 @@ class TrafficWatcher(threading.Thread):
 
         # **** DELETE OBSOLETE RELATED FLOWS ****
         if len(cleanup_messurements) > 0:
-            start_cleanup = time.time()
+            #start_cleanup = time.time()
 
             queries = []
             for messurement, tags, timestamp in cleanup_messurements:
@@ -574,14 +583,14 @@ class TrafficWatcher(threading.Thread):
                 tag_str = " AND ".join(tag_r)
                 queries.append("DELETE FROM \"{}\" WHERE {} AND \"time\" = {}".format(messurement, tag_str, (timestamp * 1000000) ))
 
-            logging.info(queries)
             result = self.influxdb.delete(queries)
 
-            end_cleanup = time.time()
-            logging.info("Delete of {} messurements in {} seconds".format( len(cleanup_messurements), round(end_cleanup-start_cleanup,3)))
+            #end_cleanup = time.time()
+            #logging.info(queries)
+            #logging.info("Delete of {} messurements in {} seconds".format( len(cleanup_messurements), round(end_cleanup-start_cleanup,3)))
         # *******************************
 
-        start_cleanup = time.time()
+        #start_cleanup = time.time()
         max_time = time.time() - 60 * 5
         flow_count = 0
         flow_cleanup_count = 0
@@ -595,8 +604,11 @@ class TrafficWatcher(threading.Thread):
             if len(self.processed_flows[key]) == 0:
                 del self.processed_flows[key]
 
-        end_cleanup = time.time()
-        logging.info("Cleanup of {}/{} flows in {} seconds".format(flow_cleanup_count, flow_count, round(end_cleanup - start_cleanup,3)))
+        #end_cleanup = time.time()
+        #logging.info("Cleanup of {}/{} flows in {} seconds".format(flow_cleanup_count, flow_count, round(end_cleanup - start_cleanup,3)))
+
+        end_processing = time.time()
+        logging.info("Processing of {} flows in {} seconds".format(len(messurements), round(end_processing - start_processing,3)))
 
         counter_values = self.ipcache.getCountStats()
         logging.info("Cache statistic - LOCATION [fetch: {}, cache {}/{}], HOSTNAME [fetch: {}, cache {}/{}]".format(counter_values["location_fetch"], counter_values["location_cache"], self.ipcache.getLocationSize(), counter_values["hostname_fetch"], counter_values["hostname_cache"], self.ipcache.getHostnameSize()))
