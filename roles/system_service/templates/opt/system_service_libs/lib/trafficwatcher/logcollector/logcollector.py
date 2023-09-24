@@ -48,8 +48,8 @@ class Connection:
 
         self.connection_type = "apache"
 
-    def applyDebugFields(self, data):
-        pass
+    def getDebugData(self):
+        return ""
 
     @staticmethod
     def mergeData(data, flow):
@@ -106,6 +106,8 @@ class LogCollector(threading.Thread):
         self.watcher = watcher
         self.ipcache = ipcache
 
+        self.connection_state = 0
+
         server_ports = []
         for service in self.config.netflow_incoming_traffic:
             if self.config.netflow_incoming_traffic[service]["logs"] != "apache":
@@ -140,9 +142,13 @@ class LogCollector(threading.Thread):
     def run(self):
         logging.info("Log collector started")
         try:
-            self._connect()
             while self.is_running:
-                self.event.wait(60)
+                self._connect()
+
+                if self.connection_state == 1011: # reached tail max duration limit
+                    continue
+
+                self.event.wait(15)
         except Exception as e:
             #logging.error(e)
             logging.error(traceback.format_exc())
@@ -155,7 +161,7 @@ class LogCollector(threading.Thread):
         self.starttime = self.watcher.getLastTrafficEventTime("apache")
         #logging.info(start)
         if self.starttime == 0:
-            self.starttime = now - self.config.traffic_blocker_unblock_timeout
+            self.starttime = now - self.watcher.getTrafficEventTimeslot()
         else:
             self.starttime += 0.001
 
@@ -169,16 +175,15 @@ class LogCollector(threading.Thread):
         self.ws.run_forever(ping_interval=5, ping_timeout=1, reconnect=5)
 
     def _on_open(self, ws):
+        self.connection_state = 0
         logging.info("Log stream started at {}".format(datetime.fromtimestamp(self.starttime)))
 
     def _on_close(self, ws, close_status_code, close_message):
+        self.connection_state = close_status_code
         logging.info("Log stream closed with status: {}, message: {}".format(close_status_code, close_message))
 
-        if self.is_running:
-            self.event.wait(5)
-            self._connect()
-
     def _on_error(self, ws, error):
+        self.connection_state = -1
         logging.error("Log stream got error {}".format(error))
 
     def _on_message(self, ws, message):

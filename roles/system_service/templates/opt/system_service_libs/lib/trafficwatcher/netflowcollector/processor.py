@@ -86,42 +86,38 @@ class Helper():
     def shouldSwapDirection(connection, config, cache):
         srcIsExternal = cache.isExternal(connection.src)
 
-        if connection.protocol in IP_PING_protocolIdentifierS:
-            return srcIsExternal
-            #if Helper.checkFlag(connection.request_icmp_flags, ICMP_TYPES["ECHO_REPLY"]): # is an answer flow
-            #    return True
-            #if Helper.checkFlag(connection.request_icmp_flags, ICMP_TYPES["TIME_REPLY"]): # is an answer flow
-            #    return True
-            #if Helper.checkFlag(connection.request_icmp_flags, ICMP_TYPES["EXTENDED_ECHO_REPLY"]): # is an answer flow
-            #    return True
-            #if Helper.checkFlag(connection.request_icmp_flags, ICMP_TYPES["ECHO_REQUEST"]): # can only happen from inside, because gateway firewall is blocking/nat traffic
-            #    return True
-        elif connection.protocol in IP_DATA_protocolIdentifierS:
+        #if connection.protocol in IP_PING_protocolIdentifierS:
+        #    return srcIsExternal
+        #    #if Helper.checkFlag(connection.request_icmp_flags, ICMP_TYPES["ECHO_REPLY"]): # is an answer flow
+        #    #    return True
+        #    #if Helper.checkFlag(connection.request_icmp_flags, ICMP_TYPES["TIME_REPLY"]): # is an answer flow
+        #    #    return True
+        #    #if Helper.checkFlag(connection.request_icmp_flags, ICMP_TYPES["EXTENDED_ECHO_REPLY"]): # is an answer flow
+        #    #    return True
+        #    #if Helper.checkFlag(connection.request_icmp_flags, ICMP_TYPES["ECHO_REQUEST"]): # can only happen from inside, because gateway firewall is blocking/nat traffic
+        #    #    return True
+        if connection.protocol in IP_DATA_protocolIdentifierS:
             #if connection.answer_tcp_flags is not None:
             #    if Helper.checkFlag(connection.request_tcp_flags, TCP_FLAG_TYPES["ACK"]): # is an answer flow
             #        return True
             if connection.src_port is not None and connection.dest_port is not None:
                 # https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers
-                if connection.src_port < 1024: # System ports
-                    if connection.dest_port >= 1024:
-                        return True
-                elif connection.src_port < 49152: # Registered ports
-                    if connection.dest_port >= 49152:
-                        return True
-                else:
-                    if connection.dest_port < 49152:
-                        return False
+                if connection.src_port < 1024 and connection.dest_port >= 1024: # System ports
+                    return True
+                elif connection.dest_port < 1024 and connection.src_port >= 1024: # System ports
+                    return False
+                elif connection.src_port < 49152 and connection.dest_port >= 49152: # Registered ports
+                    return True
+                elif connection.dest_port < 49152 and connection.src_port >= 49152: # Registered ports
+                    return False
 
                 if config.netflow_incoming_traffic:
                     if srcIsExternal:
-                        if TrafficHelper.getServiceKey(connection.dest, connection.dest_port) not in config.netflow_incoming_traffic:
-                            return True
+                        return TrafficHelper.getServiceKey(connection.dest, connection.dest_port) not in config.netflow_incoming_traffic
                     else:
-                        if TrafficHelper.getServiceKey(connection.src, connection.src_port) in config.netflow_incoming_traffic:
-                            return True
-            return False
-        else:
-            return srcIsExternal
+                        return TrafficHelper.getServiceKey(connection.src, connection.src_port) in config.netflow_incoming_traffic
+
+        return srcIsExternal
 
 class Connection:
     def __init__(self, gateway_base_time, request_ts, request_flow, answer_flow, config, ipcache):
@@ -268,27 +264,28 @@ class Connection:
 #Apr 03 15:10:49 marvin system_service[3445]: [INFO] - [lib.netflow.processor:121] - {'sourceIPv4Address': '34.158.0.131', 'destinationIPv4Address': '192.168.0.108', 'flowStartSysUpTime': 24968747, 'flowEndSysUpTime': 25030465, 'IN_BYTES': 441, 'IN_PKTS': 7, 'INPUT_SNMP': 0, 'OUTPUT_SNMP': 0, 'sourceTransportPort': 4070, 'destinationTransportPort': 48096, 'protocolIdentifier': 6, 'TCP_FLAGS': 24, 'ipVersion': 4, 'SRC_TOS': 0}
 #Apr 03 15:10:49 marvin system_service[3445]: [INFO] - [lib.netflow.processor:122] - False
 
-    def applyDebugFields(self, data):
-        data["has_answer"] = self.answer_flow is not None
-        data["request"] = self.request_flow.copy()
-        data["request"]["src"] = ipaddress.ip_address(data["request"]["sourceIPv4Address"]).compressed
-        del data["request"]['sourceIPv4Address']
-        port = data["request"]['sourceTransportPort'] if 'sourceTransportPort' in data["request"] else None
+    def getDebugData(self):
+        _request_flow = self.request_flow.copy()
+        _request_flow["src"] = ipaddress.ip_address(_request_flow["sourceIPv4Address"]).compressed
+        del _request_flow['sourceIPv4Address']
+        port = _request_flow['sourceTransportPort'] if 'sourceTransportPort' in _request_flow else None
         if port:
-            data["request"]["src"] = "{}:{}".format(data["request"]["src"], port)
-            del data["request"]['sourceTransportPort']
+            _request_flow["src"] = "{}:{}".format(_request_flow["src"], port)
+            del _request_flow['sourceTransportPort']
 
-        data["request"]["dest"] = ipaddress.ip_address(data["request"]["destinationIPv4Address"]).compressed
-        del data["request"]['destinationIPv4Address']
-        port = data["request"]['destinationTransportPort'] if 'destinationTransportPort' in data["request"] else None
+        _request_flow["dest"] = ipaddress.ip_address(_request_flow["destinationIPv4Address"]).compressed
+        del _request_flow['destinationIPv4Address']
+        port = _request_flow['destinationTransportPort'] if 'destinationTransportPort' in _request_flow else None
         if port:
-            data["request"]["dest"] = "{}:{}".format(data["request"]["dest"], port)
-            del data["request"]['destinationTransportPort']
+            _request_flow["dest"] = "{}:{}".format(_request_flow["dest"], port)
+            del _request_flow['destinationTransportPort']
 
         for key in ["flowStartSysUpTime", "flowEndSysUpTime", "ingressInterface", "egressInterface", "octetDeltaCount", "packetDeltaCount", "ipClassOfService", "ipVersion"]:
-            del data["request"][key]
+            del _request_flow[key]
             #if data["response"] is not None:
             #    del data["response"][key]
+
+        return " - answer: {} - {}".format("yes" if self.answer_flow is not None else "no", _request_flow)
 
     def formatTCPFlags(self, tcp_flags):
         flags = []
