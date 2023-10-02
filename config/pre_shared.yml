@@ -63,4 +63,4 @@ docker_mimic3_ip:                 "172.16.0.214"
 docker_vcontrold_ip:              "172.16.0.230"
 
 # version of alpine linux used in several container based roles
-alpine_version:                   "3.18.3"
+alpine_version:                   "3.18.4"
