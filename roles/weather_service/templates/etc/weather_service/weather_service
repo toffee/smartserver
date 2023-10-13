@@ -10,7 +10,8 @@ from datetime import datetime
 #from decimal import Decimal
 
 from lib.provider.meteogroup import MeteoGroup
-#from lib.provider.openmeteo import OpenMeteo
+from lib.provider.openmeteo import OpenMeteo
+
 from lib.consumer.provider import ProviderConsumer
 from lib.consumer.station import StationConsumer
 from lib.consumer.astro import AstroConsumer
@@ -34,7 +35,15 @@ class Handler(Server):
         self.scheduler = Scheduler()
 
         self.mqtt = MQTT(config)
-        self.provider = MeteoGroup(config, self.db, self.mqtt)
+
+        if config.publish_topic:
+            if config.api_username and config.api_password:
+                self.provider = MeteoGroup(config, self.db, self.mqtt)
+            else:
+                self.provider = OpenMeteo(config, self.db, self.mqtt)
+        else:
+            logging.info("Publishing disabled")
+            self.provider = None
 
         self.astro_consumer = AstroConsumer(config)
         self.station_consumer = StationConsumer(config, self.mqtt)
@@ -114,22 +123,18 @@ class Handler(Server):
         if type == "widget":
             requested_fields = request.form["fields"].split(",") if "fields" in request.form else None
 
-            _values, _last_modified = self.station_consumer.getValues(self.getLastDataModified("station") if not force else -1, requested_fields)
-            last_data_modified["station"] = _last_modified
-            result["changed_data"] |= _values
-
             _values, _last_modified = self.provider_consumer.getWidgetSVG(self.getLastDataModified("clouds") if not force else -1, requested_fields)
             last_data_modified["clouds"] = _last_modified
+            result["changed_data"] |= _values
+
+            _values, _last_modified = self.provider_consumer.getCurrentValues(self.getLastDataModified("station") if not force else -1, requested_fields)
+            last_data_modified["station"] = _last_modified
             result["changed_data"] |= _values
         elif type == "week":
             requested_fields = request.form["fields"].split(",") if "fields" in request.form else None
 
             _values, _last_modified = self.astro_consumer.getValues(self.getLastDataModified("astro") if not force else -1, requested_fields)
             last_data_modified["astro"] = _last_modified
-            result["changed_data"] |= _values
-
-            _values, _last_modified = self.station_consumer.getValues(self.getLastDataModified("station") if not force else -1, requested_fields)
-            last_data_modified["station"] = _last_modified
             result["changed_data"] |= _values
 
             _values, _last_modified = self.provider_consumer.getWidgetSVG(self.getLastDataModified("clouds") if not force else -1, requested_fields)
@@ -139,6 +144,10 @@ class Handler(Server):
             requested_day = request.form["day"] if "day" in request.form else None
             _values, _last_modified = self.provider_consumer.getDetailOverviewValues(self.getLastDataModified("provider") if not force else -1, requested_fields, requested_day)
             last_data_modified["provider"] = _last_modified
+            result["changed_data"] |= _values
+
+            _values, _last_modified = self.provider_consumer.getCurrentValues(self.getLastDataModified("station") if not force else -1, requested_fields)
+            last_data_modified["station"] = _last_modified
             result["changed_data"] |= _values
         elif type == "today":
             _values = self.provider_consumer.getTodayOverviewValues()
@@ -154,7 +163,8 @@ class Handler(Server):
         state_metrics = []
         state_metrics += self.db.getStateMetrics()
         state_metrics += self.mqtt.getStateMetrics()
-        state_metrics += self.provider.getStateMetrics()
+        if self.provider is not None:
+            state_metrics += self.provider.getStateMetrics()
         state_metrics += self.provider_consumer.getStateMetrics()
         state_metrics += self.station_consumer.getStateMetrics()
 
