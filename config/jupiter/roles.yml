@@ -34,3 +34,4 @@
 - { import_role: { name: "config/jupiter/roles/snapcast" }, tags: [ 'snapcast' ] }
 #- { import_role: { name: "config/jupiter/roles/homeassistant" }, tags: [ 'homeassistant' ] }
 - { import_role: { name: "config/jupiter/roles/mimic3" }, tags: [ 'mimic3' ] }
+- { import_role: { name: "config/jupiter/roles/rsyncd" }, tags: [ 'rsyncd' ] }

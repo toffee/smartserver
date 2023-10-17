@@ -1,0 +1,46 @@
+# BAsed on https://documentation.suse.com/sles/15-SP1/html/SLES-all/cha-net-rsync.html#sec-net-rsync-server
+- name: prepare needed folder
+  file:
+    path: '{{backup_path}}rsync'
+    state: directory
+    owner: root
+    group: root
+
+- name: create rsync module config directory
+  file:
+    path: '/etc/rsyncd.d'
+    state: directory
+    owner: root
+    group: root
+
+- name: modify main configuration file /etc/rsyncd.conf
+  lineinfile:
+    path: "/etc/rsyncd.conf"
+    insertafter: "^use slp = false"
+    line: "reverse lookup = no"
+  notify: restart rsyncd
+
+- name: modify main configuration file /etc/rsyncd.conf
+  lineinfile:
+    path: "/etc/rsyncd.conf"
+    insertafter: "^use slp = false"
+    line: "&include /etc/rsyncd.d"
+  notify: restart rsyncd
+  
+- name: copy rsyncd module config
+  template:
+    src: "templates/etc/rsyncd.d/backup.conf"
+    dest: "/etc/rsyncd.d/backup.conf"
+    owner: root
+    group: root
+    mode: 0750
+  notify: "restart rsyncd"
+  
+- name: copy rsyncd secrets file
+  template:
+    src: "templates/etc/rsyncd.secrets"
+    dest: "/etc/rsyncd.secrets"
+    owner: root
+    group: root
+    mode: 0600
+  notify: "restart rsyncd"
