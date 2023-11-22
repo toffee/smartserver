@@ -1,18 +1,18 @@
-- name: "apache : check if running"
-  command: "systemctl is-active --quiet apache2"
+- name: "librenms : check if running"
+  command: "systemctl is-active --quiet librenms"
   register: "service_result"
   changed_when: no
   failed_when: no
   
-- name: "apache : start service"
+- name: "librenms : start service"
   systemd:
-    name: apache2
+    name: librenms
     state: started
     daemon_reload: yes
   when: "service_result.rc != 0"
-
-- name: "apache : wait for to become ready"
-  command: "docker exec apache2 sh -c \"echo 'hello' > /dev/null\""
+  
+- name: "librenms : wait for to become ready"
+  command: "docker exec librenms sh -c \"echo 'hello' > /dev/null\""
   register: check_result
   until: not check_result.rc  # or check_result.rc == 0 if you prefer
   retries: 20
