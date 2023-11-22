@@ -8,7 +8,7 @@
 - name: "check apache service"
   import_tasks: roles/apache/shared/wait_until_ready.yml
 
--name: "check librenms service"    
+- name: "check librenms service"
   import_tasks: roles/librenms/shared/wait_until_ready.yml
 
 - name: "add devices"
