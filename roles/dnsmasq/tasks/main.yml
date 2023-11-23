@@ -39,18 +39,40 @@
 
 - name: copy config
   template:
-    src: "templates/etc/{{item.file}}"
-    dest: "{{ global_etc }}dnsmasq/{{item.file}}"
+    src: "templates/etc/{{item}}"
+    dest: "{{ global_etc }}dnsmasq/{{item}}"
     owner: root
     group: root
     mode: 0640
-  when: "item.condition is undefined or item.condition == 1"
   with_items:
-    - { file: "dnsmasq.conf" }
-    - { file: "resolv.conf" }
-    - { file: "hosts" }
-    - { file: "dhcp.conf", condition: "{{1 if dhcp_type == 'dnsmasq' else 0}}" }
+    - "dnsmasq.conf"
+    - "resolv.conf"
+    - "hosts"
   notify: "restart dnsmasq"
+
+- name: generate dhcp.conf
+  block:
+    - name: write static dhcp file
+      template:
+        src: templates/etc/dhcp.conf
+        dest: "{{ global_etc }}dnsmasq/dhcp.conf"
+        owner: root
+        group: root
+        mode: 0640
+      register: dhcp_changed
+
+    - name: revoke existing leases if dhcpd file changed
+      file:
+        path: "{{ global_etc }}dnsmasq/dhcp.leases"
+        state: absent
+      when: dhcp_changed.changed
+
+    - name: revoke existing leases if dhcpd file changed
+      file:
+        path: "{{ global_etc }}dnsmasq/dhcp.leases"
+        state: touch
+      when: dhcp_changed.changed
+  when: dhcp_type == 'dnsmasq'
 
 - name: build docker image
   vars:
