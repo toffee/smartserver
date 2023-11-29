@@ -296,6 +296,12 @@ docker_cloud_mosquitto_ip:        "172.16.0.200"
 docker_weather_service_ip:        "172.16.0.201"
 docker_cloud_check_ip:            "172.16.0.202"
 
+docker_zigbee2mqtt_ip:            "172.16.0.210"
+docker_recorder_ip:               "172.16.0.211"
+docker_mytracker_ip:              "172.16.0.212"
+docker_unifi_ip:                  "172.16.0.213"
+docker_mimic3_ip:                 "172.16.0.214"
+
 docker_vcontrold_ip:              "172.16.0.230"
 
 netgroup:                         "{{default_server_ip.split('.')[2]}}"
