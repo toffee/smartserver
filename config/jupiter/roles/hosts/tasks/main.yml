@@ -7,6 +7,26 @@
     mode: 0644
   notify: "restart screenoff"
 
+# Add local firewall rules
+# * allow access from dnsmqsq containre to pihole container - needed for reverse dns lookup
+# * allow docker containres to access internet (other IPs others than local one)
+- name: prepare ferm rules
+  set_fact:
+    jupiter_ferm_rules: |
+      [
+      "saddr {{docker_dns_ip}} daddr {{pihole_ip}}",
+      "saddr {{docker_base_network}}/24 daddr !{{default_server_network}}"
+      ]
+  tags: [ 'firewall_config' ]
+
+- name: firewall local rules
+  vars:
+    name: "jupiter"
+    rules: "{{jupiter_ferm_rules}}"
+    instant_activation: True
+  import_tasks: roles/firewall/shared/allow_service.yml
+  tags: [ 'firewall_config' ]
+
 - name: collect vpn other ip
   set_fact: 
     vpn_other_ips: "[ {{userdata['costache'].vpn_gates['tablet']}}, {{userdata['costache'].vpn_gates['phone']}} ]"
