@@ -238,6 +238,9 @@ default_variables: {
 
     "vault_fritzbox_api_username": { "default": "api", "optional": "{{fritzbox_devices | length == 0}}" },
     "vault_fritzbox_api_password": { "optional": "{{fritzbox_devices | length == 0}}" },
+    "vault_fireflyiii_api_key": {"optional": "true"},
+    "vault_fireflyiii_mysql_username": { "default": "fireflyiii" },
+    "vault_fireflyiii_mysql_password": { "optional": "true" },
 }
 
 project_name:                     "smartserver"
@@ -301,6 +304,8 @@ docker_recorder_ip:               "172.16.0.211"
 docker_mytracker_ip:              "172.16.0.212"
 docker_unifi_ip:                  "172.16.0.213"
 docker_mimic3_ip:                 "172.16.0.214"
+docker_fireflyiii_core_ip:        "172.16.0.215"
+docker_fireflyiii_importer_ip:    "172.16.0.216"
 
 docker_vcontrold_ip:              "172.16.0.230"
 

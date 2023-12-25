@@ -1,0 +1,17 @@
+- name: restart fireflyiii-core
+  systemd:
+    name: fireflyiii-core
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    masked: no
+  listen: "restart fireflyiii-core"
+
+- name: restart fireflyiii-importer
+  systemd:
+    name: fireflyiii-importer
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    masked: no
+  listen: "restart fireflyiii-importer"

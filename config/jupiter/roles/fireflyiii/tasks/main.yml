@@ -1,0 +1,190 @@
+- name: set version
+  set_fact:
+    fireflyiii_core_version: 'version-6.1.0'
+    fireflyiii_importer_version: 'version-1.4.0'
+  tags: [ 'update_notifier_config' ]
+
+- name: prepare needed folder
+  file:
+    path: '{{item.path}}'
+    state: directory
+    owner: "{{item.user}}"
+    group: "{{item.group}}"
+    mode: "{{item.mode}}"
+  with_items:
+    - { user: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}fireflyiii" }
+    - { user: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}fireflyiii/upload" }
+
+- name: check started docker
+  systemd:
+    name: docker
+    state: started
+
+- name: create docker fireflyiii-core container
+  docker_container:
+    name: fireflyiii-core
+    image: "fireflyiii/core:{{fireflyiii_core_version}}"
+    state: present
+    env:
+      TZ: "{{timezone}}"
+      APP_KEY: "{{vault_fireflyiii_api_key}}"
+      DB_HOST: "mysql"
+      DB_PORT: "3306"
+      DB_CONNECTION: "mysql"
+      DB_DATABASE: "fireflyiii"
+      DB_USERNAME: "{{vault_fireflyiii_mysql_username}}"
+      DB_PASSWORD: "{{vault_fireflyiii_mysql_password}}"
+      TRUSTED_PROXIES: "**"
+    log_driver: journald
+    log_options:
+      tag: fireflyiii
+    container_default_behavior: "compatibility"
+    network_mode: "default"
+    networks: 
+      - name: "isolated"
+        ipv4_address: "{{docker_fireflyiii_core_ip}}"
+    networks_cli_compatible: yes
+    volumes:
+      - '{{global_lib}}fireflyiii/upload:/var/www/html/storage/upload:z'      
+    published_ports: |
+      [
+        "21580:8080",
+        {% if default_server_ipv6 is defined %}
+          "[::]:21580:8080"
+        {% endif %}
+      ]
+  notify: "restart fireflyiii-core"
+  
+- name: create docker fireflyiii-importer container
+  docker_container:
+    name: fireflyiii-importer
+    image: "fireflyiii/data-importer:{{fireflyiii_importer_version}}"
+    state: present
+    env: 
+      TZ: "{{timezone}}"
+      FIREFLY_III_URL: "http://{{docker_fireflyiii_core_ip}}:8080"
+      VANITY_URL: "https://fireflyiii.{{server_domain}}"
+#      FIREFLY_III_CLIENT_ID: "{{vault_fireflyiii_client_id}}"
+      FIREFLY_III_ACCESS_TOKEN: "{{vault_fireflyiii_pat}}"
+      TRUSTED_PROXIES: "**"
+      NORDIGEN_ID: "{{vault_fireflyiii_nordigen_id}}"
+      NORDIGEN_KEY: "{{vault_fireflyiii_nordigen_key}}"
+      NORDIGEN_SANDBOX: "false"
+    log_driver: journald
+    log_options:
+      tag: fireflyiii
+    container_default_behavior: "compatibility"
+    network_mode: "default"
+    networks: 
+      - name: "isolated"
+        ipv4_address: "{{docker_fireflyiii_importer_ip}}"
+    networks_cli_compatible: yes
+    volumes:
+      - '{{global_lib}}fireflyiii/upload:/var/www/html/storage/upload:z'      
+    published_ports: |
+      [
+        "21680:8080",
+        {% if default_server_ipv6 is defined %}
+          "[::]:21680:8080"
+        {% endif %}
+      ]
+  notify: "restart fireflyiii-importer"
+
+- name: prepare ferm rules
+  set_fact:
+    fireflyiii_ferm_rules: |
+      [
+      "saddr {{docker_fireflyiii_core_ip}} daddr {{docker_mysql_ip}}",
+      "saddr {{docker_fireflyiii_importer_ip}} daddr {{docker_mysql_ip}}",
+      "saddr {{docker_fireflyiii_importer_ip}} daddr {{docker_fireflyiii_core_ip}}"
+      ]
+  tags: [ 'firewall_config' ]
+
+- name: allow fireflyiii service
+  vars:
+    name: "fireflyiii"
+    rules: "{{fireflyiii_ferm_rules}}"
+  import_tasks: roles/firewall/shared/allow_service.yml
+  tags: [ 'firewall_config' ]
+  
+- name: add container fireflyiii-core name
+  vars:
+    host_name: "fireflyiii"
+    host_ip_address: "{{docker_fireflyiii_core_ip}}"
+  import_tasks: roles/_shared/add_to_hosts.yml
+
+- name: add container fireflyiii-importer name
+  vars:
+    host_name: "fireflyiii-importer"
+    host_ip_address: "{{docker_fireflyiii_importer_ip}}"
+  import_tasks: roles/_shared/add_to_hosts.yml
+
+
+# ***** MYSQL DATABASE ****
+- name: create database
+  vars:
+    database: "fireflyiii"
+    username: "{{vault_fireflyiii_mysql_username}}"
+    password: "{{vault_fireflyiii_mysql_password}}"
+    backup: yes
+  import_tasks: roles/mysql/shared/add_database.yml
+
+# ***** FINALIZE *****
+- name: register webui
+  vars:
+    name: "fireflyiii"
+    js_file: "templates/webui/fireflyiii.js"
+    icons: [ 'templates/webui/icons/fireflyiii_logo.svg' ]
+  import_tasks: roles/apache_webui/shared/add_webui.yml
+
+- name: copy apache config
+  vars:
+    config_file: "templates/etc/apache2/_.ansible.conf.d/fireflyiii.conf"
+  import_tasks: roles/apache/shared/add_config.yml
+ 
+- name: copy apache vhost
+  vars:
+    sub_domain: "fireflyiii"
+    usergroup: "admin"
+    include: "templates/etc/apache2/_.ansible.vhost.d/fireflyiii.inc"
+  import_tasks: roles/apache/shared/add_vhost.yml
+ 
+- name: copy fluentd config
+  vars:
+    config_file: "templates/etc/fluent/_.ansible.d/fireflyiii.conf"
+  import_tasks: roles/fluentd/shared/add_config.yml
+
+- name: create systemd fireflyiii-core service
+  vars:
+    container_name: "fireflyiii-core"
+    container_after: [ "mysql" ]
+  import_tasks: roles/container/shared/add_docker_service.yml
+  
+- name: create systemd fireflyiii-importer service
+  vars:
+    container_name: "fireflyiii-importer"
+    container_after: [ "mysql", "fireflyiii-core" ]
+  import_tasks: roles/container/shared/add_docker_service.yml
+
+- name: register update notifier
+  vars:
+    name: "fireflyiii-core"
+    type: "docker"
+    url: "https://github.com/firefly-iii/firefly-iii/releases"
+    config: {
+      repository: "fireflyiii/core",
+      pattern: "^version-([0-9\\.]+)$"
+    }
+  import_tasks: roles/update_service/shared/add_software.yml
+  
+- name: register update notifier
+  vars:
+    name: "fireflyiii-importer"
+    type: "docker"
+    url: "https://github.com/firefly-iii/data-importer/releases"
+    config: {
+      repository: "fireflyiii/data-importer",
+      pattern: "^version-([0-9\\.]+)$"
+    }
+  import_tasks: roles/update_service/shared/add_software.yml
+
