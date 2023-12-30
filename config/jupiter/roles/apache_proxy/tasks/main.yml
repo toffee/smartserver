@@ -43,7 +43,8 @@
     group: "{{system_groups['www'].name}}"
     mode: 0644
   with_items: 
-    - templates/webui/icons/huawei.svg
+    - templates/webui/icons/router.svg
+    - templates/webui/icons/switch.svg
 
 - name: copy balancer fallback files
   copy:
