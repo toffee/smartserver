@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    fireflyiii_core_version: 'version-6.1.0'
+    fireflyiii_core_version: 'version-6.1.1'
     fireflyiii_importer_version: 'version-1.4.0'
   tags: [ 'update_notifier_config' ]
 
@@ -14,6 +14,17 @@
   with_items:
     - { user: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}fireflyiii" }
     - { user: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}fireflyiii/upload" }
+    - { user: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}fireflyiii/import" }
+
+- name: copy config
+  template:
+    src: "templates/{{item.name}}"
+    dest: "{{global_lib}}fireflyiii/import/{{item.name}}"
+    owner: "{{item.user}}"
+    group: "{{item.group}}"
+    mode: "{{item.mode}}"
+  with_items:
+    - { user: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", mode: "u=rwx,g=rx,o=", name: "config.json" }
 
 - name: check started docker
   systemd:
@@ -35,6 +46,13 @@
       DB_USERNAME: "{{vault_fireflyiii_mysql_username}}"
       DB_PASSWORD: "{{vault_fireflyiii_mysql_password}}"
       TRUSTED_PROXIES: "**"
+      MAIL_MAILER: "smtp"
+      MAIL_HOST: "{{vault_mailserver_host}}"
+      MAIL_PORT: "{{vault_mailserver_port}}"
+      MAIL_ENCRYPTION: "tls"
+      MAIL_USERNAME: "{{vault_mailserver_username}}"
+      MAIL_PASSWORD: "{{vault_mailserver_password}}"
+      MAIL_FROM: "{{root_email}}"
     log_driver: journald
     log_options:
       tag: fireflyiii
@@ -62,6 +80,7 @@
     state: present
     env: 
       TZ: "{{timezone}}"
+      IMPORT_DIR_ALLOWLIST: "/import"
       FIREFLY_III_URL: "http://{{docker_fireflyiii_core_ip}}:8080"
       VANITY_URL: "https://fireflyiii.{{server_domain}}"
 #      FIREFLY_III_CLIENT_ID: "{{vault_fireflyiii_client_id}}"
@@ -70,6 +89,15 @@
       NORDIGEN_ID: "{{vault_fireflyiii_nordigen_id}}"
       NORDIGEN_KEY: "{{vault_fireflyiii_nordigen_key}}"
       NORDIGEN_SANDBOX: "false"
+      ENABLE_MAIL_REPORT: "true"
+      MAIL_DESTINATION: "{{fireflyii_importer_email}}"
+      MAIL_MAILER: "smtp"
+      MAIL_HOST: "{{vault_mailserver_host}}"
+      MAIL_PORT: "{{vault_mailserver_port}}"
+      MAIL_ENCRYPTION: "tls"
+      MAIL_USERNAME: "{{vault_mailserver_username}}"
+      MAIL_PASSWORD: "{{vault_mailserver_password}}"
+      MAIL_FROM_ADDRESS: "{{root_email}}"
     log_driver: journald
     log_options:
       tag: fireflyiii
@@ -80,7 +108,8 @@
         ipv4_address: "{{docker_fireflyiii_importer_ip}}"
     networks_cli_compatible: yes
     volumes:
-      - '{{global_lib}}fireflyiii/upload:/var/www/html/storage/upload:z'      
+      - '{{global_lib}}fireflyiii/upload:/var/www/html/storage/upload:z'
+      - '{{global_lib}}fireflyiii/import:/import:z'
     published_ports: |
       [
         "21680:8080",
@@ -128,6 +157,16 @@
     password: "{{vault_fireflyiii_mysql_password}}"
     backup: yes
   import_tasks: roles/mysql/shared/add_database.yml
+  
+# ***** CRONJOB FOR IMPORT ****
+- name: create cron job
+  vars:
+    name: "Firefly III Importer cron job"
+    cmd: "docker exec fireflyiii-importer sh -c \"php artisan importer:import /import/config.json\""
+    file: "ansible_fireflyiii"
+    hour: "7"
+    minute: "0"
+  import_tasks: roles/cron/shared/add_cronjob.yml
 
 # ***** FINALIZE *****
 - name: register webui
