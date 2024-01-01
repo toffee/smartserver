@@ -14,12 +14,13 @@
   with_items:
     - { user: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}fireflyiii" }
     - { user: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}fireflyiii/upload" }
-    - { user: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}fireflyiii/import" }
+    - { user: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}fireflyiii/configurations" }
+    - { user: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", mode: "u=rwx,g=rx,o=", path: "{{global_log}}fireflyiii/" }
 
 - name: copy config
   template:
     src: "templates/{{item.name}}"
-    dest: "{{global_lib}}fireflyiii/import/{{item.name}}"
+    dest: "{{global_lib}}fireflyiii/configurations/{{item.name}}"
     owner: "{{item.user}}"
     group: "{{item.group}}"
     mode: "{{item.mode}}"
@@ -63,7 +64,8 @@
         ipv4_address: "{{docker_fireflyiii_core_ip}}"
     networks_cli_compatible: yes
     volumes:
-      - '{{global_lib}}fireflyiii/upload:/var/www/html/storage/upload:z'      
+      - '{{global_lib}}fireflyiii/upload:/var/www/html/storage/upload:z'
+      - '{{global_log}}fireflyiii:/var/www/html/storage/logs:z'
     published_ports: |
       [
         "21580:8080",
@@ -80,7 +82,7 @@
     state: present
     env: 
       TZ: "{{timezone}}"
-      IMPORT_DIR_ALLOWLIST: "/import"
+      IMPORT_DIR_ALLOWLIST: "/var/www/html/storage/configurations"
       FIREFLY_III_URL: "http://{{docker_fireflyiii_core_ip}}:8080"
       VANITY_URL: "https://fireflyiii.{{server_domain}}"
 #      FIREFLY_III_CLIENT_ID: "{{vault_fireflyiii_client_id}}"
@@ -108,8 +110,8 @@
         ipv4_address: "{{docker_fireflyiii_importer_ip}}"
     networks_cli_compatible: yes
     volumes:
-      - '{{global_lib}}fireflyiii/upload:/var/www/html/storage/upload:z'
-      - '{{global_lib}}fireflyiii/import:/import:z'
+      - '{{global_lib}}fireflyiii/configurations:/var/www/html/storage/configurations:z'
+      - '{{global_log}}fireflyiii:/var/www/html/storage/logs:z'
     published_ports: |
       [
         "21680:8080",
@@ -162,7 +164,7 @@
 - name: create cron job
   vars:
     name: "Firefly III Importer cron job"
-    cmd: "docker exec fireflyiii-importer sh -c \"php artisan importer:import /import/config.json\""
+    cmd: "docker exec fireflyiii-importer sh -c \"php artisan importer:import /var/www/html/storage/configurations/config.json\""
     file: "ansible_fireflyiii"
     hour: "7"
     minute: "0"
