@@ -1,11 +1,9 @@
-.vagrant/
-.vscode/
+/.vagrant/
+/.vscode/
 config/*
 !config/demo/
-!config/pre_shared.yml
-!config/post_shared.yml
 !config/default.yml
-ansible.cfg
+/ansible.cfg
 /*.retry
 !config/jupiter/
 config/jupiter/vault/vault.yml

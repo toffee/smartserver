@@ -25,7 +25,7 @@ default_variables: {
 
     "ipv6_enabled":   { "default": no },
 
-    "intern_networks": { "default": [] },                         # e.g. intern (trusted) ipv4 & ipv6 address ranges, default_server_ip network and host_ip network will be added additionally
+    "intern_networks": { "default": [] },                         # e.g. intern (trusted) ipv4 & ipv6 address ranges. Networks, based on production/staging ip and ansible server ip, be added additionally.
     "public_networks": { "default": [] },                         # e.g. public ipv6 address ranges
 
     "dns_type":       { "default": "" },                          # 'pihole' or 'dnsmasq'
@@ -194,6 +194,20 @@ default_variables: {
     #         snmp_method: { "optional": yes },                   # "v2c"
     #         snmp_community_string: { "optional": yes }          # "public"
     #         is_openwrt: { "optional": yes }                     # True
+    #     }
+    # ]
+
+    "camera_devices": { "default": [] },                          # used for ftp upload, image gallkery and menu entries
+    # *** EXAMPLE ***
+    # [
+    #     {
+    #         uid: {},                                            # unique identifier for this device. Will be used to generate proxy urls like /camera{uid | capelized}Image
+    #         name: {},                                           # menu and gallery name
+    #         details: { "optional": yes },                       # additional details like brand name
+    #         ftp_upload_name: { "optional": yes },               # the folder name where alert images are uploaded
+    #         snapshot_url: {},                                   # external url to get a snapshot/preview image
+    #         snapshot_username: { "optional": yes }              # username to authenticate external url
+    #         snapshot_password: { "optional": yes }              # password to authenticate external url
     #     }
     # ]
 

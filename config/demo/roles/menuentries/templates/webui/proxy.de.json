@@ -1,11 +1,4 @@
 {
-  "automation": {
-    "Cameras": "Kameras"
-  },
-  "automation_cameras": {
-    "Street": "Strasse",
-    "Automower": "Automower"
-  },
   "admin_devices": {
     "Automower": "Automower",
     "Robonect": "Robonect",
@@ -14,8 +7,6 @@
     "Laserprinter": "Laserdrucker",
     "HPLaserJet": "HPLaserJet",
     "Router": "Router",
-    "FritzBox": "FritzBox",
-    "Camera": "Kamera",
-    "Streedside": "Strassenseite"
+    "FritzBox": "FritzBox"
   }
 }

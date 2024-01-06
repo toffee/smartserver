@@ -2,6 +2,7 @@ internal_networks = [{% if intern_networks|length > 0 %}"{{intern_networks | joi
 public_networks = [{% if public_networks|length > 0 %}"{{public_networks | join('","') }}"{% endif %}]
 main_interface = "{{default_network_interface}}"
 default_gateway_ip = "{{default_server_gateway}}"
+default_server_network = "{{default_server_network}}"
 server_name = "{{server_name}}"
 server_domain = "{{server_domain}}"
 server_ip = "{{default_server_ip}}"
