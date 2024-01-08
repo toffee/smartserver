@@ -1,13 +1,23 @@
 var subGroup = mx.Menu.getMainGroup('admin').getSubGroup('tools');
-//subGroup.addUrl('guest_wifi', '/guest_wifi/', 'admin', 380, '{i18n_Guest Wifi}', '{i18n_QRCode}', false, "guest_wifi.svg");
 
 mx.GuestWifi = (function( ret ) {
     var css = `
     div.guestwifi {
         position: relative;
     }
+    div.guestwifi > img.deobfuscated {
+        transition: opacity 0.3s;
+        left: 0;
+        right: 0;
+        margin-left: auto;
+        margin-right: auto;
+        z-index: 1;
+        opacity: 0;
+        position: absolute;
+    }
     div.guestwifi > img.obfuscated {
         filter: blur(10px);
+        transition: opacity 0.3s;
     }
     div.guestwifi > div.obfuscated {
         position: absolute;
@@ -43,19 +53,23 @@ mx.GuestWifi = (function( ret ) {
             obfuscationInfoDiv.classList.add("obfuscated");
             element.appendChild(obfuscationInfoDiv);
 
-            function deobfuscate(event)
-            {
-                var img = mx._$("img", element);
-                img.onload = function()
-                {
-                    img.classList.remove("obfuscated");
-                    element.removeChild(obfuscationInfoDiv);
-                };
-                img.src = img.getAttribute("src").replace("obfuscated=1", mx.Page.isDemoMode() ? "obfuscated=-1" : "obfuscated=0");
+            var obfuscated_img = mx._$("img.obfuscated", element);
+            var deobfuscated_img = mx._$("img.deobfuscated", element);
 
-                element.removeEventListener("click",deobfuscate);
+            function handler(event)
+            {
+                if( obfuscated_img.style.opacity == "" )
+                {
+                    deobfuscated_img.style.opacity = "1";
+                    obfuscated_img.style.opacity = "0";
+                }
+                else
+                {
+                    deobfuscated_img.style.opacity = "";
+                    obfuscated_img.style.opacity = "";
+                }
             }
-            element.addEventListener("click",deobfuscate);
+            element.addEventListener("click",handler);
         });
     }
     return ret;
