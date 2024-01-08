@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    fireflyiii_core_version: 'version-6.1.1'
+    fireflyiii_core_version: 'version-6.1.6'
     fireflyiii_importer_version: 'version-1.4.0'
   tags: [ 'update_notifier_config' ]
 
@@ -164,7 +164,7 @@
 - name: create cron job
   vars:
     name: "Firefly III Importer cron job"
-    cmd: "docker exec fireflyiii-importer sh -c \"php artisan importer:import /var/www/html/storage/configurations/config.json\""
+    cmd: "docker exec fireflyiii-importer --user www-data sh -c \"php artisan importer:import /var/www/html/storage/configurations/config.json\""
     file: "ansible_fireflyiii"
     hour: "7"
     minute: "0"
