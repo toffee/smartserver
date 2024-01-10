@@ -28,6 +28,9 @@ default_variables: {
     "intern_networks": { "default": [] },                         # e.g. intern (trusted) ipv4 & ipv6 address ranges. Networks, based on production/staging ip and ansible server ip, be added additionally.
     "public_networks": { "default": [] },                         # e.g. public ipv6 address ranges
 
+    "env_path":       { "default": "/dataDisk/" },
+    "data_path":      { "default": "/dataRaid/" },
+
     "dns_type":       { "default": "" },                          # 'pihole' or 'dnsmasq'
     "dns_overrides":  {"default": [] },
     "dns_default_domain": {"default": "lan"},
@@ -204,7 +207,7 @@ default_variables: {
     #         uid: {},                                            # unique identifier for this device. Will be used to generate proxy urls like /camera{uid | capelized}Image
     #         name: {},                                           # menu and gallery name
     #         details: { "optional": yes },                       # additional details like brand name
-    #         ftp_upload_name: { "optional": yes },               # the folder name where alert images are uploaded
+    #         ftp_upload_name: { "optional": yes },               # the folder name where alert images are uploaded int the ftp folder (it is just the subfolder name, not the whole path)
     #         snapshot_url: {},                                   # external url to get a snapshot/preview image
     #         snapshot_username: { "optional": yes }              # username to authenticate external url
     #         snapshot_password: { "optional": yes }              # password to authenticate external url
@@ -264,7 +267,6 @@ alpine_version:                   "3.19.0"
 flask_core_version:               "3.0.0"
 flask_socketio_version:           "5.3.6"
 
-env_path:                         "/dataDisk/"
 ftp_path:                         "{{env_path}}ftp/"
 htdocs_path:                      "{{env_path}}htdocs/"
 global_etc:                       "{{env_path}}etc/"
@@ -273,7 +275,6 @@ global_build:                     "{{env_path}}build/"
 global_log:                       "{{env_path}}var/log/"
 global_lib:                       "{{env_path}}var/lib/"
 
-data_path:                        "/dataRaid/"
 projects_path:                    "{{data_path}}projects/"
 cloud_path:                       "{{data_path}}cloud/"
 backup_path:                      "{{data_path}}backups/"

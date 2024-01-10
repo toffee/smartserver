@@ -734,8 +734,9 @@ body.nobackground #submenu .service.button div:last-child {
 }
 #submenu .service.imageWatcher > div {
     position: relative;
-    width: auto;
-    max-width: 90%;
+    /*width: auto;
+     max-width: 90%;*/
+    width: 90%;
     padding-bottom: 5px;
     cursor: pointer;
 }
@@ -754,10 +755,10 @@ body.nobackground #submenu .service.button div:last-child {
     width: 100%;
     transform: translate(-50%, -50%);
 }
-#submenu .service.imageWatcher > div:first-child:nth-last-child(1) {
+/*#submenu .service.imageWatcher > div:first-child:nth-last-child(1) {
     width: auto;
     max-width: 90%;
-}
+}*/
 #submenu .service.imageWatcher > div > a,
 #submenu .service.imageWatcher > div > img {
     display: block;
@@ -765,6 +766,7 @@ body.nobackground #submenu .service.button div:last-child {
 #submenu .service.imageWatcher > div > span {
     position: absolute;
     color: var(--image-watcher-text);
+    font-size: 16px;
 }
 #submenu .service.imageWatcher > div > span.gallery {
     top: 0;
@@ -791,6 +793,22 @@ body.nobackground #submenu .service.button div:last-child {
     right: 1%;
     bottom: 3px;
     cursor: default;
+}
+#submenu .service.imageWatcher > div > span.info {
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    text-align: center;
+    display: grid;
+    align-items: center;
+    color: var(--image-watcher-text);
+    font-size: 30px;
+    transition: opacity 300ms linear;
+    pointer-events: none;
+}
+#submenu .service.imageWatcher > div > span.info.error {
+    color: var(--alarm-button-error);
 }
 @media screen and (orientation: landscape) {
     #submenu .service.imageWatcher {
@@ -857,5 +875,5 @@ body.phone #menu .spacer {
     opacity: 1;
 }
 body.phone #submenu .service.imageWatcher {
-    margin-top: -5vh;
+    margin-top: -4.4vh;
 }
