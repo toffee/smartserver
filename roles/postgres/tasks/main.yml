@@ -1,0 +1,99 @@
+- name: set version
+  set_fact:
+    postgres_version: "16.1-alpine3.19"
+  tags: [ 'update_notifier_config' ]
+  
+- name: prepare needed folder
+  file:
+    path: '{{item}}'
+    state: directory
+    owner: "root"
+    group: root
+    mode: 0750
+  with_items:
+    - '{{ global_etc }}postgres'
+    - '{{ global_lib }}postgres'
+    - '{{backup_path}}postgres'
+
+- name: synchronize config
+  synchronize:
+    src: "templates/etc/postgres/"
+    dest: "{{ global_etc }}postgres/"
+    archive: no
+    checksum: yes
+    group: yes
+    owner: yes
+    perms: yes
+    recursive: yes
+    rsync_opts:
+      - "--chown=root:root"
+      - "--chmod=D750,F640"
+  notify: "restart postgres"
+
+- name: check started docker
+  systemd:
+    name: docker
+    state: started
+
+- name: create docker container
+  docker_container:
+    name: postgres
+    image: "postgres:{{postgres_version}}"
+    state: present
+    env:
+      POSTGRES_PASSWORD: "{{vault_postgres_password}}"
+      TZ: "{{timezone}}"
+    log_driver: journald
+    log_options:
+      tag: postgres
+    volumes:
+      - '{{ global_etc }}postgres:/etc/postgresql:z'
+      - '{{ global_lib }}postgres:/var/lib/postgresql/data:z'
+    container_default_behavior: "compatibility"
+    network_mode: "default"
+    networks:
+      - name: "isolated"
+        ipv4_address: "{{docker_postgres_ip}}"
+    networks_cli_compatible: yes
+    exposed_ports:
+      - "5432" 
+  register: postgres_container
+  notify: "restart postgres"
+
+- name: add container name
+  vars:
+    host_name: "postgres"
+    host_ip_address: "{{docker_postgres_ip}}"
+  import_tasks: roles/_shared/add_to_hosts.yml
+
+# ***** FINALIZE *****
+- name: copy fluentd config
+  vars:
+    config_file: "templates/etc/fluent/_.ansible.d/postgres.conf"
+  import_tasks: roles/fluentd/shared/add_config.yml
+
+- name: create systemd service
+  vars:
+    container_name: "postgres"
+  import_tasks: roles/container/shared/add_docker_service.yml
+    
+- name: register update notifier
+  vars:
+    name: "postgres"
+    type: "docker"
+    url: "https://www.postgresql.org/docs/release/"
+    config: {
+      repository: "postgres",
+      pattern: "^([0-9\\.]+)-alpine([0-9\\.]+)$"
+    }
+  import_tasks: roles/update_service/shared/add_software.yml
+
+- name: trigger postgres handler
+  vars:
+    notify: "restart postgres"
+    service: "postgres.service"
+  import_tasks: roles/_shared/service_check.yml
+
+#- name: check postgres service
+#  import_tasks: roles/postgres/shared/wait_until_ready.yml
+#  when: postgres_container.changed

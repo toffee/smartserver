@@ -168,6 +168,8 @@
     - { import_role: { name: speedtest }, tags: [ 'speedtest' ] }                                # inhouse network performance test                                  [docker,user:1000|1000]
 
     - { import_role: { name: openwrt }, tags: [ 'openwrt' ], when: "openwrt_devices | length > 0" } # default configs for uploading to openwrt to allow monitoring
+    
+    - { import_role: { name: postgres }, tags: [ 'postgres' ] }                                  # postgres db                                                       [docker,user:root]
 
     # ************ CUSTOM ROLES ************
     - { include_tasks: "{{config_path}}roles.yml", tags: [ 'always' ] }                          # Details can be found inside the demo configuration 'config/demo/roles.yml'

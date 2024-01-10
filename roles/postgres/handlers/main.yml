@@ -1,0 +1,8 @@
+- name: restart postgres
+  systemd:
+    name: postgres
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    masked: no
+  listen: "restart postgres"
