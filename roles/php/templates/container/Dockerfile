@@ -10,6 +10,8 @@ RUN groupadd -g {{system_groups['www'].id}} {{system_groups['www'].name}} && \
   docker-php-ext-install exif && \
   docker-php-ext-install bcmath && \
   docker-php-ext-install mysqli pdo_mysql && \
+  apt-get install -y libpq-dev && \
+  docker-php-ext-install pgsql pdo_pgsql && \
   docker-php-ext-install sysvsem && \
 
 # preview generator nextcloud
