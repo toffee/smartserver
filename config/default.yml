@@ -257,6 +257,10 @@ default_variables: {
     "vault_fireflyiii_api_key": {"optional": "true"},
     "vault_fireflyiii_mysql_username": { "default": "fireflyiii" },
     "vault_fireflyiii_mysql_password": { "optional": "true" },
+    "vault_ghostfolio_token_salt": {"optional": "true"},
+    "vault_ghostfolio_jwt_key": {"optional": "true"},
+    "vault_ghostfolio_postgres_username": { "default": "ghostfolio" },
+    "vault_ghostfolio_postgres_password": { "optional": "true" },
 }
 
 project_name:                     "smartserver"
@@ -321,6 +325,7 @@ docker_unifi_ip:                  "172.16.0.213"
 docker_mimic3_ip:                 "172.16.0.214"
 docker_fireflyiii_core_ip:        "172.16.0.215"
 docker_fireflyiii_importer_ip:    "172.16.0.216"
+docker_ghostfolio_ip:             "172.16.0.217"
 
 docker_vcontrold_ip:              "172.16.0.230"
 

@@ -1,0 +1,8 @@
+- name: restart ghostfolio
+  systemd:
+    name: ghostfolio
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    masked: no
+  listen: "restart ghostfolio"

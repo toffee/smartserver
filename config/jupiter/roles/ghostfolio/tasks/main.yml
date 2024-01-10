@@ -1,0 +1,118 @@
+- name: set version
+  set_fact:
+    ghostfolio_version: '2.36.0'
+  tags: [ 'update_notifier_config' ]
+
+- name: check started docker
+  systemd:
+    name: docker
+    state: started
+
+- name: create docker ghostfolio container
+  docker_container:
+    name: ghostfolio
+    image: "ghostfolio/ghostfolio:{{ghostfolio_version}}"
+    state: present
+    env:
+      TZ: "{{timezone}}"
+      ACCESS_TOKEN_SALT: "{{vault_ghostfolio_token_salt}}"
+      POSTGRES_DB: "ghostfolio"
+      POSTGRES_USER: "{{vault_ghostfolio_postgres_username}}"
+      POSTGRES_PASSWORD: "{{vault_ghostfolio_postgres_password}}"
+      DATABASE_URL: "postgresql://{{vault_ghostfolio_postgres_username}}:{{vault_ghostfolio_postgres_password}}@postgres:5432/ghostfolio?connect_timeout=300&sslmode=prefer"
+      JWT_SECRET_KEY: "{{vault_ghostfolio_jwt_key}}"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+    log_driver: journald
+    log_options:
+      tag: ghostfolio
+    container_default_behavior: "compatibility"
+    network_mode: "default"
+    networks: 
+      - name: "isolated"
+        ipv4_address: "{{docker_ghostfolio_ip}}"
+    networks_cli_compatible: yes
+    published_ports: |
+      [
+        "3333:3333",
+        {% if default_server_ipv6 is defined %}
+          "[::]:3333:3333"
+        {% endif %}
+      ]
+  notify: "restart ghostfolio"
+  
+- name: prepare ferm rules
+  set_fact:
+    ghostfolio_ferm_rules: |
+      [
+      "saddr {{docker_ghostfolio_ip}} daddr {{docker_postgres_ip}}",
+      "saddr {{docker_ghostfolio_ip}} daddr {{docker_redis_ip}}",
+      ]
+  tags: [ 'firewall_config' ]
+
+- name: allow ghostfolio service
+  vars:
+    name: "ghostfolio"
+    rules: "{{ghostfolio_ferm_rules}}"
+  import_tasks: roles/firewall/shared/allow_service.yml
+  tags: [ 'firewall_config' ]
+  
+- name: add container ghostfolio name
+  vars:
+    host_name: "ghostfolio"
+    host_ip_address: "{{docker_ghostfolio_ip}}"
+  import_tasks: roles/_shared/add_to_hosts.yml
+
+# ***** POSTGRES DATABASE ****
+#
+#CREATE DATABASE ghostfolio;
+#CREATE USER ghostfolio WITH ENCRYPTED PASSWORD 'xxx';
+#GRANT ALL PRIVILEGES ON DATABASE ghostfolio TO ghostfolio;
+#\c ghostfolio postgres
+# You are now connected to database "ghostfolio" as user "postgres".
+#GRANT ALL ON SCHEMA public TO ghostfolio;
+
+#- name: create database
+#  vars:
+#    database: "fireflyiii"
+#    username: "{{vault_ghostfolio_postgres_username}}"
+#    password: "{{vault_ghostfolio_postgres_password}}"
+#    backup: yes
+#  import_tasks: roles/mysql/shared/add_database.yml
+  
+# ***** FINALIZE *****
+- name: register webui
+  vars:
+    name: "ghostfolio"
+    js_file: "templates/webui/ghostfolio.js"
+    icons: [ 'templates/webui/icons/ghostfolio_logo.svg' ]
+  import_tasks: roles/apache_webui/shared/add_webui.yml
+
+- name: copy apache vhost
+  vars:
+    sub_domain: "ghostfolio"
+    usergroup: "user"
+    include: "templates/etc/apache2/_.ansible.vhost.d/ghostfolio.inc"
+  import_tasks: roles/apache/shared/add_vhost.yml
+
+- name: copy fluentd config
+  vars:
+    config_file: "templates/etc/fluent/_.ansible.d/ghostfolio.conf"
+  import_tasks: roles/fluentd/shared/add_config.yml
+
+- name: create systemd ghostfolio service
+  vars:
+    container_name: "ghostfolio"
+    container_after: [ "postgres", "redis" ]
+  import_tasks: roles/container/shared/add_docker_service.yml
+  
+- name: register update notifier
+  vars:
+    name: "ghostfolio"
+    type: "docker"
+    url: "https://github.com/ghostfolio/ghostfolio/releases"
+    config: {
+      repository: "ghostfolio/ghostfolio",
+      pattern: "^([0-9\\.]+)$"
+    }
+  import_tasks: roles/update_service/shared/add_software.yml
