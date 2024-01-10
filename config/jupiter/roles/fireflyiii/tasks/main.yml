@@ -12,10 +12,13 @@
     group: "{{item.group}}"
     mode: "{{item.mode}}"
   with_items:
-    - { user: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}fireflyiii" }
-    - { user: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}fireflyiii/upload" }
-    - { user: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}fireflyiii/configurations" }
-    - { user: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", mode: "u=rwx,g=rx,o=", path: "{{global_log}}fireflyiii/" }
+    - { user: "33", group: "33", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}fireflyiii" }
+    - { user: "33", group: "33", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}fireflyiii/upload" }
+    - { user: "33", group: "33", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}fireflyiii/configurations" }
+    - { user: "33", group: "33", mode: "u=rwx,g=rx,o=", path: "{{global_log}}fireflyiii/" }
+  notify:
+    - restart fireflyiii-core
+    - restart fireflyiii-importer
 
 - name: copy config
   template:
@@ -25,7 +28,10 @@
     group: "{{item.group}}"
     mode: "{{item.mode}}"
   with_items:
-    - { user: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", mode: "u=rwx,g=rx,o=", name: "config.json" }
+    - { user: "33", group: "33", mode: "u=rwx,g=rx,o=", name: "config.json" }
+  notify:
+    - restart fireflyiii-core
+    - restart fireflyiii-importer
 
 - name: check started docker
   systemd:
@@ -164,7 +170,7 @@
 - name: create cron job
   vars:
     name: "Firefly III Importer cron job"
-    cmd: "docker exec fireflyiii-importer --user www-data sh -c \"php artisan importer:import /var/www/html/storage/configurations/config.json\""
+    cmd: "docker exec --user www-data fireflyiii-importer sh -c \"php artisan importer:import /var/www/html/storage/configurations/config.json\""
     file: "ansible_fireflyiii"
     hour: "7"
     minute: "0"
@@ -186,7 +192,7 @@
 - name: copy apache vhost
   vars:
     sub_domain: "fireflyiii"
-    usergroup: "admin"
+    usergroup: "user"
     include: "templates/etc/apache2/_.ansible.vhost.d/fireflyiii.inc"
   import_tasks: roles/apache/shared/add_vhost.yml
  
