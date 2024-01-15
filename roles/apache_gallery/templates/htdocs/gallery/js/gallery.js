@@ -1,3 +1,168 @@
+mx.GalleryAnimation = (function( ret ) {
+    ret.TYPE_INSTANT = 0;
+    ret.TYPE_SMOOTH = 1;
+    ret.TYPE_CUSTOM = 2;
+
+    var requestId = null;
+    var startPos = null;
+    var diff = null;
+    var duration = null;
+    var startTime = null;
+    var currentPos = null;
+
+    ret.scrollTo = function(options, behavior, item)
+    {
+        if( behavior != mx.GalleryAnimation.TYPE_CUSTOM )
+        {
+            mx.GalleryAnimation.stop();
+
+            options["behavior"] = behavior == mx.GalleryAnimation.TYPE_INSTANT ? 'instant' : 'smooth';
+            window.scrollTo(options);
+        }
+        else
+        {
+            // scrollX is not 100% reliable during animations on mobile devices.
+            startPos = currentPos == null ? window.scrollX : currentPos;
+            diff = options["left"] - startPos;
+            duration = Math.abs(diff) * 800 / window.innerWidth;
+            if( duration > 2000 ) duration = 2000;
+            startTime = null;
+
+            if( requestId != null ) return;
+
+            const loop = function (currentTime) {
+                if( requestId == null ) return;
+
+                if (!startTime) startTime = currentTime;
+
+                // Elapsed time in miliseconds
+                const time = currentTime - startTime;
+
+                const percent = Math.min(time / duration, 1);
+                // https://easings.net/de => easeOutQuint
+                const animation = function (x) { return 1 - Math.pow(1 - x, 5); };
+
+                currentPos = startPos + diff * animation(percent);
+                window.scrollTo(currentPos, 0);
+
+                // Continue moving
+                if (time < duration)
+                {
+                    requestId = window.requestAnimationFrame(loop);
+                }
+                else
+                {
+                    window.cancelAnimationFrame(requestId);
+                    requestId = currentPos = null;
+                }
+            };
+            requestId = window.requestAnimationFrame(loop);
+        }
+    }
+
+    ret.stop = function()
+    {
+        if( requestId == null ) return;
+
+        window.cancelAnimationFrame(requestId);
+        requestId = currentPos = null;
+    }
+
+    return ret;
+})( mx.GalleryAnimation || {} );
+
+mx.GallerySwipeHandler = (function( ret ) {
+    var startClientX = -1;
+    var startScrollX = -1;
+    var isMoving = false;
+
+    var tabticker = null;
+    var trackerCurrentOffset = 0;
+    var trackerLastOffset = 0;
+    var trackerVelocity = 0;
+    var trackerTimestamp = null;
+
+    var swipeCallback = null;
+    var swipeElement = null;
+
+    function tabtracker()
+    {
+        var now = performance.now();
+
+        var elapsed = now - trackerTimestamp;
+
+        var delta = trackerCurrentOffset - trackerLastOffset;
+        trackerLastOffset = trackerCurrentOffset;
+
+        v = 1000 * delta / (1 + elapsed);
+        trackerVelocity = 0.8 * v + 0.2 * trackerVelocity;
+
+        trackerTimestamp = now;
+    }
+
+    function tapstart(e)
+    {
+        if( e.target.classList.contains("button") ) return;
+
+        mx.GalleryAnimation.stop();
+
+        startClientX = e.detail.clientX;
+        startScrollX = window.scrollX;
+        isMoving = false;
+
+        trackerCurrentOffset = e.detail.clientX;
+        trackerLastOffset = e.detail.clientX;
+        trackerVelocity = 0;
+        trackerTimestamp = performance.now();
+        tabticker = setInterval(tabtracker, 100);
+
+        swipeElement.addEventListener("tapmove",tapmove);
+        swipeElement.addEventListener("tapend",tapend);
+    }
+
+    function tapmove(e)
+    {
+        trackerCurrentOffset = e.detail.clientX;
+
+        isMoving = true;
+        //console.log("tapmove " + ( startScrollX - diff ) );
+        var diff = e.detail.clientX - startClientX;
+        window.scrollTo( startScrollX - diff, 0 );
+    }
+
+    function tapend(e)
+    {
+        clearInterval(tabticker);
+
+        swipeElement.removeEventListener("tapmove",tapmove);
+        swipeElement.removeEventListener("tapend",tapend);
+
+        if( !isMoving ) return;
+        isMoving = false;
+
+        startClientX = -1;
+
+        if( trackerVelocity == 0 ) tabtracker();
+
+        swipeCallback(trackerVelocity);
+    }
+
+    ret.enable = function(element, callback)
+    {
+        swipeCallback = callback;
+        swipeElement = element;
+
+        element.addEventListener("tapstart",tapstart);
+    }
+
+    ret.disable = function()
+    {
+        swipeElement.removeEventListener("tapstart",tapstart);
+    }
+
+    return ret;
+})( mx.GallerySwipeHandler || {} );
+
 mx.Gallery = (function( ret ) {
     var isFullscreen = false;
     
@@ -8,7 +173,6 @@ mx.Gallery = (function( ret ) {
     var imageHeight = 0;
     var imageWidth = 0;
     var folder = null;
-    var requestedScrollPosition = null;
     var debug = false;
     
     var slotOverview = null;
@@ -22,20 +186,106 @@ mx.Gallery = (function( ret ) {
     var galleryRect = null;
 
     var containers = [];
-
-    var visibleContainer = [];
     
     var containerObserver = null;
-    
-    var tabStartPageX = -1;
-    var tabStartScrollX = -1;
-    var isTabMoving = false;
-    var momentumScrollTimer = null;
+    var visibleContainer = [];
 
     var playTimer = null;
     var isPlaying = false;
 
+    var requestedScrollPosition = null;
     var lastScrollPosition = null;
+
+    function updateList()
+    {
+        var url = mx.Host.getBase() + 'index_update.php';
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", url );
+        xhr.onreadystatechange = function() {
+            if (this.readyState != 4) return;
+
+            if( this.status == 200 )
+            {
+                var content = document.createElement("div");
+                content.innerHTML = this.response;
+
+                if( content.querySelector("#gallery") )
+                {
+                    var containerMap = {};
+                    containers.forEach(function(container,index){
+                        containerMap[container.dataset.src] = container;
+                    });
+
+                    var _containers = content.querySelector("#gallery").childNodes;
+                    var _nextContainer = containers[0];
+                    Object.values(_containers).forEach(function(container,index){
+                        if( typeof containerMap[container.dataset.src] == "undefined" )
+                        {
+                            if( _nextContainer )
+                            {
+                                gallery.insertBefore(container,_nextContainer);
+                            }
+                            else
+                            {
+                                gallery.appendChild(container);
+                            }
+                            containerObserver.observe(container);
+                        }
+                        else
+                        {
+                            _nextContainer = containerMap[container.dataset.src].nextSibling;
+                            containerMap[container.dataset.src].dataset.index = container.dataset.index;
+                            delete containerMap[container.dataset.src];
+                        }
+                    });
+
+                    var _activeItem = activeItem;
+                    Object.values(containerMap).forEach(function(container,index){
+                        container.parentNode.removeChild(container);
+                        //console.log("remove image");
+                        if( container.dataset.src == activeItem.dataset.src )
+                        {
+                            _activeItem = null;
+                        }
+                    });
+
+                    if( _activeItem == null ) _activeItem = containers[0]
+
+                    // refresh containers
+                    containers = gallery.querySelectorAll(".container");
+
+                    slotOverview.innerHTML = content.querySelector("#slots").innerHTML;
+
+                    // reset active states
+                    activeItem = null;
+                    activeSlot = null;
+                    slotTooltipElement = null;
+
+                    if( ( isFullscreen ? window.scrollX : window.scrollY ) == 0 )
+                    {
+                        setActiveItem(containers[0]);
+                    }
+                    else
+                    {
+                        scrollToActiveItem(_activeItem,mx.GalleryAnimation.TYPE_INSTANT);
+                    }
+                }
+
+                updateTimer = window.setTimeout(updateList,30000);
+            }
+            else
+            {
+                updateTimer = mx.Page.handleRequestError(this.status,url,updateList,60000);
+            }
+        };
+
+        var data = {};
+        data['count'] = containers.length;
+        data['sub'] = folder;
+
+        xhr.send(JSON.stringify(data));
+    }
 
     function getOffset(element)
     {
@@ -94,20 +344,30 @@ mx.Gallery = (function( ret ) {
     
     function setSlotTooltip(element)
     {
-        if( element == slotTooltipElement )
-        {
-            return;
-        }
+        if( element == slotTooltipElement ) return;
         
-        if( slotTooltipElement != null )
-        {
-            slotTooltipElement.classList.remove("active");
-        }
+        if( slotTooltipElement != null ) slotTooltipElement.classList.remove("active");
         
         slotTooltipElement = element;
         slotTooltipElement.classList.add("active");
         
         positionSlotTooltip();
+    }
+
+    function slotHoverHandler(e)
+    {
+        var reference = e.target;
+        if( !reference.classList ) return;
+
+        if( reference.classList.contains("bar") ) reference = reference.parentNode;
+
+        if( !reference.classList.contains("slot") )
+        {
+            if( activeSlot ) setSlotTooltip(activeSlot);
+            return;
+        }
+
+        setSlotTooltip(reference);
     }
     
     function loadImage(element,callback)
@@ -121,12 +381,8 @@ mx.Gallery = (function( ret ) {
         img.src = "image.php?sub=" + folder + "&image=" + element.dataset.src;
         if( typeof callback != "undefined" )
         {
-            img.onload = function() {
-                callback(true);
-            };
-            img.onerror = function() {
-                callback(false);
-            };
+            img.onload = function() { callback(true); };
+            img.onerror = function() { callback(false); };
         }
         element.appendChild(img);
         
@@ -138,25 +394,27 @@ mx.Gallery = (function( ret ) {
         timeLabel.innerHTML = element.dataset.formattedtime;
         element.appendChild(timeLabel);
     }
+
     function delayedLoading(element)
     {
-        if( !element.dataset.loaded )
-        {
-            var id = window.setTimeout(function(){ loadImage(element); },100);
-            element.dataset.timer = id;
-        }
-    }
-    
-    function cancelLoading(element)
-    {
-        if( element.dataset.timer ) 
-        {
-            window.clearTimeout(element.dataset.timer);
+        if( element.dataset.loaded ) return;
+
+        var id = window.setTimeout(function(){
             element.removeAttribute("data-timer");
-        }
+            loadImage(element);
+        },100);
+        element.dataset.timer = id;
     }
 
-    function scrollToActiveItem(item,animated)
+    function cancelLoading(element)
+    {
+        if( !element.dataset.timer ) return;
+
+        window.clearTimeout(element.dataset.timer);
+        element.removeAttribute("data-timer");
+    }
+
+    function scrollToActiveItem(item,behavior)
     {
         if( isFullscreen )
         {
@@ -165,10 +423,7 @@ mx.Gallery = (function( ret ) {
                 if( debug ) console.log("scrollToActiveItem: " + item.dataset.formattedtime);
     
                 requestedScrollPosition = { source: window.scrollX, target: item.offsetLeft };
-                window.scrollTo({
-                  left: requestedScrollPosition["target"],
-                  behavior: animated ? 'smooth' : 'auto'
-                });
+                mx.GalleryAnimation.scrollTo({ left: requestedScrollPosition["target"] }, behavior, item);
             }
         }
         else
@@ -179,10 +434,7 @@ mx.Gallery = (function( ret ) {
                 if( debug ) console.log("scrollToActiveItem: " + item.dataset.formattedtime);
 
                 requestedScrollPosition = { source: window.scrollY, target: targetPosition };
-                window.scrollTo({
-                  top: requestedScrollPosition["target"],
-                  behavior: animated ? 'smooth' : 'auto'
-                });
+                mx.GalleryAnimation.scrollTo({ top: requestedScrollPosition["target"] }, behavior, item);
             }
         }
         
@@ -220,21 +472,6 @@ mx.Gallery = (function( ret ) {
         }
     }
 
-    function jumpToSlot(timeslot) {
-        var firstItemInSlot = gallery.querySelector("div.container[data-timeslot='" + timeslot + "']");
-        scrollToActiveItem(firstItemInSlot,true);
-    }
-
-    function processMomentingScroll()
-    {
-        if( momentumScrollTimer ) window.clearTimeout(momentumScrollTimer);
-        
-        momentumScrollTimer = window.setTimeout(function()
-        {
-            momentumScrollTimer = null;
-            scrollToActiveItem(getMostVisibleItem(),true);
-        },200);
-    }
     function getMostVisibleItem()
     {
         var scrollX = window.scrollX;
@@ -248,67 +485,142 @@ mx.Gallery = (function( ret ) {
         {
             targetIndex = (window.scrollX - currentImageX) / activeItem.offsetWidth;
         }
-        
+
         return containers[targetIndex];
     }
-    function tapstart(e)
+
+    function checkRequestedPosition()
     {
-        if( e.target.classList.contains("button") )
+        if( lastScrollPosition == null ) lastScrollPosition = requestedScrollPosition["source"];
+
+        var currentScrollPosition = isFullscreen ? window.scrollX : window.scrollY;
+
+        if( currentScrollPosition != lastScrollPosition )
         {
+            var isForwardRequested = requestedScrollPosition["target"] - requestedScrollPosition["source"] > 0;
+            var isForwardActive = currentScrollPosition - lastScrollPosition > 0;
+            lastScrollPosition = currentScrollPosition;
+
+            if( isForwardRequested )
+            {
+                if( !isForwardActive ) return true;
+            }
+            else
+            {
+                if( isForwardActive ) return true;
+            }
+        }
+
+        // offset of 1 is needed for chrome browser
+        if( Math.abs( requestedScrollPosition["target"] - Math.round( isFullscreen ? window.scrollX : window.scrollY ) ) <= 1 )
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    function delayedSlotPosition()
+    {
+        if( isFullscreen || visibleContainer.length == 0 ) return;
+
+        if( requestedScrollPosition != null )
+        {
+            if( debug ) console.log("delayedPositon: skipped");
             return;
         }
-        
-        //console.log("tabstart");
-        tabStartPageX = e.detail.clientX;
-        tabStartScrollX = window.scrollX;
-        isTabMoving = false;
+
+        var firstElement = visibleContainer[0];
+        var minIndex = visibleContainer[0].dataset.index;
+        visibleContainer.forEach(function(element,index){
+            if( minIndex > element.dataset.index )
+            {
+                firstElement = element;
+                minIndex = element.dataset.index
+            }
+        });
+
+        setActiveItem(firstElement);
     }
-    function tapmove(e)
+
+    function initObserver()
     {
-        isTabMoving = true;
-        //console.log("tapmove " + ( tabStartScrollX - diff ) );
-        var diff = e.detail.clientX - tabStartPageX;
-        window.scrollTo( tabStartScrollX - diff, 0 );
+        var observerOptions = { rootMargin: ( ( galleryRect.top+window.scrollY ) * -1 ) + "px 0px 0px 0px" };
+
+        containerObserver = new IntersectionObserver((entries, imgObserver) => {
+            var activeItemUpdateNeeded = activeItem == null;
+
+            entries.forEach((entry) => {
+                if( entry.isIntersecting )
+                {
+                    activeItemUpdateNeeded = true;
+                    delayedLoading(entry.target);
+                    visibleContainer.push(entry.target);
+                }
+                else
+                {
+                    if( activeItem == entry.target ) activeItemUpdateNeeded = true;
+                    cancelLoading(entry.target);
+                    var index = visibleContainer.indexOf(entry.target)
+                    if( index != -1 ) visibleContainer.splice(index, 1);
+                }
+            });
+
+            if( activeItemUpdateNeeded ) delayedSlotPosition();
+        },observerOptions);
+
+        containers.forEach( function(container,index){
+            containerObserver.observe(container);
+        });
     }
-    function tapend(e)
+
+    function swipeHandler(velocity)
     {
-        if( !isTabMoving ) return;
-        isTabMoving = false;
-        
-        //console.log("tapend");
-        tabStartPageX = -1;
-        
-        if( mx.Core.isTouchDevice() )
+        var index1 = -1, index2 = -1;
+
+        if (velocity > 500 )
         {
-            processMomentingScroll();
+            index1 = parseInt(activeItem.dataset.index) - 1;
+            index2 = index1 - 1;
         }
-        else
+        else if( velocity < -500 )
         {
-            scrollToActiveItem(getMostVisibleItem(),true);
+            index1 = parseInt(activeItem.dataset.index) + 1;
+            index2 = index1 + 1;
         }
+
+        if( index1 >= 0 && index1 < containers.length )
+        {
+            if( index2 >= 0 && index2 < containers.length ) delayedLoading(containers[index2]);
+
+            scrollToActiveItem(containers[index1],mx.GalleryAnimation.TYPE_CUSTOM);
+            return;
+        }
+
+        scrollToActiveItem(getMostVisibleItem(),mx.GalleryAnimation.TYPE_SMOOTH);
     }
 
     function playIteration()
     {
         if( isPlaying == false ) return;
-                
+
         var nextContainer = containers[parseInt(activeItem.dataset.index) - 1];
         if( typeof nextContainer == "undefined" )
         {
-            stopPlay();
+            mx.Gallery.stopPlay();
             return;
         }
-        scrollToActiveItem(nextContainer,false);
-        
+        scrollToActiveItem(nextContainer,mx.GalleryAnimation.TYPE_INSTANT);
+
         nextContainer = containers[parseInt(activeItem.dataset.index) - 1];
         if( typeof nextContainer == "undefined" )
         {
-            stopPlay();
+            mx.Gallery.stopPlay();
             return;
         }
         var img = nextContainer.querySelector("img");
         if( img == null || img.naturalWidth  == 0 )
-        { 
+        {
             //console.log("not loaded");
             var startTime = new Date().getTime();
             cancelLoading(nextContainer);
@@ -325,8 +637,117 @@ mx.Gallery = (function( ret ) {
             playTimer = window.setTimeout(playIteration,500);
         }
     }
-    function stopPlay()
+
+    // watcher to check if scroll animations are finished
+    function scrollHandler()
     {
+        if( requestedScrollPosition == null || !checkRequestedPosition() ) return;
+
+        if( debug ) console.log("requestedScrollPosition reset");
+        requestedScrollPosition = null;
+        lastScrollPosition = null;
+    }
+
+    function resizeHandler()
+    {
+        if( !activeItem ) return;
+
+        scrollToActiveItem(activeItem,mx.GalleryAnimation.TYPE_INSTANT);
+        positionSlotTooltip();
+    }
+
+    ret.openDetails = function(index)
+    {
+        if( isFullscreen ) return;
+        isFullscreen = true;
+
+        mx.GallerySwipeHandler.enable(gallery, swipeHandler);
+
+        var layer = gallery.querySelector("div.layer");
+        var img = containers[index].querySelector("img");
+
+        var scrollbarSize = window.innerWidth - document.documentElement.clientWidth;
+
+        var sourceImgRect = img.getBoundingClientRect();
+        var galleryRect = gallery.getBoundingClientRect();
+        var galleryTop = galleryRect.top + window.scrollY;
+
+        var targetLayerRect = {top: galleryTop, left: 0, width: window.innerWidth, height: window.innerHeight - galleryTop - scrollbarSize };
+        var targetImgRect = {top: 0, left: 0, width: 0, height: 0 };
+        var imgRatio = sourceImgRect.height / sourceImgRect.width;
+
+        var ratio = targetLayerRect.width / sourceImgRect.width;
+        if( sourceImgRect.height * ratio > targetLayerRect.height ) ratio = targetLayerRect.height / sourceImgRect.height;
+        targetImgRect.height = sourceImgRect.height * ratio;
+        targetImgRect.width = sourceImgRect.width * ratio;
+        //if( targetImgRect.height > imageHeight ) targetImgRect.height = imageHeight;
+        //if( targetImgRect.width > imageWidth ) targetImgRect.width = imageWidth;
+        targetImgRect.top = targetLayerRect.top + ( targetLayerRect.height - targetImgRect.height ) / 2 - 1;
+        targetImgRect.left = targetLayerRect.left + ( targetLayerRect.width - targetImgRect.width ) / 2 - 1;
+
+        layer.style.cssText = "display: block; top: " + targetLayerRect.top + "px; left: " + targetLayerRect.left + "px; width: " + targetLayerRect.width + "px; height: " + targetLayerRect.height + "px";
+        img.style.cssText = "position: fixed; z-index: 50; top: " + sourceImgRect.top + "px; left: " + sourceImgRect.left + "px; width: " + sourceImgRect.width + "px; height: " + sourceImgRect.height + "px;";
+
+        // force refresh
+        img.offsetHeight;
+
+        window.setTimeout(function() { layer.style.opacity = "1.0"; }, 150);
+
+        img.style.cssText = "position: fixed; z-index: 50; transition: all 0.3s; top: " + targetImgRect.top + "px; left: " + targetImgRect.left + "px; width: " + targetImgRect.width + "px; height: " + targetImgRect.height + "px;";
+
+        window.setTimeout(function(){
+            gallery.classList.add("fullscreen");
+
+            layer.style.cssText = "";
+            img.style.cssText = "";
+
+            scrollToActiveItem(containers[index],mx.GalleryAnimation.TYPE_INSTANT);
+            positionSlotTooltip();
+        },300);
+    }
+
+    ret.closeDetails = function()
+    {
+        if( !isFullscreen ) return;
+        isFullscreen = false;
+
+        mx.GallerySwipeHandler.disable();
+
+        var layer = gallery.querySelector("div.layer");
+        var img = activeItem.querySelector("img");
+
+        var sourceImgRect = getOffset(img);
+        sourceImgRect.left = img.offsetLeft;
+        var sourceLayerRect = getOffset(activeItem);
+        sourceLayerRect.left = 0;
+
+        gallery.classList.remove("fullscreen");
+
+        scrollToActiveItem(activeItem,mx.GalleryAnimation.TYPE_INSTANT);
+
+        var targetImgRect = getOffset(img);
+
+        layer.style.cssText = "display: block; top: " + sourceLayerRect.top + "px; left: " + sourceLayerRect.left + "px; width: " + sourceLayerRect.width + "px; height: " + sourceLayerRect.height + "px; opacity: 1.0";
+        img.style.cssText = "position: fixed; z-index: 50; top: " + sourceImgRect.top + "px; left: " + sourceImgRect.left + "px; width: " + sourceImgRect.width + "px; height: " + sourceImgRect.height + "px;";
+
+        // force refresh
+        img.offsetHeight;
+
+        layer.style.opacity = "";
+        img.style.cssText = "position: fixed; z-index: 50; transition: all 0.3s; top: " + targetImgRect.top + "px; left: " + targetImgRect.left + "px; width: " + targetImgRect.width + "px; height: " + targetImgRect.height + "px;";
+
+        window.setTimeout(function(){
+            layer.style.display = "";
+            img.style.cssText = "";
+
+            positionSlotTooltip();
+        },300);
+    }
+
+    ret.stopPlay = function(e)
+    {
+        if( e && e.target.classList.contains("button") && e.target.classList.contains("stop") && e.type == 'tapstart' ) return;
+
         isPlaying = false;
 
         if( playTimer != null )
@@ -334,393 +755,40 @@ mx.Gallery = (function( ret ) {
             window.clearTimeout(playTimer);
             playTimer = null;
         }
-        
+
         galleryStartPlayButton.style.display = activeItem.dataset.index == 0 ? "none" : "";
         galleryStopPlayButton.style.display = "";
-        
-        document.removeEventListener("tapstart",stopPlay);
+
+        document.removeEventListener("tapstart",mx.Gallery.stopPlay);
+
     }
-    function startPlay()
+
+    ret.startPlay = function(e)
     {
         isPlaying = true;
 
         galleryStartPlayButton.style.display = "none";
         galleryStopPlayButton.style.display = "inline";
-        
-        document.addEventListener("tapstart",stopPlay);
-        
+
+        document.addEventListener("tapstart",mx.Gallery.stopPlay);
+
         playIteration();
     }
-    function openDetails(index)
-    { 
-        if( isFullscreen ) return;
-        isFullscreen = true;
-        
-        var layer = gallery.querySelector("div.layer");
-        
-        var item = containers[index];
-        var img = item.querySelector("img");
-        
-        var scrollbarSize = window.innerWidth - document.documentElement.clientWidth;
-        
-        var sourceImgRect = img.getBoundingClientRect();
-        var galleryRect = gallery.getBoundingClientRect();
-        var galleryTop = galleryRect.top + window.scrollY;
-        
-        var targetLayerRect = {top: galleryTop, left: 0, width: window.innerWidth, height: window.innerHeight - galleryTop - scrollbarSize };
-        var targetImgRect = {top: 0, left: 0, width: 0, height: 0 };
-        var imgRatio = sourceImgRect.height / sourceImgRect.width;
-        
-        var ratio = targetLayerRect.width / sourceImgRect.width;
-        if( sourceImgRect.height * ratio > targetLayerRect.height ) ratio = targetLayerRect.height / sourceImgRect.height;
-        targetImgRect.height = sourceImgRect.height * ratio;
-        targetImgRect.width = sourceImgRect.width * ratio;
-        if( targetImgRect.height > imageHeight ) targetImgRect.height = imageHeight;
-        if( targetImgRect.width > imageWidth ) targetImgRect.width = imageWidth;
-        targetImgRect.top = targetLayerRect.top + ( targetLayerRect.height - targetImgRect.height ) / 2 - 1;
-        targetImgRect.left = targetLayerRect.left + ( targetLayerRect.width - targetImgRect.width ) / 2 - 1;
-        
-        var t5 = performance.now()
 
-        layer.style.cssText = "display: block; top: " + targetLayerRect.top + "px; left: " + targetLayerRect.left + "px; width: " + targetLayerRect.width + "px; height: " + targetLayerRect.height + "px";
-        
-        img.style.cssText = "position: fixed; z-index: 50; top: " + sourceImgRect.top + "px; left: " + sourceImgRect.left + "px; width: " + sourceImgRect.width + "px; height: " + sourceImgRect.height + "px;";
-        
-        // force refresh
-        img.offsetHeight;
-        
-        window.setTimeout(function() { layer.style.opacity = "1.0"; }, 150);
-        
-        img.style.cssText = "position: fixed; z-index: 50; transition: all 0.3s; top: " + targetImgRect.top + "px; left: " + targetImgRect.left + "px; width: " + targetImgRect.width + "px; height: " + targetImgRect.height + "px;";
-
-        window.setTimeout(function(){
-            gallery.classList.add("fullscreen");
-            
-            gallery.addEventListener("tapstart",tapstart);
-            gallery.addEventListener("tapmove",tapmove);
-            gallery.addEventListener("tapend",tapend);
-            
-            layer.style.cssText = "";
-            img.style.cssText = "";
-
-            scrollToActiveItem(containers[index],false);
-
-            positionSlotTooltip();
-        },300);
+    ret.jumpToSlot = function(timeslot) {
+        var firstItemInSlot = gallery.querySelector("div.container[data-timeslot='" + timeslot + "']");
+        scrollToActiveItem(firstItemInSlot,mx.GalleryAnimation.TYPE_SMOOTH);
     }
-    
-    function closeDetails()
+
+    ret.jumpToPreviousImage = function()
     {
-        if( !isFullscreen ) return;
-        isFullscreen = false;
-        
-        var layer = gallery.querySelector("div.layer");
-        
-        var img = activeItem.querySelector("img");
-
-        var sourceImgRect = getOffset(img);
-        sourceImgRect.left = img.offsetLeft;
-        var sourceLayerRect = getOffset(activeItem);
-        sourceLayerRect.left = 0;
-        
-        gallery.classList.remove("fullscreen");
-        gallery.removeEventListener("tapstart",tapstart);
-        gallery.removeEventListener("tapmove",tapmove);
-        gallery.removeEventListener("tapend",tapend);
-        
-        scrollToActiveItem(activeItem,false);
-
-        var targetImgRect = getOffset(img);
-        
-        layer.style.cssText = "display: block; top: " + sourceLayerRect.top + "px; left: " + sourceLayerRect.left + "px; width: " + sourceLayerRect.width + "px; height: " + sourceLayerRect.height + "px; opacity: 1.0";
-
-        img.style.cssText = "position: fixed; z-index: 50; top: " + sourceImgRect.top + "px; left: " + sourceImgRect.left + "px; width: " + sourceImgRect.width + "px; height: " + sourceImgRect.height + "px;";
-        
-        // force refresh
-        img.offsetHeight;
-
-        layer.style.opacity = "";
-        
-        img.style.cssText = "position: fixed; z-index: 50; transition: all 0.3s; top: " + targetImgRect.top + "px; left: " + targetImgRect.left + "px; width: " + targetImgRect.width + "px; height: " + targetImgRect.height + "px;";
-
-        window.setTimeout(function(){
-            layer.style.display = "";
-            
-            img.style.cssText = "";
-            
-            positionSlotTooltip();
-        },300);
+        scrollToActiveItem(containers[parseInt(activeItem.dataset.index) - 1],mx.GalleryAnimation.TYPE_SMOOTH);
     }
-  
-    function jumpToPreviousImage()
+
+    ret.jumpToNextImage = function()
     {
-        scrollToActiveItem(containers[parseInt(activeItem.dataset.index) - 1],true);
+        scrollToActiveItem(containers[parseInt(activeItem.dataset.index) + 1],mx.GalleryAnimation.TYPE_SMOOTH);
     }
-    
-    function jumpToNextImage()
-    {
-        scrollToActiveItem(containers[parseInt(activeItem.dataset.index) + 1],true);
-    }
-    
-    function delayedPosition()
-    {
-        if( requestedScrollPosition != null )
-        {
-            if( debug ) console.log("delayedPositon: skipped");
-            return;
-        }
-        
-        var offsetReference = Math.round( isFullscreen ? window.scrollX : window.scrollY);
-        
-        var galleryRect = gallery.getBoundingClientRect();
-        var galleryTop = galleryRect.top + window.scrollY;
-        
-        var firstElement = null;
-        var firstElementRect = null;
-        
-        visibleContainer.forEach(function(element,index){
-            var elementRect = element.getBoundingClientRect();
-        
-            if( isFullscreen )
-            {
-                if( elementRect.left < -2 )
-                {
-                    return;
-                }
-            
-                if( firstElement == null 
-                    || firstElementRect.left > elementRect.left
-                    || firstElementRect.left == elementRect.left
-                ){
-                    firstElement = element;
-                    firstElementRect = elementRect;
-                }
-            }
-            else
-            {
-                //console.log(element.dataset.formattedtime);
-                if( elementRect.top + elementRect.height < galleryTop - 2 )
-                {
-                    return;
-                }
-            
-                if( firstElement == null 
-                    || firstElementRect.top > elementRect.top
-                    || ( firstElementRect.top == elementRect.top && firstElementRect.left > elementRect.left )
-                ){
-                    firstElement = element;
-                    firstElementRect = elementRect;
-                }
-            }
-        });
-        
-        if( firstElement != null )
-        {
-            //console.log(firstElement.dataset.formattedtime);
-            if( debug ) console.log("delayedPositon: " + firstElement.dataset.formattedtime);
-            setActiveItem(firstElement);
-        }
-        else
-        {
-            if( debug ) console.log("delayedPositon: notfound");
-        }
-    }
-    
-    function checkRequestedPosition()
-    {
-        if( lastScrollPosition == null ) lastScrollPosition = requestedScrollPosition["source"];
-            
-        var currentScrollPosition = isFullscreen ? window.scrollX : window.scrollY;
-        
-        if( currentScrollPosition != lastScrollPosition )
-        {
-            //console.log(isForwardRequested + " " + isForwardActive + " " + currentScrollPosition + " " + lastScrollPosition);
-
-            var isForwardRequested = requestedScrollPosition["target"] - requestedScrollPosition["source"] > 0;
-            var isForwardActive = currentScrollPosition - lastScrollPosition > 0;
-            lastScrollPosition = currentScrollPosition;
-            
-            if( isForwardRequested )
-            {
-                if( !isForwardActive ) 
-                {
-                    //console.log("forward");
-                    return true;
-                }
-            }
-            else
-            {
-                if( isForwardActive )
-                {
-                    //console.log("backward");
-                    return true;
-                }
-            }
-        }
-        
-        // offset of 1 is needed for chrome browser
-        if( Math.abs( requestedScrollPosition["target"] - Math.round( isFullscreen ? window.scrollX : window.scrollY ) ) <= 1 )
-        {
-            return true;
-        }
-
-        return false;
-    }
-    
-    function scrollHandler(e){
-        if( requestedScrollPosition != null )
-        {
-            if( checkRequestedPosition() )
-            {
-                if( debug ) console.log("requestedScrollPosition reset");
-                requestedScrollPosition = null;
-                lastScrollPosition = null;
-            }
-            return;
-        }
-        
-        if( isFullscreen )
-        {
-            if( !isTabMoving ) processMomentingScroll();
-        }
-    }
-
-    function updateList()
-    {
-        var url = mx.Host.getBase() + 'index_update.php';
-        
-        var xhr = new XMLHttpRequest();
-        xhr.open("POST", url );
-        xhr.onreadystatechange = function() {
-            if (this.readyState != 4) return;
-            
-            if( this.status == 200 ) 
-            {
-                var content = document.createElement("div");
-                content.innerHTML = this.response;
-                
-                if( content.querySelector("#gallery") )
-                {
-                    var _containers = content.querySelector("#gallery").childNodes;
-                    
-                    var containerMap = {};
-                    containers.forEach(function(container,index){
-                        containerMap[container.dataset.src] = index;
-                    });
-                    
-                    var currentIndex = 0;//containers[0];
-                    var _containerMap = {};
-                    _containers.forEach(function(container,index){
-                        _containerMap[container.dataset.src] = index;
-
-                        if( typeof containerMap[container.dataset.src] == "undefined" )
-                        {
-                            gallery.insertBefore(container,containers[currentIndex]);
-                            containerObserver.observe(container);
-                            //console.log("add image");
-                        }
-                        else
-                        {
-                            currentIndex = containerMap[container.dataset.src] + 1;
-                        }
-                    });
-                    
-                    var _activeItem = activeItem;
-                    containers.forEach(function(container,index){
-                        if( typeof _containerMap[container.dataset.src] == "undefined" )
-                        {
-                            container.parentNode.removeChild(container);
-                            //console.log("remove image");
-                            if( container.dataset.src == activeItem.dataset.src )
-                            {
-                                _activeItem = null;
-                            }
-                        }
-                        else if(_activeItem == null)
-                        {
-                            _activeItem = container;
-                        }
-                    });
-                    
-                    // refresh containers
-                    containers = gallery.querySelectorAll(".container");
-                    
-                    slotOverview.innerHTML = content.querySelector("#slots").innerHTML;
-                    
-                    // reset active states
-                    activeItem = null;
-                    activeSlot = null;
-                    slotTooltipElement = null;
-                    
-                    if( ( isFullscreen ? window.scrollX : window.scrollY ) == 0 )
-                    {
-                        setActiveItem(containers[0]);
-                    }
-                    else
-                    {
-                        scrollToActiveItem(_activeItem,false);
-                    }
-                }
-        
-                updateTimer = window.setTimeout(updateList,30000);
-            }
-            else 
-            {
-                updateTimer = mx.Page.handleRequestError(this.status,url,updateList,60000);
-            }
-        };
-        
-        var data = {};
-        data['count'] = containers.length;
-        data['sub'] = folder;
-        
-        xhr.send(JSON.stringify(data));
-    }
-
-    function initObserver()
-    {
-        var observerOptions = {
-            rootMargin: ( ( galleryRect.top+window.scrollY ) * -1 ) + "px 0px 0px 0px"
-        };
-        containerObserver = new IntersectionObserver((entries, imgObserver) => {        
-            var activeItemUpdateNeeded = activeItem == null;
-            
-            entries.forEach((entry) => {
-                if(entry.isIntersecting) 
-                {
-                    activeItemUpdateNeeded = true;
-                    
-                    delayedLoading(entry.target);
-                    visibleContainer.push(entry.target);
-                }
-                else
-                {
-                    if( activeItem == entry.target ) activeItemUpdateNeeded = true;
-
-                    cancelLoading(entry.target);
-                    var index = visibleContainer.indexOf(entry.target)
-                    if( index != -1 )
-                    {
-                        visibleContainer.splice(index, 1);
-                    }
-                }
-            });
-            
-            if( activeItemUpdateNeeded ) delayedPosition();
-        },observerOptions);
-
-        containers.forEach( function(container,index){
-            containerObserver.observe(container);
-        });
-    }
-
-    ret.jumpToSlot = jumpToSlot;
-    ret.jumpToPreviousImage = jumpToPreviousImage;
-    ret.jumpToNextImage = jumpToNextImage;
-    ret.openDetails = openDetails;
-    ret.closeDetails = closeDetails;
-    ret.startPlay = startPlay;
-    ret.stopPlay = stopPlay;
 
     ret.init = function(_imageHeight,_imageWidth,_folder)
     {
@@ -745,43 +813,10 @@ mx.Gallery = (function( ret ) {
         containers = gallery.querySelectorAll(".container");
         
         initObserver();
-        
-        document.addEventListener('scroll', scrollHandler);
-        
-        window.addEventListener('resize', function(e) {
-            if( activeItem )
-            {
-                scrollToActiveItem(activeItem,false);
-                positionSlotTooltip();
-            }
-        });
-        
-        document.addEventListener('mouseup', function(e) {
-            if( isFullscreen )
-            {
-                if( e.clientY > document.documentElement.clientHeight )
-                {
-                    scrollToActiveItem(activeItem,true);
-                }
-            }
-        });
-        
-        document.addEventListener('mousemove', function(e) {
-            var reference = e.target;
-            if( !reference.classList ) return;
-            
-            if( reference.classList.contains("bar") )
-            {
-                reference = reference.parentNode;
-            }
-            if( !reference.classList.contains("slot") )
-            {
-                if( activeSlot ) setSlotTooltip(activeSlot);
-                return;
-            }
-            
-            setSlotTooltip(reference);
-        });
+
+        window.addEventListener('resize', resizeHandler);
+        document.addEventListener('scroll', scrollHandler, {passive: true});
+        document.addEventListener('mousemove', slotHoverHandler, {passive: true});
         
         mx.Swipe.init();
     
