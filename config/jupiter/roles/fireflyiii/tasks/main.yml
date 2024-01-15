@@ -1,7 +1,7 @@
 - name: set version
   set_fact:
     fireflyiii_core_version: 'version-6.1.6'
-    fireflyiii_importer_version: 'version-1.4.0'
+    fireflyiii_importer_version: 'version-1.4.1'
   tags: [ 'update_notifier_config' ]
 
 - name: prepare needed folder
@@ -20,15 +20,21 @@
     - restart fireflyiii-core
     - restart fireflyiii-importer
 
-- name: copy config
-  template:
-    src: "templates/{{item.name}}"
-    dest: "{{global_lib}}fireflyiii/configurations/{{item.name}}"
-    owner: "{{item.user}}"
-    group: "{{item.group}}"
-    mode: "{{item.mode}}"
-  with_items:
-    - { user: "33", group: "33", mode: "u=rwx,g=rx,o=", name: "config.json" }
+- name: check for vault configuration directory
+  find:
+    paths: "{{config_path}}vault/fireflyiii/"
+  delegate_to: 127.0.0.1
+  register: vault_key_directory
+
+- name: copy configuration directory
+  copy:
+    src: "{{config_path}}vault/fireflyiii/"
+    dest: "{{global_lib}}fireflyiii/configurations/"
+    decrypt: yes
+    owner: 33
+    group: 33
+    mode: 0750
+  when: "vault_key_directory.matched > 0"
   notify:
     - restart fireflyiii-core
     - restart fireflyiii-importer
@@ -170,7 +176,7 @@
 - name: create cron job
   vars:
     name: "Firefly III Importer cron job"
-    cmd: "docker exec --user www-data fireflyiii-importer sh -c \"php artisan importer:import /var/www/html/storage/configurations/config.json\""
+    cmd: "docker exec --user www-data fireflyiii-importer sh -c \"php artisan importer:auto-import /var/www/html/storage/configurations/\""
     file: "ansible_fireflyiii"
     hour: "7"
     minute: "0"
