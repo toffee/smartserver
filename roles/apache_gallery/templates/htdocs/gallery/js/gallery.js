@@ -1,7 +1,6 @@
 mx.GalleryAnimation = (function( ret ) {
-    ret.TYPE_INSTANT = 0;
-    ret.TYPE_SMOOTH = 1;
-    ret.TYPE_CUSTOM = 2;
+    ret.TYPE_INSTANT = "instant";
+    ret.TYPE_SMOOTH = "smooth";
 
     var requestId = null;
     var startPos = null;
@@ -10,21 +9,33 @@ mx.GalleryAnimation = (function( ret ) {
     var startTime = null;
     var currentPos = null;
 
-    ret.scrollTo = function(options, behavior, item)
+    var isHorizontal = null;
+
+    ret.scrollTo = function(options)
     {
-        if( behavior != mx.GalleryAnimation.TYPE_CUSTOM )
+        if( options["behavior"] == "instant" )
         {
             mx.GalleryAnimation.stop();
-
-            options["behavior"] = behavior == mx.GalleryAnimation.TYPE_INSTANT ? 'instant' : 'smooth';
             window.scrollTo(options);
         }
         else
         {
-            // scrollX is not 100% reliable during animations on mobile devices.
-            startPos = currentPos == null ? window.scrollX : currentPos;
-            diff = options["left"] - startPos;
-            duration = Math.abs(diff) * 800 / window.innerWidth;
+            isHorizontal = "left" in options;
+            if( isHorizontal )
+            {
+                // scrollX is not 100% reliable during animations on mobile devices.
+                startPos = currentPos == null ? window.scrollX : currentPos;
+                diff = options["left"] - startPos;
+                duration = Math.abs(diff) * 800 / window.innerWidth;
+            }
+            else
+            {
+                // scrollY is not 100% reliable during animations on mobile devices.
+                startPos = currentPos == null ? window.scrollY : currentPos;
+                diff = options["top"] - startPos;
+                duration = Math.abs(diff) * 800 / window.innerHeight;
+            }
+
             if( duration > 2000 ) duration = 2000;
             startTime = null;
 
@@ -35,29 +46,26 @@ mx.GalleryAnimation = (function( ret ) {
 
                 if (!startTime) startTime = currentTime;
 
-                // Elapsed time in miliseconds
                 const time = currentTime - startTime;
-
                 const percent = Math.min(time / duration, 1);
-                // https://easings.net/de => easeOutQuint
-                const animation = function (x) { return 1 - Math.pow(1 - x, 5); };
+                // https://easings.net/de => easeOutCubic
+                const animation = function (x) { return 1 - Math.pow(1 - x, 3); };
 
                 currentPos = startPos + diff * animation(percent);
-                window.scrollTo(currentPos, 0);
+                if( isHorizontal ) window.scrollTo(currentPos, 0);
+                else window.scrollTo(0, currentPos);
 
                 // Continue moving
-                if (time < duration)
-                {
-                    requestId = window.requestAnimationFrame(loop);
-                }
-                else
-                {
-                    window.cancelAnimationFrame(requestId);
-                    requestId = currentPos = null;
-                }
+                if (time < duration) requestId = window.requestAnimationFrame(loop);
+                else requestId = currentPos = null;
             };
             requestId = window.requestAnimationFrame(loop);
         }
+    }
+
+    ret.isScrolling = function()
+    {
+        return requestId != null;
     }
 
     ret.stop = function()
@@ -72,13 +80,14 @@ mx.GalleryAnimation = (function( ret ) {
 })( mx.GalleryAnimation || {} );
 
 mx.GallerySwipeHandler = (function( ret ) {
-    var startClientX = -1;
-    var startScrollX = -1;
     var isMoving = false;
+    var startScrollX = 0;
+    var startClientX = 0;
+    var currentClientX = 0;
+    var currentClientY = 0;
 
     var tabticker = null;
-    var trackerCurrentOffset = 0;
-    var trackerLastOffset = 0;
+    var trackerLastClientX = 0;
     var trackerVelocity = 0;
     var trackerTimestamp = null;
 
@@ -88,11 +97,10 @@ mx.GallerySwipeHandler = (function( ret ) {
     function tabtracker()
     {
         var now = performance.now();
-
         var elapsed = now - trackerTimestamp;
+        var delta = currentClientX - trackerLastClientX;
 
-        var delta = trackerCurrentOffset - trackerLastOffset;
-        trackerLastOffset = trackerCurrentOffset;
+        trackerLastClientX = currentClientX;
 
         v = 1000 * delta / (1 + elapsed);
         trackerVelocity = 0.8 * v + 0.2 * trackerVelocity;
@@ -102,16 +110,14 @@ mx.GallerySwipeHandler = (function( ret ) {
 
     function tapstart(e)
     {
-        if( e.target.classList.contains("button") ) return;
+        if( e.target.classList.contains("button") && !e.target.classList.contains("next") && !e.target.classList.contains("previous") ) return;
 
-        mx.GalleryAnimation.stop();
-
-        startClientX = e.detail.clientX;
-        startScrollX = window.scrollX;
         isMoving = false;
+        startScrollX = window.scrollX;
+        startClientX = e.detail.clientX;
+        currentClientX = startClientX;
 
-        trackerCurrentOffset = e.detail.clientX;
-        trackerLastOffset = e.detail.clientX;
+        trackerLastClientX = startClientX;
         trackerVelocity = 0;
         trackerTimestamp = performance.now();
         tabticker = setInterval(tabtracker, 100);
@@ -122,11 +128,13 @@ mx.GallerySwipeHandler = (function( ret ) {
 
     function tapmove(e)
     {
-        trackerCurrentOffset = e.detail.clientX;
+        if( !isMoving ) mx.GalleryAnimation.stop();
 
         isMoving = true;
-        //console.log("tapmove " + ( startScrollX - diff ) );
-        var diff = e.detail.clientX - startClientX;
+        currentClientX = e.detail.clientX;
+        currentClientY = e.detail.clientY;
+
+        var diff = currentClientX - startClientX;
         window.scrollTo( startScrollX - diff, 0 );
     }
 
@@ -138,9 +146,16 @@ mx.GallerySwipeHandler = (function( ret ) {
         swipeElement.removeEventListener("tapend",tapend);
 
         if( !isMoving ) return;
-        isMoving = false;
 
-        startClientX = -1;
+        if( e.target.classList.contains("button") )
+        {
+            let elements = document.elementsFromPoint(currentClientX, currentClientY);
+            if( elements[0].classList.contains("button") )
+            {
+                window.scrollTo(startScrollX, 0);
+                return;
+            }
+        }
 
         if( trackerVelocity == 0 ) tabtracker();
 
@@ -173,7 +188,6 @@ mx.Gallery = (function( ret ) {
     var imageHeight = 0;
     var imageWidth = 0;
     var folder = null;
-    var debug = false;
     
     var slotOverview = null;
 
@@ -193,8 +207,25 @@ mx.Gallery = (function( ret ) {
     var playTimer = null;
     var isPlaying = false;
 
-    var requestedScrollPosition = null;
-    var lastScrollPosition = null;
+    function buildContainer(element_data){
+        var container = document.createElement("div");
+        container.classList.add("container");
+        container.dataset.index = element_data["index"];
+        container.setAttribute("onclick", "mx.Gallery.openDetails(this)" );
+        container.dataset.src = element_data["org"];
+        container.dataset.small_src = element_data["small"];
+        container.dataset.medium_src = element_data["medium"];
+        container.dataset.formattedtime = element_data["time"];
+        container.dataset.timeslot = element_data["slot"];
+
+        var dummy = document.createElement("div");
+        dummy.classList.add("dummy");
+        container.appendChild(dummy);
+
+        return container;
+
+        gallery.appendChild(container);
+    }
 
     function updateList()
     {
@@ -213,41 +244,33 @@ mx.Gallery = (function( ret ) {
                 if( content.querySelector("#gallery") )
                 {
                     var containerMap = {};
-                    containers.forEach(function(container,index){
-                        containerMap[container.dataset.src] = container;
-                    });
+                    containers.forEach(function(container,index){ containerMap[container.dataset.src] = container; });
 
-                    var _containers = content.querySelector("#gallery").childNodes;
+                    var container_data = JSON.parse(content.querySelector("#gallery").innerText);
                     var _nextContainer = containers[0];
-                    Object.values(_containers).forEach(function(container,index){
-                        if( typeof containerMap[container.dataset.src] == "undefined" )
+                    Object.values(container_data).forEach(function(element_data,index)
+                    {
+                        if( typeof containerMap[element_data["org"]] == "undefined" )
                         {
-                            if( _nextContainer )
-                            {
-                                gallery.insertBefore(container,_nextContainer);
-                            }
-                            else
-                            {
-                                gallery.appendChild(container);
-                            }
+                            var container = buildContainer(element_data);
+                            if( _nextContainer ) gallery.insertBefore(container,_nextContainer);
+                            else gallery.appendChild(container);
+
                             containerObserver.observe(container);
                         }
                         else
                         {
-                            _nextContainer = containerMap[container.dataset.src].nextSibling;
-                            containerMap[container.dataset.src].dataset.index = container.dataset.index;
-                            delete containerMap[container.dataset.src];
+                            _nextContainer = containerMap[element_data["org"]].nextSibling;
+                            containerMap[element_data["org"]].dataset.index = element_data["index"];
+                            delete containerMap[element_data["org"]];
                         }
                     });
 
                     var _activeItem = activeItem;
-                    Object.values(containerMap).forEach(function(container,index){
+                    Object.values(containerMap).forEach(function(container,index)
+                    {
                         container.parentNode.removeChild(container);
-                        //console.log("remove image");
-                        if( container.dataset.src == activeItem.dataset.src )
-                        {
-                            _activeItem = null;
-                        }
+                        if( container.dataset.src == activeItem.dataset.src ) _activeItem = null;
                     });
 
                     if( _activeItem == null ) _activeItem = containers[0]
@@ -262,14 +285,8 @@ mx.Gallery = (function( ret ) {
                     activeSlot = null;
                     slotTooltipElement = null;
 
-                    if( ( isFullscreen ? window.scrollX : window.scrollY ) == 0 )
-                    {
-                        setActiveItem(containers[0]);
-                    }
-                    else
-                    {
-                        scrollToActiveItem(_activeItem,mx.GalleryAnimation.TYPE_INSTANT);
-                    }
+                    if( ( isFullscreen ? window.scrollX : window.scrollY ) == 0 ) setActiveItem(containers[0]);
+                    else scrollToActiveItem(_activeItem,mx.GalleryAnimation.TYPE_INSTANT);
                 }
 
                 updateTimer = window.setTimeout(updateList,30000);
@@ -304,42 +321,53 @@ mx.Gallery = (function( ret ) {
         return offset;
     }
 
+    function getNextItem(item)
+    {
+        var index = parseInt((item ? item : activeItem).dataset.index) - 1;
+        return index >= 0 ? containers[index] : null;
+    }
+
+    function getPreviousItem(item)
+    {
+        var index = parseInt((item ? item : activeItem).dataset.index) + 1;
+        return index < containers.length ? containers[index] : null;
+    }
+
     function positionSlotTooltip()
     {
         if( !slotTooltipElement.dataset.count )
         {
             mx.Tooltip.hide();
+            return;
+        }
+
+        let text = slotTooltipElement.dataset.formattedtime + "<br>" + slotTooltipElement.dataset.count + " Bilder";
+        mx.Tooltip.setText(text);
+
+        var slotOverviewRect = slotOverview.getBoundingClientRect();
+        var slotRect = slotTooltipElement.getBoundingClientRect();
+        var tooltipRect = mx.Tooltip.getRootElementRect();
+        var tooltipArrowRect = mx.Tooltip.getArrowElementRect();
+
+        var pos = ( slotRect.left + slotRect.width / 2 - tooltipRect.width / 2 )
+        if( pos < 2 )
+        {
+            pos = 2;
+            var center = slotRect.left + slotRect.width / 2;
+            arrowLeft = ( center - pos - tooltipArrowRect.width / 2 + 1) + "px";
+        }
+        else if( pos + tooltipRect.width > slotOverviewRect.width )
+        {
+            pos = slotOverviewRect.width - 2 - tooltipRect.width;
+            var center = slotRect.left + slotRect.width / 2;
+            arrowLeft = ( center - pos - tooltipArrowRect.width / 2 + 1) + "px";
         }
         else
-        {            
-            let text = slotTooltipElement.dataset.formattedtime + "<br>" + slotTooltipElement.dataset.count + " Bilder";
-            mx.Tooltip.setText(text);
-
-            var slotOverviewRect = slotOverview.getBoundingClientRect();
-            var slotRect = slotTooltipElement.getBoundingClientRect();
-            var tooltipRect = mx.Tooltip.getRootElementRect();
-            var tooltipArrowRect = mx.Tooltip.getArrowElementRect();
-            
-            var pos = ( slotRect.left + slotRect.width / 2 - tooltipRect.width / 2 )
-            if( pos < 2 )
-            {
-                pos = 2;
-                var center = slotRect.left + slotRect.width / 2;
-                arrowLeft = ( center - pos - tooltipArrowRect.width / 2 + 1) + "px";
-            }
-            else if( pos + tooltipRect.width > slotOverviewRect.width )
-            {
-                pos = slotOverviewRect.width - 2 - tooltipRect.width;
-                var center = slotRect.left + slotRect.width / 2;
-                arrowLeft = ( center - pos - tooltipArrowRect.width / 2 + 1) + "px";
-            }
-            else
-            {
-                arrowLeft = "calc(50% - " + (tooltipArrowRect.width / 2 - 1) + "px)";
-            }
-            
-            mx.Tooltip.show(pos, 0, arrowLeft);
+        {
+            arrowLeft = "calc(50% - " + (tooltipArrowRect.width / 2 - 1) + "px)";
         }
+
+        mx.Tooltip.show(pos, 0, arrowLeft);
     }
     
     function setSlotTooltip(element)
@@ -370,39 +398,56 @@ mx.Gallery = (function( ret ) {
         setSlotTooltip(reference);
     }
     
+    function requiredImageSize()
+    {
+        return isFullscreen ? 2: 1;
+    }
+
+    function isImageLoaded(element)
+    {
+        return element.dataset.loaded >= requiredImageSize();
+    }
+
     function loadImage(element,callback)
     {
-        element.dataset.loaded = true;
+        if( isImageLoaded(element) ) return;
+
+        element.dataset.loaded = requiredImageSize();
 
         var img = element.querySelector("img");
+        var isNew = !img;
+        if( isNew ) img = document.createElement("img");
 
-        element.addEventListener("dragstart",function(e){ e.preventDefault(); });
-        var img = document.createElement("img");
-        img.src = "image.php?sub=" + folder + "&image=" + element.dataset.src;
         if( typeof callback != "undefined" )
         {
             img.onload = function() { callback(true); };
             img.onerror = function() { callback(false); };
         }
-        element.appendChild(img);
-        
-        var srcLabel = document.createElement("span");
-        srcLabel.innerHTML = element.dataset.src;
-        element.appendChild(srcLabel);
 
-        var timeLabel = document.createElement("span");
-        timeLabel.innerHTML = element.dataset.formattedtime;
-        element.appendChild(timeLabel);
+        if( isFullscreen ) img.src = "./cache/" + folder + "/" + element.dataset.src;
+        else img.src = "./cache/" + folder + "/" + element.dataset.medium_src;
+
+        if( isNew )
+        {
+            element.appendChild(img);
+
+            element.addEventListener("dragstart",function(e){ e.preventDefault(); });
+
+            var srcLabel = document.createElement("span");
+            srcLabel.innerHTML = element.dataset.src;
+            element.appendChild(srcLabel);
+
+            var timeLabel = document.createElement("span");
+            timeLabel.innerHTML = element.dataset.formattedtime;
+            element.appendChild(timeLabel);
+        }
     }
 
     function delayedLoading(element)
     {
-        if( element.dataset.loaded ) return;
+        if( isImageLoaded(element) ) return;
 
-        var id = window.setTimeout(function(){
-            element.removeAttribute("data-timer");
-            loadImage(element);
-        },100);
+        var id = window.setTimeout(function(){ element.removeAttribute("data-timer"); loadImage(element); },100);
         element.dataset.timer = id;
     }
 
@@ -418,24 +463,12 @@ mx.Gallery = (function( ret ) {
     {
         if( isFullscreen )
         {
-            if( Math.round(window.scrollX) != item.offsetLeft )
-            {
-                if( debug ) console.log("scrollToActiveItem: " + item.dataset.formattedtime);
-    
-                requestedScrollPosition = { source: window.scrollX, target: item.offsetLeft };
-                mx.GalleryAnimation.scrollTo({ left: requestedScrollPosition["target"] }, behavior, item);
-            }
+            if( Math.round(window.scrollX) != item.offsetLeft ) mx.GalleryAnimation.scrollTo({ left: item.offsetLeft, behavior: behavior });
         }
         else
         {
             var targetPosition = item.offsetTop - gallery.offsetTop;
-            if( Math.round(window.scrollY) != targetPosition )
-            {
-                if( debug ) console.log("scrollToActiveItem: " + item.dataset.formattedtime);
-
-                requestedScrollPosition = { source: window.scrollY, target: targetPosition };
-                mx.GalleryAnimation.scrollTo({ top: requestedScrollPosition["target"] }, behavior, item);
-            }
+            if( Math.round(window.scrollY) != targetPosition ) mx.GalleryAnimation.scrollTo({ top: targetPosition, behavior: behavior });
         }
         
         setActiveItem(item);
@@ -445,30 +478,27 @@ mx.Gallery = (function( ret ) {
     {
         if( item != activeItem )
         {
-            if( debug ) console.log("setActiveItem: " + item.dataset.formattedtime);
-            
             if( activeItem == null || activeItem.dataset.timeslot != item.dataset.timeslot )
             {
-                if( activeItem != null )
-                {
-                    var activeSteplineBar = slotOverview.querySelector(".slot[data-timeslot=\"" + activeItem.dataset.timeslot + "\"]");
-                    activeSteplineBar.classList.remove("active");
-                }
-                var steplineBar = slotOverview.querySelector(".slot[data-timeslot=\"" + item.dataset.timeslot + "\"]");
-                steplineBar.classList.add("active");
-                
-                activeSlot = steplineBar;
+                if( activeItem != null ) activeSlot.classList.remove("active");
+                activeSlot = slotOverview.querySelector(".slot[data-timeslot=\"" + item.dataset.timeslot + "\"]");
+                activeSlot.classList.add("active");
                 setSlotTooltip(activeSlot);
             }
-
             activeItem = item;
-        }
-        
-        if( isFullscreen )
-        {
-            galleryStartPlayButton.style.display = activeItem.dataset.index == 0 || isPlaying ? "none" : "";
-            galleryPreviousButton.style.display = activeItem.dataset.index == 0 ? "none" : "";
-            galleryNextButton.style.display = activeItem.dataset.index == containers.length - 1 ? "none" : "";
+
+            if( isFullscreen )
+            {
+                galleryStartPlayButton.style.display = activeItem.dataset.index == 0 || isPlaying ? "none" : "";
+                galleryNextButton.style.display = activeItem.dataset.index == 0 ? "none" : "";
+                galleryPreviousButton.style.display = activeItem.dataset.index == containers.length - 1 ? "none" : "";
+
+                var previousItem = getPreviousItem();
+                if( previousItem != null ) delayedLoading(previousItem);
+
+                var nextItem = getNextItem();
+                if( nextItem != null ) delayedLoading(nextItem);
+            }
         }
     }
 
@@ -489,46 +519,11 @@ mx.Gallery = (function( ret ) {
         return containers[targetIndex];
     }
 
-    function checkRequestedPosition()
-    {
-        if( lastScrollPosition == null ) lastScrollPosition = requestedScrollPosition["source"];
-
-        var currentScrollPosition = isFullscreen ? window.scrollX : window.scrollY;
-
-        if( currentScrollPosition != lastScrollPosition )
-        {
-            var isForwardRequested = requestedScrollPosition["target"] - requestedScrollPosition["source"] > 0;
-            var isForwardActive = currentScrollPosition - lastScrollPosition > 0;
-            lastScrollPosition = currentScrollPosition;
-
-            if( isForwardRequested )
-            {
-                if( !isForwardActive ) return true;
-            }
-            else
-            {
-                if( isForwardActive ) return true;
-            }
-        }
-
-        // offset of 1 is needed for chrome browser
-        if( Math.abs( requestedScrollPosition["target"] - Math.round( isFullscreen ? window.scrollX : window.scrollY ) ) <= 1 )
-        {
-            return true;
-        }
-
-        return false;
-    }
-
     function delayedSlotPosition()
     {
         if( isFullscreen || visibleContainer.length == 0 ) return;
 
-        if( requestedScrollPosition != null )
-        {
-            if( debug ) console.log("delayedPositon: skipped");
-            return;
-        }
+        if( mx.GalleryAnimation.isScrolling() ) return;
 
         var firstElement = visibleContainer[0];
         var minIndex = visibleContainer[0].dataset.index;
@@ -569,62 +564,57 @@ mx.Gallery = (function( ret ) {
             if( activeItemUpdateNeeded ) delayedSlotPosition();
         },observerOptions);
 
-        containers.forEach( function(container,index){
-            containerObserver.observe(container);
-        });
+        containers.forEach( function(container,index){ containerObserver.observe(container); });
     }
 
     function swipeHandler(velocity)
     {
-        var index1 = -1, index2 = -1;
+        var item = null, direction = 0;
 
         if (velocity > 500 )
         {
-            index1 = parseInt(activeItem.dataset.index) - 1;
-            index2 = index1 - 1;
+            item = getNextItem();
+            direction = -1;
         }
         else if( velocity < -500 )
         {
-            index1 = parseInt(activeItem.dataset.index) + 1;
-            index2 = index1 + 1;
+            item = getPreviousItem();
+            direction = 1;
         }
 
-        if( index1 >= 0 && index1 < containers.length )
+        if( item != null )
         {
-            if( index2 >= 0 && index2 < containers.length ) delayedLoading(containers[index2]);
-
-            scrollToActiveItem(containers[index1],mx.GalleryAnimation.TYPE_CUSTOM);
-            return;
+            scrollToActiveItem(item, mx.GalleryAnimation.TYPE_SMOOTH);
         }
-
-        scrollToActiveItem(getMostVisibleItem(),mx.GalleryAnimation.TYPE_SMOOTH);
+        else
+        {
+            scrollToActiveItem(getMostVisibleItem(),mx.GalleryAnimation.TYPE_SMOOTH);
+        }
     }
 
     function playIteration()
     {
         if( isPlaying == false ) return;
 
-        var nextContainer = containers[parseInt(activeItem.dataset.index) - 1];
-        if( typeof nextContainer == "undefined" )
+        var item = getNextItem();
+        if( item == null )
         {
             mx.Gallery.stopPlay();
             return;
         }
-        scrollToActiveItem(nextContainer,mx.GalleryAnimation.TYPE_INSTANT);
+        scrollToActiveItem(item,mx.GalleryAnimation.TYPE_INSTANT);
 
-        nextContainer = containers[parseInt(activeItem.dataset.index) - 1];
-        if( typeof nextContainer == "undefined" )
+        item = getNextItem();
+        if( item == null )
         {
             mx.Gallery.stopPlay();
             return;
         }
-        var img = nextContainer.querySelector("img");
-        if( img == null || img.naturalWidth  == 0 )
+        if( !isImageLoaded(item) )
         {
-            //console.log("not loaded");
             var startTime = new Date().getTime();
-            cancelLoading(nextContainer);
-            loadImage(nextContainer,function(success)
+            cancelLoading(item);
+            loadImage(item,function(success)
             {
                 var endTime = new Date().getTime();
                 var diff = endTime - startTime;
@@ -638,16 +628,6 @@ mx.Gallery = (function( ret ) {
         }
     }
 
-    // watcher to check if scroll animations are finished
-    function scrollHandler()
-    {
-        if( requestedScrollPosition == null || !checkRequestedPosition() ) return;
-
-        if( debug ) console.log("requestedScrollPosition reset");
-        requestedScrollPosition = null;
-        lastScrollPosition = null;
-    }
-
     function resizeHandler()
     {
         if( !activeItem ) return;
@@ -656,15 +636,28 @@ mx.Gallery = (function( ret ) {
         positionSlotTooltip();
     }
 
-    ret.openDetails = function(index)
+    function keyHandler(e)
+    {
+        e.preventDefault();
+
+        if( isPlaying ) mx.Gallery.stopPlay();
+
+        if( e["key"] == "ArrowLeft" ) mx.Gallery.jumpToNextImage();
+        else if( e["key"] == "ArrowRight" ) mx.Gallery.jumpToPreviousImage();
+    }
+
+    ret.openDetails = function(item)
     {
         if( isFullscreen ) return;
         isFullscreen = true;
 
+        loadImage(item);
+
         mx.GallerySwipeHandler.enable(gallery, swipeHandler);
+        window.addEventListener("keydown",keyHandler);
 
         var layer = gallery.querySelector("div.layer");
-        var img = containers[index].querySelector("img");
+        var img = item.querySelector("img");
 
         var scrollbarSize = window.innerWidth - document.documentElement.clientWidth;
 
@@ -701,7 +694,7 @@ mx.Gallery = (function( ret ) {
             layer.style.cssText = "";
             img.style.cssText = "";
 
-            scrollToActiveItem(containers[index],mx.GalleryAnimation.TYPE_INSTANT);
+            scrollToActiveItem(item,mx.GalleryAnimation.TYPE_INSTANT);
             positionSlotTooltip();
         },300);
     }
@@ -712,6 +705,7 @@ mx.Gallery = (function( ret ) {
         isFullscreen = false;
 
         mx.GallerySwipeHandler.disable();
+        window.removeEventListener("keydown",keyHandler);
 
         var layer = gallery.querySelector("div.layer");
         var img = activeItem.querySelector("img");
@@ -782,12 +776,16 @@ mx.Gallery = (function( ret ) {
 
     ret.jumpToPreviousImage = function()
     {
-        scrollToActiveItem(containers[parseInt(activeItem.dataset.index) - 1],mx.GalleryAnimation.TYPE_SMOOTH);
+        var item = getPreviousItem();
+        if( item == null ) return;
+        scrollToActiveItem(item,mx.GalleryAnimation.TYPE_SMOOTH);
     }
 
     ret.jumpToNextImage = function()
     {
-        scrollToActiveItem(containers[parseInt(activeItem.dataset.index) + 1],mx.GalleryAnimation.TYPE_SMOOTH);
+        var item = getNextItem();
+        if( item == null ) return;
+        scrollToActiveItem(item,mx.GalleryAnimation.TYPE_SMOOTH);
     }
 
     ret.init = function(_imageHeight,_imageWidth,_folder)
@@ -804,6 +802,9 @@ mx.Gallery = (function( ret ) {
         galleryStartPlayButton = gallery.querySelector(".button.start");
         galleryStopPlayButton = gallery.querySelector(".button.stop");
 
+        var data = JSON.parse(gallery.querySelector(".data").innerText);
+        data.forEach(function(element_data){ var container = buildContainer(element_data); gallery.appendChild(container); });
+
         var style = document.createElement('style');
         style.type = 'text/css';
         style.innerHTML = 'div.dummy { margin-top: ' + (imageHeight*100/imageWidth) + '%; }';
@@ -815,7 +816,6 @@ mx.Gallery = (function( ret ) {
         initObserver();
 
         window.addEventListener('resize', resizeHandler);
-        document.addEventListener('scroll', scrollHandler, {passive: true});
         document.addEventListener('mousemove', slotHoverHandler, {passive: true});
         
         mx.Swipe.init();

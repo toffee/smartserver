@@ -28,7 +28,7 @@ require "../shared/libs/ressources.php";
     if( empty($_GET["sub"]) ) exit;
     $sub_folder = $_GET['sub'];
     
-    $folder = new Folder($ftp_folder,$sub_folder);
+    $folder = new Folder($sub_folder);
     $images = $folder->getImages();
     
     if( count($images) == 0 )
@@ -40,7 +40,7 @@ require "../shared/libs/ressources.php";
     }
     else
     {
-        list($width, $height, $type, $attr) = getimagesize($images[0]->getPath());
+        list($width, $height, $type, $attr) = getimagesize(CACHE_DIRECTORY.$images[0]->getSubFolder()."/".$images[0]->getOriginalCacheName());
 
         $starttime = Template::getStarttime($images);
         $endtime = Template::getEndtime($images);
@@ -57,8 +57,8 @@ require "../shared/libs/ressources.php";
 <div class="slots"><?php echo Template::getSlots($starttime,$endtime,$images); ?></div>
 <div id="gallery">
   <div class="layer"></div>
-  <span class="button previous icon-left" onclick="mx.Gallery.jumpToPreviousImage(event)"></span>
-  <span class="button next icon-right" onclick="mx.Gallery.jumpToNextImage(event)"></span>
+  <span class="button next icon-left" onclick="mx.Gallery.jumpToNextImage(event)"></span>
+  <span class="button previous icon-right" onclick="mx.Gallery.jumpToPreviousImage(event)"></span>
   <span class="button close icon-cancel" onclick="mx.Gallery.closeDetails(event)"></span>
   <span class="button start icon-play" onclick="mx.Gallery.startPlay(event)"></span>
   <span class="button stop icon-stop" onclick="mx.Gallery.stopPlay(event)"></span>
