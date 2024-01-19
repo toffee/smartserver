@@ -1,0 +1,125 @@
+- name: set version
+  set_fact:
+    pgadmin_version: "8.2"
+  tags: [ 'update_notifier_config' ]
+  
+- name: prepare needed folder
+  file:
+    path: '{{item}}'
+    state: directory
+    owner: 5050
+    group: 5050
+    mode: 0750
+  with_items:
+    - '{{ global_etc }}pgadmin'
+    - '{{ global_lib }}pgadmin'
+
+- name: copy config
+  template:
+    src: "templates/etc/pgadmin/{{item}}"
+    dest: "{{ global_etc }}pgadmin/{{item}}"
+    owner: 5050
+    group: 5050
+    mode: 0640
+  with_items:
+    - "servers.json"
+  notify: "restart pgadmin"
+
+- name: check started docker
+  systemd:
+    name: docker
+    state: started
+
+- name: create docker container
+  docker_container:
+    name: pgadmin
+    image: "dpage/pgadmin4:{{pgadmin_version}}"
+    state: present
+    env:
+      PGADMIN_DEFAULT_EMAIL: "{{root_email}}"
+      PGADMIN_DEFAULT_PASSWORD: "{{vault_pgadmin_password}}"
+      PGADMIN_LISTEN_PORT: "5050"
+      TZ: "{{timezone}}"
+    log_driver: journald
+    log_options:
+      tag: pgadmin
+    volumes:
+      - '{{ global_etc }}pgadmin/servers.json:/pgadmin4/servers.json:z'
+      - '{{ global_lib }}pgadmin:/var/lib/pgadmin:z'
+    container_default_behavior: "compatibility"
+    network_mode: "default"
+    networks:
+      - name: "isolated"
+        ipv4_address: "{{docker_pgadmin_ip}}"
+    networks_cli_compatible: yes
+    published_ports: |
+      [
+        "5050:5050",
+        {% if default_server_ipv6 is defined %}
+          "[::]:5050:5050"
+        {% endif %}
+      ]
+  register: pgadmin_container
+  notify: "restart pgadmin"
+
+- name: add container name
+  vars:
+    host_name: "pgadmin"
+    host_ip_address: "{{docker_pgadmin_ip}}"
+  import_tasks: roles/_shared/add_to_hosts.yml
+
+- name: prepare ferm rules
+  set_fact:
+    pgadmin_ferm_rules: |
+      [
+      "saddr {{docker_pgadmin_ip}} daddr {{docker_postgres_ip}}"
+      ]
+  tags: [ 'firewall_config' ]
+
+- name: allow pgadmin service
+  vars:
+    name: "pgadmin"
+    rules: "{{pgadmin_ferm_rules}}"
+  import_tasks: roles/firewall/shared/allow_service.yml
+  tags: [ 'firewall_config' ]
+
+# ***** FINALIZE *****
+- name: register webui
+  vars:
+    name: "pgadmin"
+    js_file: "templates/webui/pgadmin.js"
+    icons: [ 'templates/webui/icons/pgadmin_logo.svg' ]
+  import_tasks: roles/apache_webui/shared/add_webui.yml
+  
+- name: copy apache config
+  vars:
+    config_file: "templates/etc/apache2/_.ansible.conf.d/pgadmin.conf"
+  import_tasks: roles/apache/shared/add_config.yml
+
+- name: copy fluentd config
+  vars:
+    config_file: "templates/etc/fluent/_.ansible.d/pgadmin.conf"
+  import_tasks: roles/fluentd/shared/add_config.yml
+
+- name: create systemd service
+  vars:
+    container_name: "pgadmin"
+  import_tasks: roles/container/shared/add_docker_service.yml
+    
+- name: register update notifier
+  vars:
+    name: "pgadmin"
+    type: "docker"
+    url: "https://www.pgadmin.org/news/"
+    config: {
+      repository: "dpage/pgadmin4",
+      pattern: "^([0-9\\.]+)$"
+    }
+  import_tasks: roles/update_service/shared/add_software.yml
+
+- name: trigger pgadmin handler
+  vars:
+    notify: "restart pgadmin"
+    service: "pgadmin.service"
+  import_tasks: roles/_shared/service_check.yml
+

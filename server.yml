@@ -147,6 +147,7 @@
 
     - { import_role: { name: mysql_phpmyadmin }, tags: [ 'mysql_phpmyadmin' ] }                  # phpMyAdmin
     - { import_role: { name: mysql_adminer }, tags: [ 'mysql_adminer' ] }                        # Adminer
+    - { import_role: { name: pgadmin }, tags: [ 'pgadmin' ] }                                    # pgAdmin
 
     - { import_role: { name: apache_webui }, tags: [ 'apache_webui' ] }                          # responsive web ui
     - { import_role: { name: apache_gallery }, tags: [ 'apache_gallery' ], when: "camera_devices | length > 0" }    # camera image gallery
