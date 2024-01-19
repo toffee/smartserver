@@ -178,8 +178,8 @@
     name: "Firefly III Importer cron job"
     cmd: "docker exec --user www-data fireflyiii-importer sh -c \"php artisan importer:auto-import /var/www/html/storage/configurations/\""
     file: "ansible_fireflyiii"
-    hour: "7"
-    minute: "0"
+    hour: "8"
+    minute: "30"
   import_tasks: roles/cron/shared/add_cronjob.yml
 
 # ***** FINALIZE *****
