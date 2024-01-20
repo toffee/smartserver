@@ -212,19 +212,13 @@ mx.Gallery = (function( ret ) {
         container.classList.add("container");
         container.dataset.index = element_data["index"];
         container.setAttribute("onclick", "mx.Gallery.openDetails(this)" );
-        container.dataset.src = element_data["org"];
-        container.dataset.small_src = element_data["small"];
-        container.dataset.medium_src = element_data["medium"];
-        container.dataset.formattedtime = element_data["time"];
+        container.dataset.name = element_data["name"];
+        container.dataset.formatted = element_data["formatted"];
+        container.dataset.src = element_data["name"] + "_" + element_data["timestamp"] + ".jpg";
+        container.dataset.small_src = element_data["name"] + "_small.jpg";
+        container.dataset.medium_src = element_data["name"] + "_medium.jpg";
         container.dataset.timeslot = element_data["slot"];
-
-        var dummy = document.createElement("div");
-        dummy.classList.add("dummy");
-        container.appendChild(dummy);
-
         return container;
-
-        gallery.appendChild(container);
     }
 
     function updateList()
@@ -415,8 +409,7 @@ mx.Gallery = (function( ret ) {
         element.dataset.loaded = requiredImageSize();
 
         var img = element.querySelector("img");
-        var isNew = !img;
-        if( isNew ) img = document.createElement("img");
+        if( !img ) img = document.createElement("img");
 
         if( typeof callback != "undefined" )
         {
@@ -427,19 +420,18 @@ mx.Gallery = (function( ret ) {
         if( isFullscreen ) img.src = "./cache/" + folder + "/" + element.dataset.src;
         else img.src = "./cache/" + folder + "/" + element.dataset.medium_src;
 
-        if( isNew )
+        if( !img.parentNode)
         {
-            element.appendChild(img);
-
-            element.addEventListener("dragstart",function(e){ e.preventDefault(); });
+            var timeLabel = document.createElement("span");
+            timeLabel.innerHTML = element.dataset.formatted;
+            element.appendChild(timeLabel);
 
             var srcLabel = document.createElement("span");
-            srcLabel.innerHTML = element.dataset.src;
-            element.appendChild(srcLabel);
+            srcLabel.innerHTML = element.dataset.name;
+            element.insertBefore(srcLabel, element.firstChild);
 
-            var timeLabel = document.createElement("span");
-            timeLabel.innerHTML = element.dataset.formattedtime;
-            element.appendChild(timeLabel);
+            element.insertBefore(img, element.firstChild);
+            element.addEventListener("dragstart",function(e){ e.preventDefault(); });
         }
     }
 
@@ -669,14 +661,10 @@ mx.Gallery = (function( ret ) {
         var targetImgRect = {top: 0, left: 0, width: 0, height: 0 };
         var imgRatio = sourceImgRect.height / sourceImgRect.width;
 
-        var ratio = targetLayerRect.width / sourceImgRect.width;
-        if( sourceImgRect.height * ratio > targetLayerRect.height ) ratio = targetLayerRect.height / sourceImgRect.height;
-        targetImgRect.height = sourceImgRect.height * ratio;
-        targetImgRect.width = sourceImgRect.width * ratio;
-        //if( targetImgRect.height > imageHeight ) targetImgRect.height = imageHeight;
-        //if( targetImgRect.width > imageWidth ) targetImgRect.width = imageWidth;
-        targetImgRect.top = targetLayerRect.top + ( targetLayerRect.height - targetImgRect.height ) / 2 - 1;
-        targetImgRect.left = targetLayerRect.left + ( targetLayerRect.width - targetImgRect.width ) / 2 - 1;
+        targetImgRect.height = targetLayerRect.height;
+        targetImgRect.width = targetLayerRect.width
+        targetImgRect.top = targetLayerRect.top;
+        targetImgRect.left = targetLayerRect.left;
 
         layer.style.cssText = "display: block; top: " + targetLayerRect.top + "px; left: " + targetLayerRect.left + "px; width: " + targetLayerRect.width + "px; height: " + targetLayerRect.height + "px";
         img.style.cssText = "position: fixed; z-index: 50; top: " + sourceImgRect.top + "px; left: " + sourceImgRect.left + "px; width: " + sourceImgRect.width + "px; height: " + sourceImgRect.height + "px;";
@@ -807,7 +795,7 @@ mx.Gallery = (function( ret ) {
 
         var style = document.createElement('style');
         style.type = 'text/css';
-        style.innerHTML = 'div.dummy { margin-top: ' + (imageHeight*100/imageWidth) + '%; }';
+        style.innerHTML = '#gallery:not(.fullscreen) > div.container { aspect-ratio: ' + (imageWidth / imageHeight) + '; }';
         document.getElementsByTagName('head')[0].appendChild(style);
         
         galleryRect = gallery.getBoundingClientRect();

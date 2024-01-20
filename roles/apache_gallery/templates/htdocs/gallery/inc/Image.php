@@ -1,31 +1,27 @@
 <?php
 class Image {
-    private $main_folder = null;
-    private $sub_folder = null;
-    private $file = null;
-    private $time = null;
+    private $name = null;
+    private $original_cache_name = null;
+    private $datetime = null;
+    private $slot = null;
     
-    public function __construct($sub_folder, $small_cache_name, $medium_cache_name, $org_cache_name, $creation_time ) {
-        $this->sub_folder = $sub_folder;
-        $this->small_cache_name = $small_cache_name;
-        $this->medium_cache_name = $medium_cache_name;
+    public function __construct($name, $org_cache_name, $timestamp ) {
+        $this->name = $name;
         $this->original_cache_name = $org_cache_name;
-        $this->time = $creation_time;
+
+        $datetime = new DateTime();
+        $datetime->setTimestamp($timestamp);
+        $this->datetime = $datetime;
+
+        $date = clone $this->datetime;
+        $date->setTime( $date->format("H"), 0, 0, 0 );
+        $date->add(new DateInterval('PT1H'));
+        $this->slot = $date->getTimestamp();
     }
     
-    public function getSubFolder()
+    public function getName()
     {
-        return $this->sub_folder;
-    }
-
-    public function getSmallCacheName()
-    {
-        return $this->small_cache_name;
-    }
-
-    public function getMediumCacheName()
-    {
-        return $this->medium_cache_name;
+        return $this->name;
     }
 
     public function getOriginalCacheName()
@@ -33,8 +29,13 @@ class Image {
         return $this->original_cache_name;
     }
 
-    public function getTime()
+    public function getDateTime()
     {
-        return $this->time;
+        return $this->datetime;
+    }
+
+    public function getSlot()
+    {
+        return $this->slot;
     }
 }

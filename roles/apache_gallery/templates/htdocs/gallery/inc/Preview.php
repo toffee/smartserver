@@ -13,45 +13,33 @@ class Preview {
                 $images = array();
                 foreach( scandir($camera_cache_directory) as $file )
                 {
-                    if( $file == "." || $file == ".." || strpos($file, ".lock") !== false ) continue;
+                    preg_match('/^(.+)_([a-z0-9]+)\.jpg+$/', $file, $matches);
+                    if( !$matches ) continue;
+                    $name =  $matches[1];
+                    $type =  $matches[2];
 
-                    $index = strrpos($file, ".");
-                    if( $index === false ) continue;
-
-                    $filename = substr($file,0,$index);
-
-                    $index = strrpos($filename, "_");
-                    if( $index === false ) continue;
-
-                    $name = substr($filename,0,$index);
-                    $type = substr($filename,$index + 1);
-
-                    if( !isset($images[$name]) ) $images[$name] = array(null,null,null,null);
+                    if( !isset($images[$name]) ) $images[$name] = array();
                     $image_data = &$images[$name];
 
                     switch($type)
                     {
                         case "small":
-                            $image_data[2] = $file;
-                            break;
                         case "medium":
-                            $image_data[1] = $file;
+                            $image_data[$type] = $file;
                             break;
                         default:
-                            $image_data[0] = $file;
-                            $image_data[4] = $type;
+                            $image_data["original"] = $file;
+                            $image_data["timestamp"] = $type;
                     }
                 }
 
-                Preview::$cache_map[$camera_name] = array_filter($images, function($image_data){ return $image_data[0] != null && $image_data[1] != null && $image_data[2] != null; } );;
+                Preview::$cache_map[$camera_name] = array_filter($images, function($image_data){ return count($image_data) == 4; } );
             }
         }
     }
 
     private static function generatePreview($img, $original_file, $preview_file, $preview_size, $timestamp)
     {
-        list( $width, $height ) = explode("x", $preview_size);
-
         if( $img == null )
         {
             $img = new Imagick;
@@ -63,7 +51,11 @@ class Preview {
 
         }
 
-        $img->scaleImage( $width, $height, true );
+        if( $preview_size != null )
+        {
+            list( $width, $height ) = explode("x", $preview_size);
+            $img->scaleImage( $width, $height, true );
+        }
 
         file_put_contents($preview_file, $img->getImageBlob());
         touch($preview_file,$timestamp);
@@ -80,7 +72,7 @@ class Preview {
     {
         if( !array_key_exists($camera_name, Preview::$cache_map) ) Preview::initFiles($camera_name);
 
-        return array_values(Preview::$cache_map[$camera_name]);
+        return Preview::$cache_map[$camera_name];
     }
 
     public static function check($original_file)
@@ -107,15 +99,11 @@ class Preview {
                     echo "create " . $name . "\n";
 
                     $timestamp = filemtime($original_file);
-                    $org_cache_path = $camera_cache_directory . $name . "_" . $timestamp . "." . $path_parts["extension"] ;
-
-                    if( !is_file( $org_cache_path ) )
-                    {
-                        copy($original_file, $org_cache_path);
-                        touch($org_cache_path,$timestamp);
-                    }
 
                     $img = null;
+                    $org_cache_path = $camera_cache_directory . $name . "_" . $timestamp . ".jpg" ;
+                    if( !is_file( $org_cache_path ) ) $img = Preview::generatePreview($img, $original_file, $org_cache_path, null, $timestamp);
+
                     $medium_cache_path = $camera_cache_directory . $path_parts["filename"] . "_medium.jpg";
                     if( !is_file( $medium_cache_path ) ) $img = Preview::generatePreview($img, $original_file, $medium_cache_path, PREVIEW_MEDIUM_SIZE, $timestamp);
 
