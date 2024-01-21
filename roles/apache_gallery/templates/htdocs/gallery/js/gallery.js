@@ -13,7 +13,7 @@ mx.GalleryAnimation = (function( ret ) {
 
     ret.scrollTo = function(options)
     {
-        if( options["behavior"] == "instant" )
+        if( options["behavior"] == mx.GalleryAnimation.TYPE_INSTANT )
         {
             mx.GalleryAnimation.stop();
             window.scrollTo(options);
@@ -135,7 +135,7 @@ mx.GallerySwipeHandler = (function( ret ) {
         currentClientY = e.detail.clientY;
 
         var diff = currentClientX - startClientX;
-        window.scrollTo( startScrollX - diff, 0 );
+        mx.GalleryAnimation.scrollTo({"left": startScrollX - diff, "behavior": mx.GalleryAnimation.TYPE_INSTANT});
     }
 
     function tapend(e)
@@ -152,7 +152,7 @@ mx.GallerySwipeHandler = (function( ret ) {
             let elements = document.elementsFromPoint(currentClientX, currentClientY);
             if( elements[0].classList.contains("button") )
             {
-                window.scrollTo(startScrollX, 0);
+                mx.GalleryAnimation.scrollTo({"left": startScrollX, "behavior": mx.GalleryAnimation.TYPE_INSTANT});
                 return;
             }
         }
@@ -197,8 +197,6 @@ mx.Gallery = (function( ret ) {
     var galleryStartPlayButton = null;
     var galleryStopPlayButton = null;
   
-    var galleryRect = null;
-
     var containers = [];
     
     var containerObserver = null;
@@ -238,13 +236,13 @@ mx.Gallery = (function( ret ) {
                 if( content.querySelector("#gallery") )
                 {
                     var containerMap = {};
-                    containers.forEach(function(container,index){ containerMap[container.dataset.src] = container; });
+                    containers.forEach(function(container,index){ containerMap[container.dataset.name] = container; });
 
                     var container_data = JSON.parse(content.querySelector("#gallery").innerText);
                     var _nextContainer = containers[0];
                     Object.values(container_data).forEach(function(element_data,index)
                     {
-                        if( typeof containerMap[element_data["org"]] == "undefined" )
+                        if( !( element_data["name"] in containerMap ) )
                         {
                             var container = buildContainer(element_data);
                             if( _nextContainer ) gallery.insertBefore(container,_nextContainer);
@@ -254,9 +252,9 @@ mx.Gallery = (function( ret ) {
                         }
                         else
                         {
-                            _nextContainer = containerMap[element_data["org"]].nextSibling;
-                            containerMap[element_data["org"]].dataset.index = element_data["index"];
-                            delete containerMap[element_data["org"]];
+                            _nextContainer = containerMap[element_data["name"]].nextSibling;
+                            containerMap[element_data["name"]].dataset.index = element_data["index"];
+                            delete containerMap[element_data["name"]];
                         }
                     });
 
@@ -437,7 +435,7 @@ mx.Gallery = (function( ret ) {
 
     function delayedLoading(element)
     {
-        if( isImageLoaded(element) ) return;
+        if( element.dataset.timer || isImageLoaded(element) ) return;
 
         var id = window.setTimeout(function(){ element.removeAttribute("data-timer"); loadImage(element); },100);
         element.dataset.timer = id;
@@ -481,16 +479,19 @@ mx.Gallery = (function( ret ) {
 
             if( isFullscreen )
             {
-                galleryStartPlayButton.style.display = activeItem.dataset.index == 0 || isPlaying ? "none" : "";
-                galleryNextButton.style.display = activeItem.dataset.index == 0 ? "none" : "";
-                galleryPreviousButton.style.display = activeItem.dataset.index == containers.length - 1 ? "none" : "";
-
                 var previousItem = getPreviousItem();
                 if( previousItem != null ) delayedLoading(previousItem);
 
                 var nextItem = getNextItem();
                 if( nextItem != null ) delayedLoading(nextItem);
             }
+        }
+
+        if( isFullscreen )
+        {
+            galleryStartPlayButton.style.display = activeItem.dataset.index == 0 || isPlaying ? "none" : "";
+            galleryNextButton.style.display = activeItem.dataset.index == 0 ? "none" : "";
+            galleryPreviousButton.style.display = activeItem.dataset.index == containers.length - 1 ? "none" : "";
         }
     }
 
@@ -532,11 +533,11 @@ mx.Gallery = (function( ret ) {
 
     function initObserver()
     {
-        var observerOptions = { rootMargin: ( ( galleryRect.top+window.scrollY ) * -1 ) + "px 0px 0px 0px" };
+        var galleryRect = gallery.getBoundingClientRect();
+        var observerOptions = { root: document, rootMargin: ( ( galleryRect.top + 1 ) * -1 ) + "px 0px 0px 0px" };
 
+        var activeItemUpdateNeeded = true;
         containerObserver = new IntersectionObserver((entries, imgObserver) => {
-            var activeItemUpdateNeeded = activeItem == null;
-
             entries.forEach((entry) => {
                 if( entry.isIntersecting )
                 {
@@ -544,16 +545,20 @@ mx.Gallery = (function( ret ) {
                     delayedLoading(entry.target);
                     visibleContainer.push(entry.target);
                 }
-                else
+                else if( activeItem != null ) // not initial loading
                 {
                     if( activeItem == entry.target ) activeItemUpdateNeeded = true;
                     cancelLoading(entry.target);
-                    var index = visibleContainer.indexOf(entry.target)
+                    var index = visibleContainer.indexOf(entry.target);
                     if( index != -1 ) visibleContainer.splice(index, 1);
                 }
             });
 
-            if( activeItemUpdateNeeded ) delayedSlotPosition();
+            if( activeItemUpdateNeeded )
+            {
+                delayedSlotPosition();
+                activeItemUpdateNeeded = false;
+            }
         },observerOptions);
 
         containers.forEach( function(container,index){ containerObserver.observe(container); });
@@ -638,10 +643,13 @@ mx.Gallery = (function( ret ) {
         else if( e["key"] == "ArrowRight" ) mx.Gallery.jumpToPreviousImage();
     }
 
+    var openerDetails = null;
     ret.openDetails = function(item)
     {
         if( isFullscreen ) return;
         isFullscreen = true;
+
+        openerDetails = { "visible_indexes": visibleContainer.map(function(visibleItem){ return visibleItem.dataset.index; }), "top": window.scrollY };
 
         loadImage(item);
 
@@ -705,7 +713,9 @@ mx.Gallery = (function( ret ) {
 
         gallery.classList.remove("fullscreen");
 
-        scrollToActiveItem(activeItem,mx.GalleryAnimation.TYPE_INSTANT);
+        if( openerDetails["visible_indexes"].includes(activeItem.dataset.index) ) mx.GalleryAnimation.scrollTo({"top": openerDetails["top"], "behavior": mx.GalleryAnimation.TYPE_INSTANT});
+        else scrollToActiveItem(activeItem,mx.GalleryAnimation.TYPE_INSTANT);
+        openerDetails = null;
 
         var targetImgRect = getOffset(img);
 
@@ -798,10 +808,9 @@ mx.Gallery = (function( ret ) {
         style.innerHTML = '#gallery:not(.fullscreen) > div.container { aspect-ratio: ' + (imageWidth / imageHeight) + '; }';
         document.getElementsByTagName('head')[0].appendChild(style);
         
-        galleryRect = gallery.getBoundingClientRect();
         containers = gallery.querySelectorAll(".container");
         
-        initObserver();
+        window.addEventListener('load', initObserver); // css must be applied to gallery
 
         window.addEventListener('resize', resizeHandler);
         document.addEventListener('mousemove', slotHoverHandler, {passive: true});
