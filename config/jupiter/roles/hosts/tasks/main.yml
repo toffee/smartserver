@@ -8,8 +8,8 @@
   notify: "restart screenoff"
 
 # Add local firewall rules
-# * allow access from dnsmqsq containre to pihole container - needed for reverse dns lookup
-# * allow docker containres to access internet (other IPs others than local one)
+# * allow access from dnsmqsq container to pihole container - needed for reverse dns lookup
+# * allow docker containers to access internet (other IPs others than local one)
 - name: prepare ferm rules
   set_fact:
     jupiter_ferm_rules: |
