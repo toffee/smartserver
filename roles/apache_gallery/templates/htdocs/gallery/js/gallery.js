@@ -392,19 +392,19 @@ mx.Gallery = (function( ret ) {
     
     function requiredImageSize()
     {
-        return isFullscreen ? 2: 1;
+        return isFullscreen ? 3: ( window.devicePixelRatio > 1 ? 2 : 1 );
     }
 
-    function isImageLoaded(element)
+    function isImageLoaded(element, imageSize)
     {
-        return element.dataset.loaded >= requiredImageSize();
+        return element.dataset.loaded >= imageSize;
     }
 
     function loadImage(element,callback)
     {
-        if( isImageLoaded(element) ) return;
-
-        element.dataset.loaded = requiredImageSize();
+        var imageSize = requiredImageSize();
+        if( isImageLoaded(element, imageSize) ) return;
+        element.dataset.loaded = imageSize;
 
         var img = element.querySelector("img");
         if( !img ) img = document.createElement("img");
@@ -415,8 +415,9 @@ mx.Gallery = (function( ret ) {
             img.onerror = function() { callback(false); };
         }
 
-        if( isFullscreen ) img.src = "./cache/" + folder + "/" + element.dataset.src;
-        else img.src = "./cache/" + folder + "/" + element.dataset.medium_src;
+        if( imageSize == 3 ) img.src = "./cache/" + folder + "/" + element.dataset.src;
+        else if( imageSize == 2 ) img.src = "./cache/" + folder + "/" + element.dataset.medium_src;
+        else img.src = "./cache/" + folder + "/" + element.dataset.small_src;
 
         if( !img.parentNode)
         {
@@ -435,7 +436,7 @@ mx.Gallery = (function( ret ) {
 
     function delayedLoading(element)
     {
-        if( element.dataset.timer || isImageLoaded(element) ) return;
+        if( element.dataset.timer || isImageLoaded(element, requiredImageSize()) ) return;
 
         var id = window.setTimeout(function(){ element.removeAttribute("data-timer"); loadImage(element); },100);
         element.dataset.timer = id;
@@ -538,14 +539,16 @@ mx.Gallery = (function( ret ) {
 
         var activeItemUpdateNeeded = true;
         containerObserver = new IntersectionObserver((entries, imgObserver) => {
+            var isInitialLoading = activeItem == null;
             entries.forEach((entry) => {
                 if( entry.isIntersecting )
                 {
                     activeItemUpdateNeeded = true;
-                    delayedLoading(entry.target);
+                    if( isInitialLoading || !mx.GalleryAnimation.isScrolling() ) loadImage(entry.target); // mx.GalleryAnimation.isScrolling() == false : if touch or mouse initiated scrolling
+                    else delayedLoading(entry.target);
                     visibleContainer.push(entry.target);
                 }
-                else if( activeItem != null ) // not initial loading
+                else if( !isInitialLoading )
                 {
                     if( activeItem == entry.target ) activeItemUpdateNeeded = true;
                     cancelLoading(entry.target);
