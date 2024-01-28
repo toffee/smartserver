@@ -11,6 +11,7 @@ import json
 from datetime import datetime
 
 from smartserver.server import Server
+from smartserver.scheduler import Scheduler
 
 from config import config
 
@@ -21,7 +22,6 @@ from lib.info.info import Info
 
 from lib.mqtt import MQTTHandler
 from lib.influxdb import InfluxDB
-from lib.scheduler import Scheduler
 from lib.ipcache import IPCache
 
 from lib.trafficwatcher.trafficwatcher import TrafficWatcher
@@ -53,7 +53,7 @@ class Handler(Server):
 
         self.trafficwatcher = TrafficWatcher(config, self, self.influxdb, self.ipcache)
 
-        self.scheduler = Scheduler()
+        self.scheduler = Scheduler("system_service")
 
         self.startup_timestamp = round(datetime.now().timestamp(),3)
 
@@ -129,20 +129,20 @@ class Handler(Server):
 
     def getStateMetrics(self):
         metrics = []
-        metrics = metrics + self.trafficwatcher.getStateMetrics()
+        metrics += self.trafficwatcher.getStateMetrics()
 
-        metrics = metrics + self.scanner.getStateMetrics()
-        metrics = metrics + self.speedtest.getStateMetrics()
-        metrics = metrics + self.fping.getStateMetrics()
+        metrics += self.scanner.getStateMetrics()
+        metrics += self.speedtest.getStateMetrics()
+        metrics += self.fping.getStateMetrics()
 
-        metrics = metrics + self.info.getStateMetrics()
+        metrics += self.info.getStateMetrics()
 
-        metrics = metrics + self.ipcache.getStateMetrics()
+        metrics += self.ipcache.getStateMetrics()
 
-        metrics = metrics + self.influxdb.getStateMetrics()
-        metrics = metrics + self.mqtt.getStateMetrics()
+        metrics += self.influxdb.getStateMetrics()
+        metrics += self.mqtt.getStateMetrics()
 
-        metrics = metrics + self.scheduler.getStateMetrics()
+        metrics += self.scheduler.getStateMetrics()
 
         return "{}\n".format( "\n".join(metrics) )
 
