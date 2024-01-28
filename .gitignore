@@ -5,3 +5,8 @@ config/*
 !config/default.yml
 /ansible.cfg
 /*.retry
+!config/saturn/
+config/saturn/vault/vault.yml
+config/saturn/vault/wireguard_mobile/
+config/saturn/vault/wireguard_cloud/
+config/saturn/vault/letsencrypt.tgz

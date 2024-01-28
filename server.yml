@@ -60,15 +60,15 @@
     - { import_role: { name: apache_webui, tasks_from: create_shared_folder, handlers_from: empty }, tags: [ 'apache_webui', "apache_webui_config", ] }    # creates {{htdocs_path}}main/components
 
     # needed by all roles which needs to register their own prometheus endpoints and rules
-    - { import_role: { name: prometheus, tasks_from: create_shared_folder, handlers_from: empty }, tags: [ 'prometheus', "prometheus_config" ] }    # creates {{ global_etc }}prometheus/rules/ & {{ global_etc }}prometheus/scrapes/
-    - { import_role: { name: loki, tasks_from: create_shared_folder, handlers_from: empty }, tags: [ 'loki', "loki_config" ] }    # creates {{ global_etc }}loki/rules/fake
+#    - { import_role: { name: prometheus, tasks_from: create_shared_folder, handlers_from: empty }, tags: [ 'prometheus', "prometheus_config" ] }    # creates {{ global_etc }}prometheus/rules/ & {{ global_etc }}prometheus/scrapes/
+#    - { import_role: { name: loki, tasks_from: create_shared_folder, handlers_from: empty }, tags: [ 'loki', "loki_config" ] }    # creates {{ global_etc }}loki/rules/fake
 
     # needed by all roles which needs to register their own datasources or dashboards
-    - { import_role: { name: grafana, tasks_from: create_shared_folder, handlers_from: empty }, tags: [ 'grafana', "grafana_config" ] }    # creates {{ global_etc }}grafana/provisioning/datasources/ & {{ global_lib }}grafana/dashboards/
+#    - { import_role: { name: grafana, tasks_from: create_shared_folder, handlers_from: empty }, tags: [ 'grafana', "grafana_config" ] }    # creates {{ global_etc }}grafana/provisioning/datasources/ & {{ global_lib }}grafana/dashboards/
 
-    - { import_role: { name: nextcloud, tasks_from: create_shared_folder, handlers_from: empty }, tags: [ 'nextcloud', 'php' ] }
+#    - { import_role: { name: nextcloud, tasks_from: create_shared_folder, handlers_from: empty }, tags: [ 'nextcloud', 'php' ] }
 
-    - { import_role: { name: openhab_toolbox, tasks_from: create_shared_folder, handlers_from: empty }, tags: [ 'openhab_toolbox', 'php', 'apache' ] }
+#    - { import_role: { name: openhab_toolbox, tasks_from: create_shared_folder, handlers_from: empty }, tags: [ 'openhab_toolbox', 'php', 'apache' ] }
 
     - { import_role: { name: systemd_watcher, tasks_from: create_shared_folder, handlers_from: empty }, tags: [ 'systemd_watcher', "systemd_watcher_config" ] }
     
@@ -102,25 +102,25 @@
 
     - { import_role: { name: pihole }, tags: [ 'pihole' ], when: "pihole_ip is defined" }        # adblock server                                                    [docker,user:root]
 
-    - { import_role: { name: wireguard_mobile }, tags: [ 'wireguard', 'wireguard_mobile', 'macvlan', 'alpine' ] } # vpn configuration (mobile access)                [docker,user:root]
+#    - { import_role: { name: wireguard_mobile }, tags: [ 'wireguard', 'wireguard_mobile', 'macvlan', 'alpine' ] } # vpn configuration (mobile access)                [docker,user:root]
 
     - { import_role: { name: postfix }, tags: [ 'postfix', 'alpine' ] }                          # mail server to forward root mails                                 [docker,user:root]
 
-    - { import_role: { name: prometheus }, tags: [ 'prometheus' ] }                              # prometheus                                                        [docker,user:root]
+#    - { import_role: { name: prometheus }, tags: [ 'prometheus' ] }                              # prometheus                                                        [docker,user:root]
 
-    - { import_role: { name: alertmanager }, tags: [ 'alertmanager' ] }                          # alertmanager => depends on postfix                                [docker,user:root]
+#    - { import_role: { name: alertmanager }, tags: [ 'alertmanager' ] }                          # alertmanager => depends on postfix                                [docker,user:root]
 
     - { import_role: { name: samba }, tags: [ 'samba', 'alpine' ] }                              # smb file server                                                   [docker,user:root]
 
-    - { import_role: { name: mysql }, tags: [ 'mysql' ] }                                        # mysql db => needed by nextcloud and openhab                       [docker,user:999]
+#    - { import_role: { name: mysql }, tags: [ 'mysql' ] }                                        # mysql db => needed by nextcloud and openhab                       [docker,user:999]
 
-    - { import_role: { name: influxdb }, tags: [ 'influxdb' ] }                                  # influxdb => needed by openhab & system_info                       [docker,user:root]
+#    - { import_role: { name: influxdb }, tags: [ 'influxdb' ] }                                  # influxdb => needed by openhab & system_info                       [docker,user:root]
     
-    - { import_role: { name: loki }, tags: [ 'loki' ] }                                          # grafana logstore                                                  [docker,user:10001|10001]
+#    - { import_role: { name: loki }, tags: [ 'loki' ] }                                          # grafana logstore                                                  [docker,user:10001|10001]
 
-    - { import_role: { name: redis }, tags: [ 'redis' ] }                                        # redis db => needed by nextcloud                                   [docker,user:999]
+#    - { import_role: { name: redis }, tags: [ 'redis' ] }                                        # redis db => needed by nextcloud                                   [docker,user:999]
     
-    - { import_role: { name: mosquitto }, tags: [ 'mosquitto' ] }                                # mqtt message broker                                               [docker,user:1883]
+#    - { import_role: { name: mosquitto }, tags: [ 'mosquitto' ] }                                # mqtt message broker                                               [docker,user:1883]
 
     - { import_role: { name: php }, tags: [ 'php' ] }                                            # php cli                                                           [docker,user:wwwrun|apache]
     
@@ -137,37 +137,37 @@
     - { import_role: { name: netdata }, tags: [ 'netdata' ] }                                    # server monitoring
 #    - { import_role: { name: netdata, tasks_from: main_container, handlers_from: empty }, tags: [ 'netdata_container' ] }
 
-    - { import_role: { name: librenms }, tags: [ 'librenms' ], when: "librenms_devices | length > 0" } # network monitoring                                          [docker,user:1000|1000]
+#    - { import_role: { name: librenms }, tags: [ 'librenms' ], when: "librenms_devices | length > 0" } # network monitoring                                          [docker,user:1000|1000]
     
-    - { import_role: { name: system_service }, tags: [ 'system_service', 'alpine' ] }            # system monitoring                                                 [docker,user:root]
+#    - { import_role: { name: system_service }, tags: [ 'system_service', 'alpine' ] }            # system monitoring                                                 [docker,user:root]
 
-    - { import_role: { name: grafana }, tags: [ 'grafana' ] }                                    # graphical dashboards                                              [docker,user:root]
+#    - { import_role: { name: grafana }, tags: [ 'grafana' ] }                                    # graphical dashboards                                              [docker,user:root]
 
-    - { import_role: { name: mysql_phpmyadmin }, tags: [ 'mysql_phpmyadmin' ] }                  # phpMyAdmin
-    - { import_role: { name: mysql_adminer }, tags: [ 'mysql_adminer' ] }                        # Adminer
+#    - { import_role: { name: mysql_phpmyadmin }, tags: [ 'mysql_phpmyadmin' ] }                  # phpMyAdmin
+#    - { import_role: { name: mysql_adminer }, tags: [ 'mysql_adminer' ] }                        # Adminer
 
-    - { import_role: { name: camera_ftp }, tags: [ 'camera_ftp', 'alpine' ], when: "camera_devices | length > 0" } # ftp file server for camera picture upload       [docker,user:ftp]
-    - { import_role: { name: camera_service }, tags: [ 'camera_service', 'alpine' ], when: "camera_devices | length > 0" } # camera image gallery
+#    - { import_role: { name: camera_ftp }, tags: [ 'camera_ftp', 'alpine' ], when: "camera_devices | length > 0" } # ftp file server for camera picture upload       [docker,user:ftp]
+#    - { import_role: { name: camera_service }, tags: [ 'camera_service', 'alpine' ], when: "camera_devices | length > 0" } # camera image gallery
 
     - { import_role: { name: apache_webui }, tags: [ 'apache_webui' ] }                          # responsive web ui
 
-    - { import_role: { name: nextcloud }, tags: [ 'nextcloud' ] }                                # private cloud
-    - { import_role: { name: nextcloud_libreoffice }, tags: [ 'nextcloud_libreoffice' ] }        # office editor                                                     [docker,user:106|108]
+#    - { import_role: { name: nextcloud }, tags: [ 'nextcloud' ] }                                # private cloud
+#    - { import_role: { name: nextcloud_libreoffice }, tags: [ 'nextcloud_libreoffice' ] }        # office editor                                                     [docker,user:106|108]
 
-    - { import_role: { name: minidlna }, tags: [ 'minidlna', 'alpine' ], when: "dlna_ip is defined and ( dlna_volumes | length ) > 0" } # dlna media server           [docker,user:wwwrun|apache]
+#    - { import_role: { name: minidlna }, tags: [ 'minidlna', 'alpine' ], when: "dlna_ip is defined and ( dlna_volumes | length ) > 0" } # dlna media server           [docker,user:wwwrun|apache]
      
-    - { import_role: { name: openhab }, tags: [ 'openhab' ] }                                    # openhab iot server                                                [docker,user:openhab|openhab]
-    - { import_role: { name: openhab_toolbox }, tags: [ 'openhab_toolbox' ] }                    # admin scripts and tools
+#    - { import_role: { name: openhab }, tags: [ 'openhab' ] }                                    # openhab iot server                                                [docker,user:openhab|openhab]
+#    - { import_role: { name: openhab_toolbox }, tags: [ 'openhab_toolbox' ] }                    # admin scripts and tools
 
-    - { import_role: { name: backup_rsync }, tags: [ 'backup_rsync' ] }                          # rsync copy of {{env_path}} to {{backup_path}}dataDisk/
+#    - { import_role: { name: backup_rsync }, tags: [ 'backup_rsync' ] }                          # rsync copy of {{env_path}} to {{backup_path}}dataDisk/
 
     - { import_role: { name: deployment }, tags: [ 'deployment' ] }                              # ansible deployment project + backup collector
 
     - { import_role: { name: update_service }, tags: [ 'update_service' ], when: "update_service_software_check_enabled or update_service_system_check_enabled" }    # update check & handler
 
-    - { import_role: { name: speedtest }, tags: [ 'speedtest' ] }                                # inhouse network performance test                                  [docker,user:1000|1000]
+#    - { import_role: { name: speedtest }, tags: [ 'speedtest' ] }                                # inhouse network performance test                                  [docker,user:1000|1000]
 
-    - { import_role: { name: openwrt }, tags: [ 'openwrt' ], when: "openwrt_devices | length > 0" } # default configs for uploading to openwrt to allow monitoring
+#    - { import_role: { name: openwrt }, tags: [ 'openwrt' ], when: "openwrt_devices | length > 0" } # default configs for uploading to openwrt to allow monitoring
 
     # ************ CUSTOM ROLES ************
     - { include_tasks: "{{config_path}}roles.yml", tags: [ 'always' ] }                          # Details can be found inside the demo configuration 'config/demo/roles.yml'
@@ -179,13 +179,13 @@
 
     - { import_role: { name: pihole, tasks_from: lists, handlers_from: empty }, tags: [ 'pihole', 'pihole_lists' ] }   # add whitelist and adlist entries
 
-    - { import_role: { name: librenms, tasks_from: apply_config, handlers_from: empty }, tags: [ 'librenms', 'librenms_config' ], when: "librenms_devices | length > 0" }   # apply librenms configs
+#    - { import_role: { name: librenms, tasks_from: apply_config, handlers_from: empty }, tags: [ 'librenms', 'librenms_config' ], when: "librenms_devices | length > 0" }   # apply librenms configs
 
-    - { import_role: { name: nextcloud, tasks_from: enable_apps, handlers_from: empty }, tags: [ 'nextcloud', 'nextcloud_apps' ] }   # enable nextcloud apps needs a running system (php, database, redis ...)
+#    - { import_role: { name: nextcloud, tasks_from: enable_apps, handlers_from: empty }, tags: [ 'nextcloud', 'nextcloud_apps' ] }   # enable nextcloud apps needs a running system (php, database, redis ...)
 
-    - { import_role: { name: influxdb, tasks_from: create_users, handlers_from: empty }, tags: [ 'influxdb', 'influxdb_users' ] }   # create influxdb users
+#    - { import_role: { name: influxdb, tasks_from: create_users, handlers_from: empty }, tags: [ 'influxdb', 'influxdb_users' ] }   # create influxdb users
 
-    - { import_role: { name: openhab, tasks_from: create_users, handlers_from: empty }, tags: [ 'openhab', 'openhab_users' ] }   # create openhab users
+#    - { import_role: { name: openhab, tasks_from: create_users, handlers_from: empty }, tags: [ 'openhab', 'openhab_users' ] }   # create openhab users
 
     - { import_role: { name: update_service, tasks_from: collect_deployment_tags, handlers_from: empty }, tags: [ 'all', 'collect_deployment_tags' ], when: "update_service_system_check_enabled" } # get ansible tags, used in update daemon webui
 
