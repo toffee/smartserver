@@ -3,7 +3,7 @@
   register: "service_result"
   changed_when: no
   failed_when: no
-  
+
 - name: "influxdb : start service"
   systemd:
     name: influxdb

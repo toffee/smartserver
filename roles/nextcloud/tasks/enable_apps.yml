@@ -5,13 +5,15 @@
 
 # ***** CHECK *****
 - name: check mysql service
-  import_tasks: roles/mysql/shared/wait_until_ready.yml
+  include_tasks: roles/mysql/shared/wait_until_ready.yml
+  when: "mysql_enabled"
     
 - name: check redis service
-  import_tasks: roles/redis/shared/wait_until_ready.yml
+  include_tasks: roles/redis/shared/wait_until_ready.yml
+  when: "redis_enabled"
 
 - name: check apache service
-  import_tasks: roles/apache/shared/wait_until_ready.yml
+  include_tasks: roles/apache/shared/wait_until_ready.yml
 
 # ***** DISABLE APPS *****
 - name: disable apps
@@ -125,7 +127,8 @@
 #      - { app: "onlyoffice", name: "verify_peer_off", value: "false" }
 #      - { app: "onlyoffice", name: "versionHistory", value: "true" }
 
-      - { app: "jsloader", name: "snippet", value: "document.domain='{{server_domain}}'; if( window.parent != window && window.parent == window.top ){ var found = document.location.hostname.match(/(fa|ba)(\\.|-).*/); var script = document.createElement('script'); script.src = 'https://' + ( found ? found[1] + '.' : '' ) + '{{server_domain}}' + '/main/listener/frame.js'; document.head.appendChild(script); }" }
+      - { app: "jsloader", name: "snippet", value: "document.domain='{{server_domain}}'; if( window.parent != window && window.parent == window.top ){ var found = document.location.hostname.match(/(fa|ba)(.|-).*/); var script = document.createElement('script'); script.src = 'https://' + ( found ? found[1] + '.' : '' ) + '{{server_domain}}' + '/main/listener/frame.js'; document.head.appendChild(script); }" }
+#      - { app: "jsloader", name: "snippet", value: "document.domain='{{server_domain}}'; if( window.parent != window && window.parent == window.top ){ var found = document.location.hostname.match(/(fa|ba)(\\.|-).*/); var script = document.createElement('script'); script.src = 'https://' + ( found ? found[1] + '.' : '' ) + '{{server_domain}}' + '/main/listener/frame.js'; document.head.appendChild(script); }" }
 
       - { app: "previewgenerator", name: "squareSizes", value: "256" }
       - { app: "previewgenerator", name: "widthSizes", value: "256" }
@@ -134,7 +137,7 @@
       - { app: "notes", name: "fileSuffix", value: ".md" }
 
       - { app: "text", name: "workspace_available", value: "0" }
-      
+
 - name: prepare app configs
   set_fact:
     prepared_app_configs: "{{ prepared_app_configs | default([]) + [ { 'app': item.app, 'name': item.name, 'value': item.value | replace(\"'\", \"\\'\" ) | replace('\"', '\\\\\\\"') } ] }}"
@@ -161,7 +164,7 @@
     cmd: "docker exec php sh -c \"php -f {{htdocs_path}}nextcloud/occ preview:pre-generate > /dev/null\""
     file: "ansible_nextcloud"
     minute: "*/15"
-  import_tasks: roles/cron/shared/add_cronjob.yml
+  include_tasks: roles/cron/shared/add_cronjob.yml
 
 # ***** FINALIZE NEWS INSTALLATION *****
 - name: prepare news config folder
@@ -291,7 +294,7 @@
     js_file: "templates/nextcloud_additional_apps.js"
     i18n_files: []
     icons: "{{nextcloud_additional_icons}}"
-  import_tasks: roles/apache_webui/shared/add_webui.yml
+  include_tasks: roles/apache_webui/shared/add_webui.yml
   when: "nextcloud_additional_apps | length > 0"
 
 - name: register update notifier
@@ -300,7 +303,8 @@
     type: "nextcloud"
     url: "https://apps.nextcloud.com/apps/"
     config: {}
-  import_tasks: roles/update_service/shared/add_software.yml
+  include_tasks: roles/update_service/shared/add_software.yml
+  when: "update_service_software_check_enabled"
 
 #- name: apply patches
 #  copy:

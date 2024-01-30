@@ -1,5 +1,5 @@
 - name: "influxdb : check service"
-  import_tasks: roles/influxdb/shared/wait_until_ready.yml
+  include_tasks: roles/influxdb/shared/wait_until_ready.yml
 
 # BUCKETS
 - name: "influxdb : check bucket"
@@ -22,7 +22,7 @@
   shell: "docker exec influxdb sh -c \"influx v1 dbrp list --org default-org\""
   register: influxdb_mapping_result
   changed_when: False
-  
+
 - name: "influxdb : create v1 mapping => bucket mapping does not exists"
   shell: "docker exec influxdb sh -c \"influx v1 dbrp create --db {{database}} --org default-org --rp {{item.name if item.name is defined else 'autogen'}} --bucket-id {{(influxdb_bucket_result.stdout | from_json | selectattr('name', 'equalto', database + ('_' + item.name if item.name is defined else '')) )[0].id}} {{'' if item.name is defined else '--default'}}\""
   when: "'\t' + ( influxdb_bucket_result.stdout | from_json | selectattr('name', 'equalto', database + ('_' + item.name if item.name is defined else '')) )[0].id + '\t' not in influxdb_mapping_result.stdout"
@@ -65,7 +65,7 @@
     minute: "0"
   include_tasks: roles/cron/shared/add_cronjob.yml
   with_items: "{{retentions}}"
-  
+
 - name: "influxdb : copy backup restore script"
   template:
     src: "roles/influxdb/templates/backup_restore/influxdb.sh"
