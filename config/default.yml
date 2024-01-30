@@ -78,7 +78,6 @@ default_variables: {
     #     }
     # }
 
-<<<<<<< HEAD
     # for details how to configure, check: https://github.com/zmartzone/mod_auth_openidc
     # to enable openid connect for google, go to: https://console.developers.google.com/apis/credentials
     "vault_openid_connect_url": { "optional": yes },              # 'optional' means disabled is not defined, to enable check documentation urls to get the right values
@@ -137,8 +136,6 @@ default_variables: {
     "vault_openhab_mysql_username": { "default": "openhab" },     # used for openhab data
     "vault_openhab_mysql_password": {},
 
-=======
->>>>>>> master
     "network_devices": { "default": [] },                         # used for librenms and system_service (network monitoring)
     # *** EXAMPLE ***
     # [
@@ -226,6 +223,8 @@ default_variables: {
     "mysql_enabled": { "default": yes },                          # enabled by default, be careful with disabling, because it will break openhab, nextcloud, and librenms.
     "vault_shared_mysql_username": { "default": "shared" },       # used for internal data
     "vault_shared_mysql_password": { "optional": "{{not mysql_enabled}}" },
+    
+    "postgres_enabled": { "default": no },
 
     "redis_enabled": { "default": yes },                          # enabled by default, be careful with disabling, because it will break nextcloud and librenms
 
