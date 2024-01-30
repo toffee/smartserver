@@ -5,6 +5,7 @@ config/*
 !config/default.yml
 /ansible.cfg
 /*.retry
+*/__pycache__/*
 !config/jupiter/
 config/jupiter/vault/vault.yml
 config/jupiter/vault/wireguard_mobile/
