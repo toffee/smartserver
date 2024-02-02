@@ -251,7 +251,7 @@ default_variables: {
 
     # Roles:
     # - 'postgres'
-    "postgres_enabled":                       { "default": no },
+    postgres_enabled:                         { "default": no },
 
     # Roles:
     # - 'redis'
@@ -558,9 +558,9 @@ default_variables: {
     # This is an opensource personal finance manager
     # Roles:
     # - 'fireflyiii'
-    "vault_fireflyiii_api_key":                    {"optional": "true"},
-    "vault_fireflyiii_mysql_username":             { "default": "fireflyiii" },
-    "vault_fireflyiii_mysql_password":             { "optional": "true" },
+    vault_fireflyiii_api_key:                 { "optional": "true" },
+    vault_fireflyiii_mysql_username:          { "default": "fireflyiii" },
+    vault_fireflyiii_mysql_password:          { "optional": "true" },
     # **** END FIREFLY III                                                             ***
     # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<    
 
@@ -570,10 +570,10 @@ default_variables: {
     # This is an opensource personal finance manager
     # Roles:
     # - 'fireflyiii'
-    "vault_ghostfolio_token_salt":                 {"optional": "true"},
-    "vault_ghostfolio_jwt_key":                    {"optional": "true"},
-    "vault_ghostfolio_postgres_username":          { "default": "ghostfolio" },
-    "vault_ghostfolio_postgres_password":          { "optional": "true" },
+    vault_ghostfolio_token_salt:              { "optional": "true" },
+    vault_ghostfolio_jwt_key:                 { "optional": "true" },
+    vault_ghostfolio_postgres_username:       { "default": "ghostfolio" },
+    vault_ghostfolio_postgres_password:       { "optional": "true" },
     # **** END GHOSTFOLIO                                                              ***
     # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 }
