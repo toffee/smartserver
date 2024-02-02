@@ -87,6 +87,7 @@ default_variables: {
     vault_deployment_token_git:               { optional: yes },                                                    # used in update_service or ci_service in case of a private repository
 
 
+    # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     # *** BEGIN OUTGOING MAIL SERVER                                                   ***
     # Roles:
     # - 'postfix'
@@ -95,8 +96,9 @@ default_variables: {
     vault_mailserver_host:                    {},                                                                   # "smtp.gmail.com" => smtp address from your email server
     vault_mailserver_port:                    {},                                                                   # "587" => smtp port from your email server
     # *** END OUTGOING MAIL SERVER                                                     ***
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-
+    # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     # *** BEGIN APACHE AUTH                                                            ***
     # for details how to configure, check: https://github.com/zmartzone/mod_auth_openidc
     # to enable openid connect for google, go to: https://console.developers.google.com/apis/credentials
@@ -230,8 +232,7 @@ default_variables: {
     # *** END VPN                                                                      ***
     # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-    #"postgres_enabled": { "default": no },
-    
+    # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     # *** BEGIN DATABASES                                                              ***
     # Roles:
     # - 'influxdb'
@@ -247,6 +248,10 @@ default_variables: {
     vault_shared_mysql_username:              { default: "shared",                                                  # used for internal data
                                                 optional: "{{not mysql_enabled}}" },
     vault_shared_mysql_password:              { optional: "{{not mysql_enabled}}" },
+
+    # Roles:
+    # - 'postgres'
+    "postgres_enabled":                       { "default": no },
 
     # Roles:
     # - 'redis'
@@ -478,13 +483,7 @@ default_variables: {
     # ### 2. You have to configure related variables below                             ###
     # ####################################################################################
 
-    "vault_fireflyiii_api_key": {"optional": "true"},
-    "vault_fireflyiii_mysql_username": { "default": "fireflyiii" },
-    "vault_fireflyiii_mysql_password": { "optional": "true" },
-    "vault_ghostfolio_token_salt": {"optional": "true"},
-    "vault_ghostfolio_jwt_key": {"optional": "true"},
-    "vault_ghostfolio_postgres_username": { "default": "ghostfolio" },
-    "vault_ghostfolio_postgres_password": { "optional": "true" },
+    
  
     # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     # *** BEGIN PRIVATE CLOUD SERVICE                                                  ***
@@ -552,6 +551,30 @@ default_variables: {
     # - 'vcontrol'
     # Related variables are 'vault_deployment_config_git' and 'vault_deployment_token_git'
     # **** END VCONTROLD SERVICE                                                       ***
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+    # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    # **** BEGIN FIREFLY III                                                           ***
+    # This is an opensource personal finance manager
+    # Roles:
+    # - 'fireflyiii'
+    "vault_fireflyiii_api_key":                    {"optional": "true"},
+    "vault_fireflyiii_mysql_username":             { "default": "fireflyiii" },
+    "vault_fireflyiii_mysql_password":             { "optional": "true" },
+    # **** END FIREFLY III                                                             ***
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<    
+
+
+    # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    # **** BEGIN GHOSTFOLIO                                                            ***
+    # This is an opensource personal finance manager
+    # Roles:
+    # - 'fireflyiii'
+    "vault_ghostfolio_token_salt":                 {"optional": "true"},
+    "vault_ghostfolio_jwt_key":                    {"optional": "true"},
+    "vault_ghostfolio_postgres_username":          { "default": "ghostfolio" },
+    "vault_ghostfolio_postgres_password":          { "optional": "true" },
+    # **** END GHOSTFOLIO                                                              ***
     # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 }
 
