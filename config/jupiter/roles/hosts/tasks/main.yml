@@ -10,12 +10,14 @@
 # Add local firewall rules
 # * allow access from dnsmqsq container to pihole container - needed for reverse dns lookup
 # * allow docker containers to access internet (other IPs others than local one)
+# * allow docker containers (host network) to access everything - needed for jekyll (maybe too permisive)
 - name: prepare ferm rules
   set_fact:
     jupiter_ferm_rules: |
       [
       "saddr {{docker_dns_ip}} daddr {{pihole_ip}}",
-      "saddr {{docker_base_network}}/24 daddr !{{default_server_network}}"
+      "saddr {{docker_base_network}}/24 daddr !{{default_server_network}}",
+      "saddr 172.17.0.0/24"
       ]
   tags: [ 'firewall_config' ]
 

@@ -36,3 +36,5 @@
 - { import_role: { name: "config/jupiter/roles/rsyncd" }, tags: [ 'rsyncd' ] }
 - { import_role: { name: "config/jupiter/roles/fireflyiii" }, tags: [ 'fireflyiii' ] }
 - { import_role: { name: "config/jupiter/roles/ghostfolio" }, tags: [ 'ghostfolio' ] }
+- { import_role: { name: "config/jupiter/roles/vdirsyncer" }, tags: [ 'vdirsyncer' ] }
+- { import_role: { name: "config/jupiter/roles/jekyll" }, tags: [ 'jekyll' ] }
