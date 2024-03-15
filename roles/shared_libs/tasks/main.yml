@@ -1,18 +1,15 @@
-- name: prepare needed folder
-  file:
-    path: "{{item.path}}"
-    state: directory
-    owner: "{{item.owner}}"
-    group: "{{item.group}}"
-    mode: "{{item.mode}}"
-  with_items:
-    - {mode: "u=rwX,g=rX,o=", owner: "root", group: "root", path: "/opt/shared/" }
-    - {mode: "u=rwX,g=rX,o=rX", owner: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", path: "{{htdocs_path}}/shared/" }
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{global_opt}}shared/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", path: "{{htdocs_path}}/shared/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", path: "{{htdocs_path}}/shared/font/" }
+  include_tasks: roles/_shared/create_directories.yml
 
 - name: synchronize python libs
   synchronize:
     src: "templates/libs/shared"
-    dest: "/opt/"
+    dest: "{{global_opt}}"
     archive: no
     checksum: yes
     group: yes
@@ -26,7 +23,7 @@
 - name: synchronize python libs installer
   synchronize:
     src: "templates/install.py"
-    dest: "/opt/shared/python/"
+    dest: "{{global_opt}}shared/python/"
     archive: no
     checksum: yes
     group: yes
@@ -39,7 +36,7 @@
   register: installer_state
 
 - name: install python libs
-  shell: "/opt/shared/python/install.py"
+  shell: "{{global_opt}}shared/python/install.py"
   when: installer_state.changed
 
 - name: synchronize web libs
@@ -54,9 +51,15 @@
     recursive: yes
     rsync_opts:
       - "--chown={{system_users['www'].name}}:{{system_groups['www'].name}}"
-      - "--chmod=D755,F644"
+      - "--chmod=D750,F640"
   with_items:
     - { src: "htdocs/shared", dest: "" }
-    - { src: "fonts/font", dest: "shared/" }
-    - { src: "fonts/css/animation.css", dest: "shared/css/animation.css" }
-    - { src: "fonts/css/fontello.css", dest: "shared/css/fontello.css" }
+    - { src: "fonts/fontello/font", dest: "shared/" }
+    - { src: "fonts/fontello/css/animation.css", dest: "shared/css/animation.css" }
+    - { src: "fonts/fontello/css/fontello.css", dest: "shared/css/fontello.css" }
+    - { src: "fonts/opensans/open-sans-v40-latin-300.woff2", dest: "shared/font/" }
+    - { src: "fonts/opensans/open-sans-v40-latin-400.woff2", dest: "shared/font/" }
+    - { src: "fonts/opensans/open-sans-v40-latin-500.woff2", dest: "shared/font/" }
+    - { src: "fonts/opensans/open-sans-v40-latin-600.woff2", dest: "shared/font/" }
+    - { src: "fonts/opensans/open-sans-v40-latin-700.woff2", dest: "shared/font/" }
+    - { src: "fonts/opensans/open-sans-v40-latin-800.woff2", dest: "shared/font/" }

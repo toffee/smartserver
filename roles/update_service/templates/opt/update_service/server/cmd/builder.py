@@ -1,12 +1,10 @@
 from config import config
 import logging
 
+from server.cmd.workflow import CmdWorkflow
+
 
 class CmdBuilder: 
-    CHECK_WRONG_UPDATE_STATE_SUFFIX = "update_hash"
-    CHECK_WRONG_SYSTEM_UPDATE_STATE = "wrong_system_update_hash"
-    CHECK_WRONG_SMARTSERVER_UPDATE_STATE = "wrong_smartserver_update_hash"
-
     def __init__(self,dependency_watcher,process_watcher,system_update_watcher,deployment_state_watcher, operating_system):
         self.system_update_cmds = operating_system.getSystemUpdateCmds()
         
@@ -15,13 +13,6 @@ class CmdBuilder:
         self.system_update_watcher = system_update_watcher
         self.deployment_state_watcher = deployment_state_watcher
 
-        self.cmd_software_version_check = "/opt/update_service/software_version_check"
-        self.cmd_system_update_check = "/opt/update_service/system_update_check"
-        self.cmd_service_restart = "systemctl restart"
-        self.cmd_request_reboot = "reboot"
-        self.cmd_check_reboot = "runlevel | grep \"6\""
-        self.cmd_container_cleanup = "/opt/docker/cleanup -q"
-        
         self.cmd_type_check_type_mapping = {
             None:             "update_check",
             "system_update":  "system_update_check",
@@ -45,14 +36,14 @@ class CmdBuilder:
         return self.buildFunction("process_watcher.cleanup" if is_cleanup else "process_watcher.refresh" )
 
     def buildSoftwareVersionCheckCmd(self, check_type):
-        return self.buildCmd(self.cmd_software_version_check, interaction=None,cwd=None,env=None)
+        return self.buildCmd(config.cmd_software_version_check, interaction=None,cwd=None,env=None)
 
     def buildSoftwareVersionCheckCmdBlock(self, username):
         cmd = self.buildSoftwareVersionCheckCmd(None)
         return self.buildCmdBlock(username, "software_check", [cmd])
 
     def buildSystemUpdateCheckCmd(self, check_type):
-        cmd = u"{}{}".format(self.cmd_system_update_check, " --limit={}".format(check_type) if check_type else "")
+        cmd = u"{}{}".format(config.cmd_system_update_check, " --limit={}".format(check_type) if check_type else "")
         return self.buildCmd(cmd, interaction=None,cwd=None,env=None)
       
     def buildSystemUpdateCheckBlock(self, username, check_type):
@@ -65,7 +56,7 @@ class CmdBuilder:
 
     def buildSystemRebootCmdBlock(self, username):
         cmds = []
-        cmds.append( self.buildCmd(self.cmd_request_reboot, interaction=None,cwd=None,env=None) )
+        cmds.append( self.buildCmd(config.cmd_request_reboot, interaction=None,cwd=None,env=None) )
         cmds.append( self.buildProcessWatcherFunction(False) ) # needs to be refreshed, because sometimes reboot state is still true right after reboot
         return self.buildCmdBlock(username, "system_reboot", cmds)
 
@@ -76,7 +67,7 @@ class CmdBuilder:
 
     def buildRestartDaemonCmdBlock(self, username):
         cmds = []
-        cmds.append( self.buildCmd("{} update_service".format(self.cmd_service_restart), interaction=None,cwd=None,env=None) )
+        cmds.append( self.buildCmd("{} update_service".format(config.cmd_service_restart), interaction=None,cwd=None,env=None) )
         return self.buildCmdBlock(username, "daemon_restart", cmds)
 
     def buildRestartDaemonCmdBlockIfNecessary(self, username,params):
@@ -88,7 +79,7 @@ class CmdBuilder:
 
     def buildRestartServiceCmdBlock(self, username, services):
         cmds = []
-        cmds.append( self.buildCmd("{} {}".format(self.cmd_service_restart, services.replace(","," ")), interaction=None,cwd=None,env=None) )
+        cmds.append( self.buildCmd("{} {}".format(config.cmd_service_restart, services.replace(","," ")), interaction=None,cwd=None,env=None) )
         cmds.append( self.buildProcessWatcherFunction(True) )
         return self.buildCmdBlock(username, "service_restart", cmds)
 
@@ -127,9 +118,9 @@ class CmdBuilder:
             cmd_deploy_system = "{} server.yml".format(cmd_deploy_system)
 
             cmds = []
-            cmds.append( self.buildCmd(cmd_deploy_system, interaction=interaction,cwd=config.deployment_directory,env={"ANSIBLE_FORCE_COLOR": "1"}) )
+            cmds.append( self.buildCmd(cmd_deploy_system, interaction=interaction,cwd=config.deployment_directory,env={"ANSIBLE_FORCE_COLOR": "1","ANSIBLE_CONFIG": "ansible_us.cfg"}) )
             cmds.append( self.buildSystemUpdateCheckCmd("deployment_update") )
-            cmds.append( self.buildCmd(self.cmd_container_cleanup, interaction=None,cwd=None,env=None) )
+            cmds.append( self.buildCmd(config.cmd_container_cleanup, interaction=None,cwd=None,env=None) )
             return self.buildCmdBlock(username, "deployment_update", cmds)
         else:
             return None
@@ -150,13 +141,13 @@ class CmdBuilder:
             #logging.info(params["system_updates_hash"])
             #logging.info(self.system_update_watcher.getSystemUpdatesHash())
             if params["system_updates_hash"] != self.system_update_watcher.getSystemUpdatesHash():
-                checks.append(CmdBuilder.CHECK_WRONG_SYSTEM_UPDATE_STATE)
+                checks.append(CmdWorkflow.STATE_CHECK_WRONG_SYSTEM_UPDATE_STATE)
 
         if params["smartserver_changes_hash"]:
             #logging.info(params["smartserver_changes_hash"])
             #logging.info(self.system_update_watcher.getSmartserverChangesHash())
             if params["smartserver_changes_hash"] != self.system_update_watcher.getSmartserverChangesHash():
-                checks.append(CmdBuilder.CHECK_WRONG_SMARTSERVER_UPDATE_STATE)
+                checks.append(CmdWorkflow.STATE_CHECK_WRONG_SMARTSERVER_UPDATE_STATE)
                 
         if len(checks) > 0:
             return ",".join(checks)

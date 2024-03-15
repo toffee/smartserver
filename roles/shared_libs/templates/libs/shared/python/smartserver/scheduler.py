@@ -17,6 +17,7 @@ class Scheduler(threading.Thread):
     def terminate(self):
         self.is_running = False
         self.event.set()
+        self.join()
 
     def run(self):
         logging.info("Scheduler started")
@@ -24,12 +25,13 @@ class Scheduler(threading.Thread):
             while self.is_running:
                 schedule.run_pending()
                 self.event.wait(1)
-            logging.info("Scheduler stopped")
-        except Exception:
-            logging.error(traceback.format_exc())
+        except Exception as e:
             self.is_running = False
+            raise e
+        finally:
+            logging.info("Scheduler stopped")
 
     def getStateMetrics(self):
         return [
-            "{}_process{{type=\"scheduler\",}} {}".format(self.name, "1" if self.is_running else "0")
+            "{}_process{{type=\"scheduler\"}} {}".format(self.name, "1" if self.is_running else "0")
         ]

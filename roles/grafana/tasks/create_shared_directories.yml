@@ -1,0 +1,16 @@
+#- name: "create user and group => user or group does not exists"
+#  vars:
+#    user: { name: "grafana", system: true, home: "{{global_etc}}grafana" }
+#    group: { name: "grafana", system: true }
+#  include_tasks: roles/user/shared/add_system_user.yml
+#  when: "'grafana' not in system_users or 'grafana' not in system_groups"
+
+- name: "prepare shared directories"
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_lib }}grafana/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_lib }}grafana/dashboards/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_etc }}grafana/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_etc }}grafana/provisioning/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_etc }}grafana/provisioning/datasources/" }
+  include_tasks: roles/_shared/create_directories.yml

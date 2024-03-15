@@ -1,8 +1,9 @@
 - name: set version
   set_fact:
-    pihole_version: '2024.01.0'
+    pihole_version: '2024.02.2'
   tags: [ 'update_notifier_config' ]
 
+<<<<<<< HEAD
 - name: prepare needed folder
   file:
     path: '{{item}}'
@@ -14,6 +15,22 @@
     - "{{ global_etc }}pihole"
     - "{{ global_etc }}pihole/dnsmasq.d/"
     - "{{ global_lib }}pihole/tftpboot/"
+=======
+- name: "create user and group => user or group does not exists"
+  vars:
+    user: { name: "pihole", system: true, home: "{{ global_etc }}pihole/" }
+    group: { name: "pihole", system: true }
+  include_tasks: roles/user/shared/add_system_user.yml
+  when: "'pihole' not in system_users or 'pihole' not in system_groups"
+
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['pihole'].name}}", group: "{{system_groups['pihole'].name}}", path: "{{ global_etc }}pihole/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['pihole'].name}}", group: "{{system_groups['pihole'].name}}", path: "{{ global_etc }}pihole/dnsmasq.d/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['pihole'].name}}", group: "{{system_groups['pihole'].name}}", path: "{{ global_lib }}pihole/" }
+  include_tasks: roles/_shared/create_directories.yml
+>>>>>>> master
 
 - name: generate static-dhcp.conf
   block:
@@ -21,8 +38,9 @@
       template:
         src: templates/etc/pihole/dnsmasq.d/04-pihole-static-dhcp.conf
         dest: "{{global_etc}}pihole/dnsmasq.d/04-pihole-static-dhcp.conf"
-        owner: "999"
-        group: "1000"
+        owner: "{{system_users['pihole'].name}}"
+        group: "{{system_groups['pihole'].name}}"
+        mode: 0640
       register: dhcp_changed
       
     - name: write pxeboot file
@@ -50,8 +68,9 @@
   template:
     src: templates/etc/pihole/custom.list
     dest: "{{global_etc}}pihole/custom.list"
-    owner: "999"
-    group: "1000"
+    owner: "{{system_users['pihole'].name}}"
+    group: "{{system_groups['pihole'].name}}"
+    mode: 0640
   notify: restart pihole
   when: "dns_enabled and dns_type == 'pihole'"
 
@@ -76,7 +95,9 @@
     pihole_env: |
       {
         "TZ": "{{timezone}}",
-        "WEBPASSWORD": "{{vault_pihole_password}}",
+        "PIHOLE_UID": "{{system_users['pihole'].id}}",
+        "PIHOLE_GID": "{{system_groups['pihole'].id}}",
+        "WEBPASSWORD": "{{pihole_password}}",
         "DNS1": "127.0.0.11",
         "DNS2": "no"
         {% if dns_enabled and dns_type == 'pihole' %}
@@ -96,6 +117,14 @@
             , "DHCP_LEASETIME": "24"
         {% endif %}
       }
+
+- name: copy config
+  copy:
+    src: "templates/pihole-FTL.conf"
+    dest: "{{ global_etc }}pihole/pihole-FTL.conf"
+    owner: "{{system_users['pihole'].name}}"
+    group: "{{system_groups['pihole'].name}}"
+    mode: 0640
 
 - name: create docker container
   docker_container:
@@ -118,6 +147,7 @@
       - '{{ global_etc }}pihole/:/etc/pihole/:z'
       - '{{ global_etc }}pihole/dnsmasq.d/:/etc/dnsmasq.d/:z'
       - '{{ global_lib }}pihole/tftpboot/:/tftpboot/:z'
+      - '{{ global_lib }}pihole/:/var/lib/pihole/:z'
     exposed_ports:
       - "53/tcp"
       - "53/udp"
@@ -134,26 +164,30 @@
     i18n_files: [ { language: "de", file: "templates/webui/pihole.de.json" } ]
     icons: [ 'templates/webui/icons/pihole_logo.svg' ]
   include_tasks: roles/apache_webui/shared/add_webui.yml
+  tags: ['apache_webui_config']
 
 - name: create cron job
   vars:
     name: "Pihole update"
     cmd: "docker exec pihole pihole updateGravity > /dev/null"
-    file: "ansible_pihole"
+    group: "pihole"
     hour: "1"
     minute: "0"
   include_tasks: roles/cron/shared/add_cronjob.yml
+  tags: ['cron_job']
 
 - name: copy fluentd config
   vars:
     config_file: "templates/etc/fluent/_.ansible.d/pihole.conf"
   include_tasks: roles/fluentd/shared/add_config.yml
+  tags: ['fluentd_config']
   when: "monitoring_enabled"
 
 - name: create systemd service
   vars:
     container_name: "pihole"
   include_tasks: roles/container/shared/add_docker_service.yml
+  tags: ['systemd_watcher_config']
 
 - name: register update notifier
   vars:
@@ -165,6 +199,7 @@
       pattern: "^(20[0-9\\.]+)$"
     }
   include_tasks: roles/update_service/shared/add_software.yml
+  tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"
 
 - name: trigger pihole handler

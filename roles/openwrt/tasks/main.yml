@@ -4,16 +4,12 @@
     default_features: [ "rpcd", "snmpd" ]
     device_files: {}
 
-- name: prepare needed folder
-  file:
-    path: '{{item.path}}'
-    state: directory
-    owner: "{{item.user}}"
-    group: "{{item.group}}"
-    mode: "{{item.mode}}"
-  with_items:
-    - { user: "1000", group: "1000", mode: "u=rwx,g=rx,o=", path: "{{global_etc}}openwrt" }
-    - { user: "1000", group: "1000", mode: "u=rwx,g=rx,o=", path: "{{global_etc}}openwrt/ap/" }
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{global_etc}}openwrt" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{global_etc}}openwrt/ap/" }
+  include_tasks: roles/_shared/create_directories.yml
 
 # **** PREPARE & BUILD CONFIGS ****
 - name: prepare used services
@@ -201,3 +197,5 @@
     i18n_files: [ { language: "de", file: "templates/webui/openwrt.de.json" } ]
     icons: []
   include_tasks: roles/apache_webui/shared/add_webui.yml
+  tags: ['apache_webui_config']
+  

@@ -1,13 +1,9 @@
-- name: prepare needed folder
-  file:
-    path: "{{item}}"
-    state: directory
-    owner: "root"
-    group: "root"
-    mode: 0700
-  with_items:
-    - "{{global_etc}}cloud_nfs"
-    - "{{global_etc}}cloud_nfs/util"
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{global_etc}}cloud_nfs/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{global_etc}}cloud_nfs//util/" }
+  include_tasks: roles/_shared/create_directories.yml
 
 - name: prepare cloud folder
   file:
@@ -28,6 +24,8 @@
     owner: "root"
     group: "root"
     mode: 0750
+  loop_control:
+    label: "{{item}}"
   with_items: "{{cloud_vpn.peers}}"
 
 - name: prepare nfs mount points
@@ -37,16 +35,20 @@
     owner: "root"
     group: "root"
     mode: 0750
+  loop_control:
+    label: "{{item}}"
   with_items: "{{cloud_vpn.peers}}"
 
 - name: create fstab mount entries
   mount:
-    path: "{{cloud_path}}/remote/{{item}}"
+    path: "{{cloud_path}}remote/{{item}}"
     src: "{{vpn_cloud_services.remote[item].nfs}}:/"
     fstype: nfs
     opts: "nfsvers=4.2,soft,actimeo=0,rw,timeo=30,retrans=3,noauto,nofail,x-systemd.automount,x-systemd.mount-timeout=5,x-systemd.idle-timeout=300"
     state: present
   register: "fstab_result"
+  loop_control:
+    label: "{{item}}"
   with_items: "{{cloud_vpn.peers}}"
 
 - name: "activate automount"
@@ -63,14 +65,14 @@
     dest: "{{global_etc}}cloud_nfs/util/startup.sh"
     owner: root
     group: root
-    mode: 0700
+    mode: 0750
   notify: "restart cloud_nfs"
   
 - name: copy server config
   template:
     src: "templates/{{item}}"
     dest: "{{ global_etc }}cloud_nfs/{{item}}"
-    mode: 0600
+    mode: 0640
   notify: "restart cloud_nfs"
   with_items:
     - "peers"
@@ -131,6 +133,7 @@
     name: "cloud_nfs"
     rules_file: "templates/loki/rules.yml"
   include_tasks: roles/loki/shared/add_config.yml
+  tags: ['loki_config']
   when: "monitoring_enabled"
 
 - name: create systemd service
@@ -143,6 +146,7 @@
     container_binds:
       - "wireguard_cloud"
   include_tasks: roles/container/shared/add_docker_service.yml
+  tags: ['systemd_watcher_config']
 
 - name: trigger cloud_nfs handler
   vars:

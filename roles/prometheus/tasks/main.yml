@@ -1,27 +1,13 @@
 - name: set version
   set_fact:
-    prometheus_version: '2.49.1'
+    prometheus_version: '2.50.1'
   tags: [ 'update_notifier_config' ]    
 
-- name: prepare needed folder
-  file:
-    path: '{{item.path}}'
-    state: directory
-    owner: "{{item.user}}"
-    group: "{{item.group}}"
-    mode: 0750
-  with_items:
-    - { user: "nobody", group: "{{ 'nobody' if is_rhel or is_fedora else 'nogroup'}}", path: "{{ global_lib }}prometheus" }
-    - { user: "root", group: "root", path: "{{backup_path}}prometheus" }
-
-#- name: copy config
-#  template:
-#    src: "templates/etc/prometheus.yml"
-#    dest: "{{ global_etc }}prometheus/prometheus.yml"
-#    owner: nobody
-#    group: "{{ 'nobody' if is_rhel or is_fedora else 'nogroup'}}"
-#    mode: 0640
-#  notify: "restart prometheus"
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['nobody'].name}}", group: "{{system_groups['nobody'].name}}", path: "{{ global_lib }}prometheus" }
+  include_tasks: roles/_shared/create_directories.yml
 
 - name: copy config
   copy:
@@ -31,9 +17,9 @@
     group: "{{item.group}}"
     mode: "{{item.mode}}"
   with_items:
-    - { user: "nobody", group: "{{ 'nobody' if is_rhel or is_fedora else 'nogroup'}}", mode: "u=rw,g=r,o=", path: "prometheus.yml.tpl" }
-    - { user: "root", group: "root", mode: "u=rw,g=r,o=r", path: "rules/prometheus.yml" }
-    - { user: "root", group: "root", mode: "u=rwx,g=rx,o=", path: "generator" }
+    - { user: "{{system_users['nobody'].name}}", group: "{{system_groups['nobody'].name}}", mode: "u=rw,g=r,o=", path: "prometheus.yml.tpl" }
+    - { user: "{{system_users['nobody'].name}}", group: "{{system_groups['nobody'].name}}", mode: "u=rw,g=r,o=", path: "rules/prometheus.yml" }
+    - { user: "{{system_users['nobody'].name}}", group: "{{system_groups['nobody'].name}}", mode: "u=rwx,g=rx,o=", path: "generator" }
   notify: "restart prometheus"
 
 - name: check custom rules
@@ -48,6 +34,7 @@
     name: "custom"
     rules_file: "{{config_path}}templates/prometheus/rules.yml"
   include_tasks: roles/prometheus/shared/add_config.yml
+  tags: ['prometheus_config']
   when: "monitoring_enabled and custom_rules_result.rc == 0"
 
 - name: set docker selinux configuration => is_rhel or is_fedora
@@ -103,7 +90,7 @@
       - "saddr {{docker_prometheus_ip}} daddr {{docker_alertmanager_ip}}"
       - "saddr {{docker_prometheus_ip}} daddr {{default_server_ip}} proto tcp dport 443" # needed to pull from openhab, netdata or system_service endpoint, because they are bound to 127.0.0.1:xxxx
   include_tasks: roles/firewall/shared/allow_service.yml
-  tags: [ 'firewall_config' ]
+  tags: ['firewall_config']
 
 - name: add container name
   vars:
@@ -118,6 +105,7 @@
     datasources: 
       - "templates/grafana/datasources/prometheus.yaml"
   include_tasks: roles/grafana/shared/add_datasource.yml
+  tags: ['grafana_config']
   when: "grafana_enabled"
 
 - name: register webui
@@ -127,6 +115,7 @@
     i18n_files: [ { language: "de", file: "templates/webui/prometheus.de.json" } ]
     icons: [ 'templates/webui/icons/prometheus_logo.svg' ]
   include_tasks: roles/apache_webui/shared/add_webui.yml
+  tags: ['apache_webui_config']
 
 - name: copy apache vhost
   vars:
@@ -134,11 +123,13 @@
     usergroup: "admin"
     include: "templates/etc/apache2/_.ansible.vhost.d/prometheus.inc"
   include_tasks: roles/apache/shared/add_vhost.yml
+  tags: ['apache_config']
 
 - name: copy fluentd config
   vars:
     config_file: "templates/etc/fluent/_.ansible.d/prometheus.conf"
   include_tasks: roles/fluentd/shared/add_config.yml
+  tags: ['fluentd_config']
   when: "monitoring_enabled"
     
 - name: create systemd service
@@ -147,6 +138,7 @@
     container_pre_exec: "{{ global_etc }}prometheus/generator"
     container_after: [ "alertmanager" ]
   include_tasks: roles/container/shared/add_docker_service.yml
+  tags: ['systemd_watcher_config']
   
 - name: register update notifier
   vars:
@@ -158,6 +150,7 @@
       pattern: "^v([0-9\\.]+)$"
     }
   include_tasks: roles/update_service/shared/add_software.yml
+  tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"
 
 - name: trigger prometheus handler

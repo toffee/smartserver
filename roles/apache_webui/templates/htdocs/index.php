@@ -17,7 +17,7 @@ require "./shared/libs/auth.php";
         echo "        mx.User.groups = " . json_encode(Auth::getGroups()) . ";\n";
 ?>
     </script>
-    <?php echo Ressources::getModules(["/main/"]); ?>
+    <?php echo Ressources::getModules(["/shared/mod/websocket/", "/main/"], False); ?>
     <script>
         var pageTheme = null;
 
@@ -195,14 +195,14 @@ require "./shared/libs/auth.php";
         
             initContent();
 
-            if( mx.User.memberOf("admin") )
+            if( mx.User.memberOf("admin") && mx.Alarms )
             {
                 // defined in netdata.js (/components/)
                 mx.Alarms.init('.alarm.button','.alarm.button .badge');
             }
             else
             {
-                mx.$(".alarm.button").style.display = 'none';
+                mx.$$(".alarm.button").forEach((element) => element.style.display = 'none');
             }
             
             mx.$(".spacer").innerHTML = document.location.hostname;

@@ -11,17 +11,19 @@
     append: no
   register: system_user_result
   when: "'user' in userdata[item].groups"
+  loop_control:
+    label: "{{item}}"
   with_items: "{{userdata}}"
   
 - name: prepare user folder
-  file:
-    path: "/home/{{item}}/"
-    state: directory
-    owner: "{{item}}"
-    group: users
-    mode: 0750
-  when: "'user' in userdata[item].groups"
-  with_items: "{{userdata}}"
+  vars:
+    directories: |
+      [
+        {% for username in userdata %}{% if 'user' in userdata[username].groups %}
+          { "mode": "u=rwx,g=rx,o=", "owner": "{{username}}", "group": "users", "path": "/home/{{username}}/" },
+        {% endif %}{% endfor %}
+      ]
+  include_tasks: roles/_shared/create_directories.yml
 
 # refresh samba container, otherwise changes on /etc/passwd are not visible inside the container
 - name: refresh samba
@@ -36,22 +38,27 @@
   changed_when: no
   
 - name: add user to samba
-  shell: "(echo '{{vault_userpasswords[item].samba_password}}'; echo '{{vault_userpasswords[item].samba_password}}';) | docker exec -i samba sh -c \"smbpasswd -s -a {{item}}\""
+  shell: "(echo '{{userdata[item].password}}'; echo '{{userdata[item].password}}';) | docker exec -i samba sh -c \"smbpasswd -s -a {{item}}\""
   #register: command_result
   #failed_when: "'command-not-found' in command_result.stderr"
   changed_when: "item not in samba_user_result.stdout"
   when: "'user' in userdata[item].groups"
+  loop_control:
+    label: "{{item}}"
   with_items: "{{userdata}}"
   #notify: "restart samba"
   
 - name: add user to apache
   vars:
     username: "{{item}}"
-    password: "{{vault_userpasswords[item].web_password}}"
+    password: "{{userdata[item].password}}"
     email:    "{{userdata[item].email}}"
     fullname: "{{userdata[item].name}}"
     usergroups: "{{userdata[item].groups}}"
   include_tasks: roles/user/shared/add_web_user.yml
+  tags: [ 'user' ]
   when: "'user' in userdata[item].groups"
+  loop_control:
+    label: "{{item}}"
   with_items: "{{userdata}}"
 

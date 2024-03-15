@@ -2,29 +2,26 @@
   set_fact:
     adminer_version: '4.8.1'
   tags: [ 'update_notifier_config' ]
+
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", path: "{{htdocs_path}}/mysql-adminer-{{adminer_version}}" }
+  include_tasks: roles/_shared/create_directories.yml
   
 - name: check installation
   stat:
     path: "{{htdocs_path}}/mysql-adminer-{{adminer_version}}"
   register: adminer_exists
   changed_when: not adminer_exists.stat.exists
-  
-- name: prepare needed folder => adminer does not exists
-  file:
-    path: "{{htdocs_path}}/mysql-adminer-{{adminer_version}}"
-    state: directory
-    owner: "{{system_users['www'].name}}"
-    group: "{{system_groups['www'].name}}"
-    mode: 0755
-  when: not adminer_exists.stat.exists
-    
+
 - name: install archive => adminer does not exists
   get_url:
     url: "https://github.com/vrana/adminer/releases/download/v{{adminer_version}}/adminer-{{adminer_version}}.php"
     dest: "{{htdocs_path}}/mysql-adminer-{{adminer_version}}/adminer.php"
     owner: "{{system_users['www'].name}}"
     group: "{{system_groups['www'].name}}"
-    mode: 0755
+    mode: 0750
   when: not adminer_exists.stat.exists
 
 - name: set symbolic link
@@ -51,7 +48,7 @@
 #    i18n_files: [ { language: "de", file: "templates/webui/phpmyadmin.de.json" } ]
 #    listener: { "prefix": "mysql", "js_file": "templates/webui/phpmyadmin.listener.js" }
 #  include_tasks: roles/apache_webui/shared/add_webui.yml
-
+#  tags: ['apache_webui_config']
 #- name: prepare config folder
 #  file:
 #    path: "{{htdocs_path}}mysql/tmp"
@@ -72,4 +69,5 @@
 #      version: "RELEASE_{{phpmyadmin_version | regex_replace('\\.','_')}}" 
 #    }
 #  include_tasks: roles/update_service/shared/add_software.yml
+#  tags: ['update_notifier_config']
 #  when: "update_service_software_check_enabled"

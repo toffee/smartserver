@@ -1,4 +1,4 @@
-- name: prepare needed folder
+- name: prepare needed directories
   file:
     path: "/opt/heating_sensors"
     state: directory
@@ -30,7 +30,8 @@
   vars:
     name: "Heating Sensors"
     cmd: "/opt/heating_sensors/sensoren.bash"
-    file: "ansible_heating_sensors"
+    group: "heating_sensors"
     minute: "*/1"
-  import_tasks: roles/cron/shared/add_cronjob.yml
+  include_tasks: roles/cron/shared/add_cronjob.yml
+  tags: ['cron_job']
   when: "is_production|bool"

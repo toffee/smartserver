@@ -16,7 +16,7 @@
     remote_src: yes
     owner: "{{system_users['www'].name}}"
     group: "{{system_groups['www'].name}}"
-    mode: 0755
+    mode: 0750
   when: not phpmyadmin_exists.stat.exists
 
 - name: rename folder => phpmyadmin does not exists
@@ -38,9 +38,9 @@
     name: "phpmyadmin"
     js_file: "templates/webui/phpmyadmin.js"
     i18n_files: [ { language: "de", file: "templates/webui/phpmyadmin.de.json" } ]
-    listener: { "prefix": "mysql", "js_file": "templates/webui/phpmyadmin.listener.js" }
     icons: [ 'templates/webui/icons/phpmyadmin_logo.svg' ]
   include_tasks: roles/apache_webui/shared/add_webui.yml
+  tags: ['apache_webui_config']
 
 - name: copy config
   template:
@@ -70,4 +70,5 @@
       version: "RELEASE_{{phpmyadmin_version | regex_replace('\\.','_')}}" 
     }
   include_tasks: roles/update_service/shared/add_software.yml
+  tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"

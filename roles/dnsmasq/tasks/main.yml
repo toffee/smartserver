@@ -1,3 +1,9 @@
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_etc }}dnsmasq" }
+  include_tasks: roles/_shared/create_directories.yml
+
 - name: check named service
   stat:
     path: "{{ global_etc }}named/"
@@ -26,16 +32,6 @@
         content: "nameserver 8.8.8.8"
         dest: "/etc/resolv.conf"
   when: "named_service.stat.exists"
-
-- name: prepare needed folder
-  file:
-    path: '{{item}}'
-    state: directory
-    owner: root
-    group: root
-    mode: 0750
-  with_items:
-    - "{{ global_etc }}dnsmasq"
 
 - name: copy config
   template:
@@ -120,7 +116,7 @@
   set_fact:
     dns_rules: "{{ (dns_rules | default([])) + [ 'saddr ' + docker_dns_ip + ' daddr ' + item ] }}"
   with_items: "{{ dns_forward_ip_addresses }}"
-  tags: [ 'firewall_config' ]
+  tags: ['firewall_config']
 
 - name: allow dns service
   vars:
@@ -128,12 +124,13 @@
     rules: "{{dns_rules}}"
     instant_activation: True
   include_tasks: roles/firewall/shared/allow_service.yml
-  tags: [ 'firewall_config' ]
+  tags: ['firewall_config']
 
 - name: create systemd service
   vars:
     container_name: "dnsmasq"
   include_tasks: roles/container/shared/add_docker_service.yml
+  tags: ['systemd_watcher_config']
   
 # must be called before container is activated. Otherwise the container can't start because of the systemd_resolver on ubuntu which uses the same port
 - name: enable dnsmasq

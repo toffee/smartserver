@@ -1,30 +1,24 @@
-mx.Menu.getMainGroup('admin').getSubGroup('system').addUrl('ci', '/ci_service/', 'admin', 320, '{i18n_CI Service}', '{i18n_Continues Integration}', "ci_service_logo.svg", false);
-mx.Widgets.CiState = (function( ret ) {
-    let url = "/ci_service/api/widget_state/"
-    ret.refresh = function()
+mx.Menu.getMainGroup('admin').getSubGroup('system').addUrl('ci', ['admin'], '/ci_service/', { 'order': 320, 'title': '{i18n_CI Service}', 'info': '{i18n_Continues Integration}', 'icon': 'ci_service_logo.svg' });
+mx.Widgets.CiState = (function( widget ) {
+    widget.processData = function(data)
     {
-        mx.Widgets.fetchContent("GET", url, function(data)
+        if( data == null )
         {
-            if( data != null )
-            {
-                let msg = "";
-                let json = JSON.parse(data);
-                if( json["is_running"] || json["last_job_failed"] )
-                {
-                    msg = mx.I18N.get("CI","widget_system") + ": <strong>";
+            widget.alert(0, "CI Service N/A");
+            return
+        }
 
-                    if( json["is_running"] ) msg += "<font class=\"icon-spin2 animate-spin\"></font>";
-                    if( json["last_job_failed"] ) msg += "<font class=\"icon-attention\" style=\"color:var(--color-red)\"></font>";
+        let msg = "";
+        if( data["is_running"] || data["last_job_failed"] )
+        {
+            msg = mx.I18N.get("CI","widget_system") + ": <strong>";
 
-                    msg += "</strong>";
-                }
-                ret.show(0, msg);
-            }
-            else
-            {
-                ret.alert(0, "CI Service: N/A");
-            }
-        } );
+            if( data["is_running"] ) msg += "<font class=\"icon-spin2 animate-spin\"></font>";
+            if( data["last_job_failed"] ) msg += "<font class=\"icon-attention\" style=\"color:var(--color-red)\"></font>";
+
+            msg += "</strong>";
+        }
+        widget.show(0, msg);
     }
-    return ret;
-})( mx.Widgets.Object( "admin", [ { id: "ciState", order: 40, click: function(event){ mx.Actions.openEntryById(event, 'admin-system-ci') } } ] ) );
+    return widget;
+})( mx.Widgets.Object( "ci_service", "admin", [ { id: "ciState", order: 40, click: function(event){ mx.Actions.openEntryById(event, 'admin-system-ci') } } ] ) );
