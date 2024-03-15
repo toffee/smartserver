@@ -11,11 +11,11 @@ from server.watcher import watcher
 
 
 class DependencyWatcher(watcher.Watcher): 
-    def __init__(self, system_update_watcher ):
+    def __init__(self, handler, system_update_watcher ):
+        self.handler = handler
         self.system_update_watcher = system_update_watcher
         
         self.outdated_roles = {}
-        self.last_modified = self.getStartupTimestamp()
 
         self.initOutdatedRoles()
         
@@ -25,7 +25,8 @@ class DependencyWatcher(watcher.Watcher):
             self.outdated_roles[name] = True
         else:
             del self.outdated_roles[name]
-        self.postProcess()
+
+        self.handler.notifyWatcherDependencyState()
 
     def initOutdatedRoles(self):
         outdated_roles = {}
@@ -34,17 +35,10 @@ class DependencyWatcher(watcher.Watcher):
             name = os.path.basename(filename)
             outdated_roles[name] = True
         self.outdated_roles = outdated_roles
-        self.postProcess()
-        
-    def postProcess(self):
-        self.last_modified = self.getNowAsTimestamp()
             
     def getOutdatedRoles(self):
         return list(self.outdated_roles.keys())
             
-    def getLastModifiedAsTimestamp(self):
-        return self.last_modified
-      
     def checkSmartserverRoles(self):
         files = glob.glob("{}*.conf".format(config.dependencies_config_dir))
         package_tag_map = {}

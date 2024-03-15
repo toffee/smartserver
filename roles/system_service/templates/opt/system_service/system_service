@@ -1,0 +1,193 @@
+#!/usr/bin/python3
+
+import logging
+import sys
+import json
+from datetime import datetime
+
+from smartserver.server import Server, serverWeb, serverSocket
+from smartserver.scheduler import Scheduler
+
+from lib.scanner.scanner import Scanner as NetworkScanner
+from lib.speedtest.speedtest import Speedtest
+from lib.fping.fping import FPing
+from lib.info.info import Info
+
+from lib.mqtt import MQTTHandler
+from lib.influxdb import InfluxDB
+from lib.ipcache import IPCache
+
+from lib.trafficwatcher.trafficwatcher import TrafficWatcher
+
+from config import config
+class Handler(Server):
+    def __init__(self):
+        super().__init__("system_service", config.service_ip, config.service_port)
+        
+        #self.startup_timestamp = round(datetime.now().timestamp(),3)
+        
+        self.mqtt = MQTTHandler(config)
+        self.influxdb = InfluxDB(config)
+
+        self.ipcache = IPCache(config)
+
+        self.info = Info(config, self, self.ipcache)
+
+        self.scanner = NetworkScanner(config, self, self.mqtt, self.influxdb )
+        self.speedtest = Speedtest(config, self, self.mqtt, self.influxdb, self.info )
+        self.fping = FPing(config, self, self.influxdb )
+
+        self.trafficwatcher = TrafficWatcher(config, self, self.influxdb, self.ipcache)
+
+        self.scheduler = Scheduler("system_service")
+
+        self.startup_timestamp = round(datetime.now().timestamp(),3)
+
+    def start(self):
+        self.mqtt.start()
+        self.influxdb.start()
+
+        self.ipcache.start()
+
+        self.info.start()
+
+        self.scanner.start()
+        self.speedtest.start()
+        self.fping.start()
+
+        self.trafficwatcher.start()
+
+        self.scheduler.start()
+
+        super().start()
+
+    def terminate(self):
+        self.scheduler.terminate()
+
+        self.trafficwatcher.terminate()
+
+        self.fping.terminate()
+        self.speedtest.terminate()
+        self.scanner.terminate()
+
+        self.info.terminate()
+
+        self.ipcache.terminate()
+
+        self.influxdb.terminate()
+        self.mqtt.terminate()
+
+        super().terminate()
+
+    def notifyChangedInfoData(self, type, data):
+        if self.isSocketRoomActive("widget"):
+            result = {}
+            if type == "isp_state":
+                result["wan_isp_state"] = "default" if data else "fallback"
+            elif type == "online_state":
+                result["wan_online_state"] = "online" if data else "offline"
+
+            self.emitSocketData("widget:data", result, "widget");
+
+    def notifyChangedBlockTrafficData(self, type, data):
+        if self.isSocketRoomActive("widget"):
+            self.emitSocketData("widget:data", {"blocked_traffic": data}, "widget");
+
+    def notifyChangedBlockTrafficStatesData(self, type, data):
+        if self.isSocketRoomActive("widget"):
+            self.emitSocketData("widget:data", {"traffic_states": data}, "widget");
+
+    def notifyChangedNetworkData(self, changed_data, msg):
+        if self.isSocketRoomActive("network"):
+            self.emitSocketData('network:data', changed_data, "network")
+
+    def notifyChangedSpeedtestData(self, is_testing):
+        if self.isSocketRoomActive("speedtest"):
+            self.emitSocketData('speedtest:data', { "is_running": is_testing }, "speedtest")
+
+    def onSocketRoomJoin(self, sid, room, data = None):
+        super().onSocketRoomJoin(sid, room, data)
+
+        if room == "widget":
+            result = {}
+            result["wan_isp_state"] = "default" if self.info.isDefaultConnection() else "fallback"
+            result["wan_online_state"] = "online" if self.info.isConnectionOnline() else "offline"
+            result["blocked_traffic"] = len(self.trafficwatcher.getBlockedIPs())
+            result["traffic_states"] = self.trafficwatcher.getTrafficStateSummery()
+            self.emitSocketData("widget:data", result, room);
+
+        elif room == "speedtest":
+            self.emitSocketData('speedtest:data', { "is_running": self.speedtest.isTesting() }, room)
+
+        elif room == "network":
+            [ data, msg ] = self.scanner.getNetworkData();
+            logging.info("Emit initial network {}".format(msg))
+            data["root"] = self.scanner.getGatewayMAC()
+            self.emitSocketData('network:data', data, room)
+
+    def triggerSpeedtest(self):
+        self.speedtest.triggerSpeedtest()
+
+    def getConnectionState(self):
+        if self.info.isConnectionOnline():
+            if self.info.isDefaultConnection():
+                return "default"
+            else:
+                return "fallback"
+        else:
+            return "unknown"
+
+    def getObservedIPData(self):
+        result = {
+            "status": 0,
+        }
+
+        last_data_modified = {}
+        last_data_modified["startup"] = self.startup_timestamp
+
+        changed_data = {}
+        changed_data["observed_ips"] = self.trafficwatcher.getObservedIPData()
+
+        result["last_data_modified"] = last_data_modified
+        result["changed_data"] = changed_data
+
+        return json.dumps(result)
+
+    def getStateMetrics(self):
+        metrics = []
+        metrics += self.trafficwatcher.getStateMetrics()
+
+        metrics += self.scanner.getStateMetrics()
+        metrics += self.speedtest.getStateMetrics()
+        metrics += self.fping.getStateMetrics()
+
+        metrics += self.info.getStateMetrics()
+
+        metrics += self.ipcache.getStateMetrics()
+
+        metrics += self.influxdb.getStateMetrics()
+        metrics += self.mqtt.getStateMetrics()
+
+        metrics += self.scheduler.getStateMetrics()
+
+        return "{}\n".format( "\n".join(metrics) )
+
+@serverWeb.route('/triggerSpeedtest/', methods = ['GET'])
+def speedtest():
+    #logging.info(request.headers.get('User-Agent'))
+    handler.triggerSpeedtest()
+    return "ok"
+
+# needed for grafana wan dashboard
+@serverWeb.route('/observed_ips/', methods = ['POST'])
+def observed_ips():
+    return handler.getObservedIPData()
+
+# need by ci service to get online status
+@serverWeb.route('/wan_state/', methods = ['GET'])
+def wan_state():
+    return handler.getConnectionState()
+
+handler = Handler()
+handler.start()
+

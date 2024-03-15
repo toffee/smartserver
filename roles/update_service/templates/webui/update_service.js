@@ -1,49 +1,42 @@
-{% if update_service_software_check_enabled %}mx.Menu.getMainGroup('admin').getSubGroup('system').addUrl('update_software', '/update_service/software/', 'admin', 310, '{i18n_Software}', '{i18n_Software status}', "update_software_logo.svg", false);
+{% if update_service_software_check_enabled %}mx.Menu.getMainGroup('admin').getSubGroup('system').addUrl('update_software', ['admin'], '/update_service/software/', { 'order': 310, 'title': '{i18n_Software}', 'info': '{i18n_Software status}', 'icon': 'update_software_logo.svg' });
 {% endif %}
 {% if update_service_system_check_enabled %}
-mx.Menu.getMainGroup('admin').getSubGroup('system').addUrl('update_system', '/update_service/system/', 'admin', 311, '{i18n_Updates}', '{i18n_System updates}', "update_system_logo.svg", false);
-mx.Widgets.AvailableUpdates = (function( ret ) {
-    let url = "/update_service/api/state/";
-    ret.refresh = function()
+mx.Menu.getMainGroup('admin').getSubGroup('system').addUrl('update_system', ['admin'], '/update_service/system/', { 'order': 311, 'title': '{i18n_Updates}', 'info': '{i18n_System updates}', 'icon': 'update_system_logo.svg' });
+mx.Widgets.AvailableUpdates = (function( widget ) {
+    widget.processData = function(data)
     {
-        mx.Widgets.fetchContent("POST", url, function(data)
+        if( data == null )
         {
-            if( data != null )
+            widget.alert(0, "Update Service N/A");
+            return
+        }
+
+        let content = "";
+        let is_running = data["is_running"];
+        let needs_attention = data["needs_attention"];
+        let needs_action = data["needs_action"];
+        let available_system_uddates = data["system_updates"];
+        let available_smartserver_changes = data["smartserver_changes"];
+
+        if( is_running || needs_attention || needs_action || available_system_uddates > 0 || available_smartserver_changes > 0 )
+        {
+            content = mx.I18N.get("Updates","widget_system") + ": <strong>";
+
+            if( is_running ) content += "<font class=\"icon-spin2 animate-spin\"></font>"
+
+            if( needs_action ) content += "<font class=\"icon-attention\" style=\"color:var(--color-red)\"></font>";
+            else if( needs_attention ) content += "<font class=\"icon-attention\" style=\"color:var(--color-yellow)\"></font>";
+
+            if( available_system_uddates > 0 || available_smartserver_changes > 0 )
             {
-                let msg = "";
-                let json = JSON.parse(data);
-                let job_is_running = json["job_is_running"];
-                let needs_attention = json["needs_attention"];
-                let needs_action = json["needs_action"];
-                let available_system_uddates = json["system_updates"];
-                let available_smartserver_changes = json["smartserver_changes"];
-
-                if( job_is_running || needs_attention || needs_action || available_system_uddates > 0 || available_smartserver_changes > 0 )
-                {
-                    msg = mx.I18N.get("Updates","widget_system") + ": <strong>";
-
-                    if( job_is_running ) msg += "<font class=\"icon-spin2 animate-spin\"></font>"
-
-                    if( needs_action ) msg += "<font class=\"icon-attention\" style=\"color:var(--color-red)\"></font>";
-                    else if( needs_attention ) msg += "<font class=\"icon-attention\" style=\"color:var(--color-yellow)\"></font>";
-
-                    if( available_system_uddates > 0 || available_smartserver_changes > 0 )
-                    {
-                        msg += available_system_uddates + "/" + available_smartserver_changes;
-                    }
-
-                    msg +=  "</strong>";
-                }
-
-                ret.show(0,msg);
-            }
-            else
-            {
-                ret.alert(0,"Update Service: N/A");
+                content += available_system_uddates + "/" + available_smartserver_changes;
             }
 
-        }, mx.Core.encodeDict( { "type": "widget", "last_data_modified": null } ) );
+            content +=  "</strong>";
+        }
+
+        widget.show(0, content );
     }
-    return ret;
-})( mx.Widgets.Object( "admin", [ { id: "availableUpdates", order: 50, click: function(event){ mx.Actions.openEntryById(event, 'admin-system-update_system') } } ] ) );
+    return widget;
+})( mx.Widgets.Object( "update_service", "admin", [ { id: "availableUpdates", order: 50, click: function(event){ mx.Actions.openEntryById(event, 'admin-system-update_system') } } ] ) );
 {% endif %}

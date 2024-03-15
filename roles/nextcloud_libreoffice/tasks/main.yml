@@ -1,20 +1,16 @@
 - name: set version
   set_fact:
-    libreoffice_version: "23.05.8.2.1"
+    libreoffice_version: "23.05.9.4.1"
     libreoffice_changelog_version: "23-05"
   tags: [ 'update_notifier_config' ]
   
-#- name: prepare needed folder
-#  file:
-#    path: "{{item.path}}"
-#    state: directory
-#    owner: "109" # user id from docker container
-#    group: "112" # group id from docker container
-#    mode: "{{item.mode}}"
-#  with_items:
-#    - { mode: "u=rwx,g=rx,o=rx", path: "{{global_log}}libreoffice" }
-#    - { mode: "u=rwx,g=rx,o=rx", path: "{{global_lib}}libreoffice" }
-#    - { mode: "u=rwx,g=rx,o=", path: "{{global_etc}}libreoffice" }
+#- name: prepare needed directories
+#  vars:
+#    directories:
+#      - { mode: "u=rwx,g=rx,o=", owner: "109", group: "112", path: "{{global_log}}libreoffice" }
+#      - { mode: "u=rwx,g=rx,o=", owner: "109", group: "112", path: "{{global_lib}}libreoffice" }
+#      - { mode: "u=rwx,g=rx,o=", owner: "109", group: "112", path: "{{global_etc}}libreoffice" }
+#  include_tasks: roles/_shared/create_directories.yml
 
 #- name: build docker image
 #  vars:
@@ -64,7 +60,7 @@
       - "saddr {{docker_libreoffice_ip}} daddr {{default_server_ip}} proto tcp dport 443"
       - "saddr {{docker_libreoffice_ip}} proto tcp dport 443"
   include_tasks: roles/firewall/shared/allow_service.yml
-  tags: [ 'firewall_config' ]
+  tags: ['firewall_config']
 
 - name: add container name
   vars:
@@ -78,6 +74,7 @@
 #    name: "libreoffice"
 #    listener: { "sub_domain": "libreoffice", "js_file": "templates/webui/libreoffice.listener.js" }
 #  include_tasks: roles/apache_webui/shared/add_listener.yml
+#  tags: ['apache_webui_config']
 
 - name: copy apache vhost
   vars:
@@ -85,11 +82,13 @@
     usergroup: "user"
     include: "templates/etc/apache2/_.ansible.vhost.d/libreoffice.inc"
   include_tasks: roles/apache/shared/add_vhost.yml
+  tags: ['apache_config']
 
 - name: copy fluentd config
   vars:
     config_file: "templates/etc/fluent/_.ansible.d/libreoffice.conf"
   include_tasks: roles/fluentd/shared/add_config.yml
+  tags: ['fluentd_config']
   when: "monitoring_enabled"
 
 - name: create systemd service
@@ -97,6 +96,7 @@
     container_name: "libreoffice"
 #    container_after: [ "mysql", "redis" ]
   include_tasks: roles/container/shared/add_docker_service.yml
+  tags: ['systemd_watcher_config']
 
 - name: register update notifier
   vars:
@@ -108,6 +108,7 @@
       pattern: "^([0-9\\.]+)$" 
     }
   include_tasks: roles/update_service/shared/add_software.yml
+  tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"
 
 - name: trigger libreoffice handler

@@ -1,13 +1,9 @@
-- name: prepare needed folder
-  file:
-    path: "{{item.dir}}"
-    state: directory
-    owner: "{{item.owner}}"
-    group: "{{item.group}}"
-    mode: 0755
-  with_items:
-    - { owner: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", dir: "{{htdocs_path}}img/" }
-    - { owner: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", dir: "{{htdocs_path}}img/potd" }
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", path: "{{htdocs_path}}img/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", path: "{{htdocs_path}}img/potd" }
+  include_tasks: roles/_shared/create_directories.yml
 
 - name: synchronize htdocs
   synchronize:
@@ -21,7 +17,7 @@
     recursive: yes
     rsync_opts:
       - "--chown={{system_users['www'].name}}:{{system_groups['www'].name}}"
-      - "--chmod=D755,F644"
+      - "--chmod=D750,F640"
   
 - name: copy htdocs (template)
   template:
@@ -33,10 +29,17 @@
   with_items:
     - main/manifest.json
 
-- name: copy proxy config
-  vars:
-    config_file: "templates/etc/apache2/_.ansible.d/manifest.conf"
-  include_tasks: roles/apache/shared/add_config.yml
+- name: copy manifest config
+  copy:
+    src: "templates/etc/apache2/{{item}}"
+    dest: "{{global_etc}}apache2/{{item}}"
+    owner: "{{system_users['www'].name}}"
+    group: "{{system_groups['www'].name}}"
+    mode: 0640
+  with_items:
+    - _.ansible.conf.d/default_manifest.conf
+  notify: "restart apache2"
+  tags: ['apache_config']
 
 # POTD FETCHER
 - name: install required packages for fetchPOTD => is_rhel or is_fedora
@@ -87,7 +90,9 @@
   vars:
     name: "POTD Fetcher"
     cmd: "/opt/scripts/apache_webui_fetchPOTD.sh"
-    file: "ansible_apache_webui"
+    group: "apache"
+    log: "webui"
     hour: "3"
     minute: "0"
   include_tasks: roles/cron/shared/add_cronjob.yml
+  tags: ['cron_job']

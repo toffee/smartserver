@@ -6,7 +6,7 @@
     group: root
     mode: "{{item.mode}}"
   with_items:
-    - { mode: "u=rwx,g=rx,o=rx", path: "{{root_path}}" }
+    - { mode: "u=rwx,g=rx,o=rx", path: "{{base_path}}" }
     - { mode: "u=rwx,g=rx,o=rx", path: "{{data_path}}" }
 
     - { mode: "u=rwx,g=rx,o=rx", path: "{{global_etc}}" }
@@ -19,8 +19,8 @@
     
     - { mode: "u=rwx,g=rx,o=rx", path: "{{projects_path}}" }
     - { mode: "u=rwx,g=rx,o=", path: "{{backup_path}}" }
+    - { mode: "u=rwx,g=rx,o=", path: "{{backup_path}}databases" }
 
-    - { mode: "u=rwx,g=rx,o=", path: "/opt/backup_restore" }
     - { mode: "u=rwx,g=rx,o=", path: "/opt/scripts" }
 
 - name: enable epel repository => is_rhel
@@ -28,6 +28,16 @@
     name: epel-release
     state: latest
   when: is_rhel
+
+- name: cleanup => is_rhel or is_fedora
+  yum:
+    name: [
+        python3-werkzeug
+      , python3-flask
+      , python3-inotify
+    ]
+    state: absent
+  when: is_rhel or is_fedora
 
 - name: install required packages => is_rhel or is_fedora
   yum:
@@ -54,9 +64,6 @@
 
       , sshpass
       
-      , python3-flask
-      , python3-inotify
-
       , python3-setuptools
       , python3-pip
       , python3-passlib
@@ -67,6 +74,16 @@
     ]
     state: present
   when: is_rhel or is_fedora
+
+- name: cleanup packages => is_ubuntu
+  apt:
+    name: [
+        python3-werkzeug
+      , python3-flask
+      , python3-pyinotify
+    ]
+    state: absent
+  when: is_ubuntu
 
 - name: install required packages => is_ubuntu
   apt:
@@ -92,10 +109,7 @@
       , make
 
       , sshpass
-      
-      , python3-flask
-      , python3-pyinotify
-      
+
       , python3-setuptools
       , python3-pip
       , python3-passlib
@@ -103,6 +117,16 @@
     state: present
   when: is_ubuntu
   
+- name: cleanup packages => is_suse
+  zypper:
+    name: [
+        python3-Werkzeug   # used for daemon services like update_service
+      , python3-Flask      # used for daemon services like update_service
+      , python3-pyinotify  # used for daemon services like update_service
+    ]
+    state: absent
+  when: is_suse
+
 - name: install required packages => is_suse
   zypper:
     name: [  
@@ -130,9 +154,6 @@
       
       , sshpass            # used for ssh accessibility checks (e.g. openhab => wait until ready)
 
-      , python3-Flask      # used for daemon services like update_service and ci_service
-      , python3-pyinotify  # used for daemon services like update_service and ci_service
-      
       , python3-setuptools
       , python3-pip
       , python3-passlib    # used by ansible htpasswd module (user role), must be added here as the add web user task is a shared task
@@ -141,23 +162,6 @@
     ]
     state: present
   when: is_suse
-       
-- name: install pexpect
-  pip:
-    name:
-      - flask-socketio=={{flask_socketio_version}} # used for daemon services like update_service and ci_service
-      - simple-websocket # used for daemon services like update_service and ci_service
-      - pexpect          # needed for ansible expect module (openvpn)
-  
-- name: prepare shared backup folder
-  file:
-    path: "{{item}}"
-    state: directory
-    owner: root
-    group: root
-    mode: 0750
-  with_items:
-    - "{{backup_path}}archive"
 
 - name: set sysctl inotify related values
   lineinfile:

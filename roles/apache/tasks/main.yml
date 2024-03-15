@@ -1,7 +1,7 @@
 - name: set version
   set_fact:
     apache_version: '2.4.58'
-    openidc_version: '2.4.15.1'
+    openidc_version: '2.4.15.6'
   tags: [ 'update_notifier_config' ]
   
 # SELFSIGNED CERTIFICATE
@@ -36,7 +36,7 @@
   register: certificate_files
   changed_when: not certificate_files.stat.exists
 
-- name: prepare needed folder => certificate_files not exists
+- name: prepare needed directories => certificate_files not exists
   file:
     path: "{{global_etc}}{{item}}"
     state: directory
@@ -102,44 +102,30 @@
   when: not certificate_files.stat.exists
   
 # APACHE
-- name: prepare needed folder
-  file:
-    path: "{{item}}"
-    state: directory
-    owner: "{{system_users['www'].name}}"
-    group: "{{system_groups['www'].name}}"
-    mode: 0750
-  with_items:
-    - "{{htdocs_path}}_public"
-    - "{{htdocs_path}}_public/.well-known"
-    - "{{htdocs_path}}_fallback"
-    - "{{htdocs_path}}_fallback/domain"
-    - "{{global_log}}apache2/"
-    - "{{global_etc}}apache2/_.ansible.auth/"
-    - "{{global_etc}}apache2/_.ansible.vhost.d/auth/"
-
-- name: check owner and group
-  file:
-    path: "{{item}}"
-    state: directory
-    owner: "{{system_users['www'].name}}"
-    group: "{{system_groups['www'].name}}"
-    #recurse: yes
-  with_items:
-    - "{{htdocs_path}}"
-    - "{{global_log}}apache2/"
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", path: "{{htdocs_path}}_public" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", path: "{{htdocs_path}}_public/.well-known" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", path: "{{htdocs_path}}_fallback" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", path: "{{htdocs_path}}_fallback/domain" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", path: "{{global_log}}apache2/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", path: "{{global_etc}}apache2/_.ansible.auth/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", path: "{{global_etc}}apache2/_.ansible.vhost.d/auth/" }
+  include_tasks: roles/_shared/create_directories.yml
 
 - name: copy config
   template:
     src: "templates/etc/apache2/{{item}}"
     dest: "{{global_etc}}apache2/{{item}}"
-    owner: "root"
-    group: "root"
-    mode: 0644
+    owner: "{{system_users['www'].name}}"
+    group: "{{system_groups['www'].name}}"
+    mode: 0640
   vars:
     enable_stapeling: "{{ssl_certificate != 'selfsigned'}}"
     usergroup: "user"
   with_items:
+    - _.ansible.conf.d/default_cache_control.conf
     - _.ansible.conf.d/public.conf
     - _.ansible.conf.d/options.conf
     - _.ansible.conf.d/ssl.conf
@@ -149,14 +135,15 @@
     - _.ansible.server.conf
     - _.ansible.httpd.conf
   notify: "restart apache2"
+  tags: ['apache_config']
 
 - name: copy auth config
   template:
     src: "templates/etc/apache2/{{item}}"
     dest: "{{global_etc}}apache2/{{item}}"
-    owner: "root"
-    group: "root"
-    mode: 0644
+    owner: "{{system_users['www'].name}}"
+    group: "{{system_groups['www'].name}}"
+    mode: 0640
   vars:
     enable_stapeling: "{{ssl_certificate != 'selfsigned'}}"
   with_items:
@@ -171,9 +158,9 @@
   template:
     src: "templates/etc/apache2/_.ansible.auth/required.inc"
     dest: "{{global_etc}}apache2/_.ansible.auth/required_{{item}}.inc"
-    owner: "root"
-    group: "root"
-    mode: 0644
+    owner: "{{system_users['www'].name}}"
+    group: "{{system_groups['www'].name}}"
+    mode: 0640
   with_items:
     - "admin"
     - "user"
@@ -192,7 +179,7 @@
     recursive: yes
     rsync_opts:
       - "--chown={{system_users['www'].name}}:{{system_groups['www'].name}}"
-      - "--chmod=D755,F644"
+      - "--chmod=D750,F640"
 
 - name: copy domain fallback
   template:
@@ -200,7 +187,7 @@
     dest: "{{htdocs_path}}_fallback/{{item}}"
     owner: "{{system_users['www'].name}}"
     group: "{{system_groups['www'].name}}"
-    mode: 0644
+    mode: 0640
   with_items:
     - error.php
     - domain/index.html
@@ -212,7 +199,7 @@
     dest: "{{htdocs_path}}_public/{{item}}"
     owner: "{{system_users['www'].name}}"
     group: "{{system_groups['www'].name}}"
-    mode: 0644
+    mode: 0640
   with_items:
    - state
    - robots.txt
@@ -296,6 +283,7 @@
   vars:
     config_file: "templates/etc/fluent/_.ansible.d/apache.conf"
   include_tasks: roles/fluentd/shared/add_config.yml
+  tags: ['fluentd_config']
   when: "monitoring_enabled"
   
 - name: allow letsencrypt service
@@ -303,12 +291,13 @@
     name: "http.letsencrypt"
     rules: [ "daddr {{default_server_ip}} proto tcp dport 80" ]
   include_tasks: roles/firewall/shared/allow_service.yml
-  tags: [ 'firewall_config' ]
+  tags: ['firewall_config']
   
 - name: create systemd service
   vars:
     container_name: "apache2"
   include_tasks: roles/container/shared/add_docker_service.yml
+  tags: ['systemd_watcher_config']
 
 - name: register apache update notifier
   vars:
@@ -320,6 +309,7 @@
       pattern: "^([0-9\\.]+)$"
     }
   include_tasks: roles/update_service/shared/add_software.yml
+  tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"
 
 - name: register openidc update notifier
@@ -333,6 +323,7 @@
       version: "v{{openidc_version}}" 
     }
   include_tasks: roles/update_service/shared/add_software.yml
+  tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"
 
 - name: trigger apache2 handler

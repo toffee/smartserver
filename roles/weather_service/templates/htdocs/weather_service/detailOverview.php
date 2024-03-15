@@ -10,16 +10,12 @@ function getSVG( $icon, $id)
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<?php echo Ressources::getModules(["/weather_service/"]); ?>
+<?php echo Ressources::getModules(["/shared/mod/websocket/", "/weather_service/"]); ?>
 <script>
 mx.WeatherCore = (function( ret ) {
-    //var serviceApiUrl = mx.Host.getBase() + '../api/';
-    var serviceApiUrl = mx.Host.getBase() + '../../weather_service/api/';
-
-    var active_day = null;
-    var refreshTimer = 0;
-    var lastModified = [];
-    var currentValues = []
+    ret.socket = null;
+    ret.active_day = null;
+    var data = {};
 
     function buildRow(id, time, cloud, maxTemperature, minTemperature, sunshineDuration, precipitationProbability, precipitationAmount, windSpeed, windDirection, clickDate)
     {
@@ -46,232 +42,6 @@ mx.WeatherCore = (function( ret ) {
         row += '</div>';
 
         return row;
-    }
-
-    function handleState(data)
-    {
-        //console.log(data);
-
-        let changedValues = data["changed_data"];
-
-        currentValues = Object.assign(currentValues, changedValues);
-
-        if( "dayActive" in changedValues )
-        {
-            if( changedValues["dayActive"] )
-            {
-                active_day = new Date();
-                active_day.setTime(Date.parse(currentValues["dayActive"]));
-                mx.$(".today .title").innerHTML = mx.WeatherHelper.formatDay(active_day);
-            }
-            else
-            {
-                active_day = null;
-                mx.$(".today .title").innerHTML = "";
-            }
-        }
-
-        let now = new Date();
-
-        if( "currentAirTemperatureInCelsius" in changedValues) mx.$(".current .summary .temperature .value").innerHTML = mx.WeatherHelper.formatNumber(currentValues["currentAirTemperatureInCelsius"]) + ' °C';
-        if( "currentPerceivedTemperatureInCelsius" in changedValues) mx.$(".current .summary .perceived .value").innerHTML = mx.WeatherHelper.formatNumber(currentValues["currentPerceivedTemperatureInCelsius"]) + ' °C';
-
-        if( "currentWindSpeedInKilometerPerHour" in changedValues || "currentWindSpeedInKilometerPerHour" in changedValues )
-        {
-            let windSpeed = mx.WeatherHelper.formatNumber(currentValues["currentWindSpeedInKilometerPerHour"]);
-            let windGust = mx.WeatherHelper.formatNumber(currentValues["currentWindGustInKilometerPerHour"]);
-            let wind = windSpeed;
-            if( windSpeed != windGust && currentValues["currentWindGustInKilometerPerHour"] > 0 )
-            {
-                wind += ' (' + windGust + ')';
-            }
-            mx.$(".current .summary .wind .value").innerHTML = wind + ' km/h';
-        }
-
-        if( "currentRainLastHourInMillimeter" in changedValues || "currentRainDailyInMillimeter" in changedValues )
-        {
-            let rainValue = mx.WeatherHelper.formatNumber(currentValues["currentRainLastHourInMillimeter"]);
-            let rainDaily = mx.WeatherHelper.formatNumber(currentValues["currentRainDailyInMillimeter"]);
-            let rain = rainValue
-            if( rainValue != rainDaily && currentValues["currentRainDailyInMillimeter"] > 0 )
-            {
-                rain += ' (' + rainDaily + ')';
-            }
-            mx.$(".current .summary .rain .value").innerHTML = rain + ' mm';
-        }
-
-        if( "currentCloudsAsSVG" in changedValues) mx.$(".current .cloud").innerHTML = mx.WeatherHelper.formatNumber(currentValues["currentCloudsAsSVG"]);
-
-        if( "currentUvIndex" in changedValues) mx.$(".current .uv .value").innerHTML = mx.WeatherHelper.formatNumber(currentValues["currentUvIndex"]);
-
-        if( "astroSunrise" in changedValues)
-        {
-            let sunrise = new Date();
-            sunrise.setTime(Date.parse(currentValues["astroSunrise"]));
-            mx.$(".current .sunrise .value").innerHTML = mx.WeatherHelper.formatHour(sunrise);
-        }
-        if( "astroSunset" in changedValues)
-        {
-            let sunset = new Date();
-            sunset.setTime(Date.parse(currentValues["astroSunset"]));
-            mx.$(".current .sunset .value").innerHTML = mx.WeatherHelper.formatHour(sunset);
-        }
-
-        if( "dayList" in changedValues)
-        {
-            mx.$(".today .summary .temperature .value span.min").innerHTML = mx.WeatherHelper.formatNumber(currentValues["dayMinTemperature"]);
-            mx.$(".today .summary .temperature .value span.max").innerHTML = mx.WeatherHelper.formatNumber(currentValues["dayMaxTemperature"]);
-            mx.$(".today .summary .wind .value span").innerHTML = mx.WeatherHelper.formatNumber(currentValues["dayMaxWindSpeed"]);
-            mx.$(".today .summary .rain .value span").innerHTML = mx.WeatherHelper.formatNumber(currentValues["daySumRain"]);
-            mx.$(".today .summary .sun .value span").innerHTML = mx.WeatherHelper.formatDuration(currentValues["daySumSunshine"]);
-
-            let html_rows = [];
-            let active_id = null;
-            currentValues["dayList"].forEach(function(row)
-            {
-                let start = new Date();
-                start.setTime(Date.parse(row["start"]));
-                let end = new Date();
-                end.setTime(Date.parse(row["end"]));
-
-                let id = "day_" + start.getTime();
-                if( now.getTime() >= start.getTime() && now.getTime() <=  end.getTime() ) active_id = id;
-
-                let time = '<div class="from">' + mx.WeatherHelper.formatHour(start) + '</div>';
-                let html_row = buildRow(
-                    id,
-                    time,
-                    row["svg"],
-                    row["maxAirTemperatureInCelsius"],
-                    row["minAirTemperatureInCelsius"],
-                    row["sunshineDurationInMinutes"],
-                    row["precipitationProbabilityInPercent"],
-                    row["precipitationAmountInMillimeter"],
-                    row["windSpeedInKilometerPerHour"],
-                    row["windDirectionInDegree"],
-                    null
-                );
-                html_rows.push(html_row);
-            });
-
-            mx.$(".today .hours").innerHTML = html_rows.length > 0 ? html_rows.join("") : mx.I18N.get("No forecasts available");
-            if( active_id ) mx.$("#" + active_id ).classList.add("active");
-        }
-
-        if( "weekList" in changedValues)
-        {
-            mx.$(".week .summary .temperature .value span.min").innerHTML = mx.WeatherHelper.formatNumber(currentValues["weekMinTemperature"]);
-            mx.$(".week .summary .temperature .value span.max").innerHTML = mx.WeatherHelper.formatNumber(currentValues["weekMaxTemperature"]);
-            mx.$(".week .summary .wind .value span").innerHTML = mx.WeatherHelper.formatNumber(currentValues["weekMaxWindSpeed"]);
-            mx.$(".week .summary .rain .value span").innerHTML = mx.WeatherHelper.formatNumber(currentValues["weekSumRain"]);
-            mx.$(".week .summary .sun .value span").innerHTML = mx.WeatherHelper.formatDuration(currentValues["weekSumSunshine"]);
-
-            let html_rows = [];
-            currentValues["weekList"].forEach(function(row)
-            {
-                let start = new Date();
-                start.setTime(Date.parse(row["start"]));
-
-                let is_active = ( now.getDate() == start.getDate() && now.getMonth() == start.getMonth() );
-
-                let time = '<div>' + mx.WeatherHelper.formatWeekdayName(start) + '</div><div>' + mx.WeatherHelper.formatWeekdayDate(start) + '</div>';
-                let clickDate = start.getFullYear() + '-' + mx.WeatherHelper.formatLeadingZero(start.getMonth() + 1) + '-' + mx.WeatherHelper.formatLeadingZero(start.getDate());
-                let id = "week_" + clickDate;
-                let html_row = buildRow(
-                    id,
-                    time,
-                    row["svg"],
-                    row["maxAirTemperatureInCelsius"],
-                    row["minAirTemperatureInCelsius"],
-                    row["sunshineDurationInMinutes"],
-                    row["precipitationProbabilityInPercent"],
-                    row["precipitationAmountInMillimeter"],
-                    row["windSpeedInKilometerPerHour"],
-                    row["windDirectionInDegree"],
-                    clickDate
-                );
-                html_rows.push(html_row);
-            });
-
-            mx.$(".week .hours").innerHTML = html_rows.length > 0 ? html_rows.join("") : mx.I18N.get("No forecasts available");;
-
-            function clickHandler()
-            {
-                var day = this.getAttribute("mv-date");
-                delete lastModified["provider"];
-                refreshState(lastModified, day);
-            }
-
-            var elements = document.querySelectorAll('div[mv-date]');
-            for( var i = 0; i < elements.length; i++)
-            {
-                var element = elements[i];
-                element.addEventListener("click",clickHandler);
-            }
-        }
-
-        mx.$$(".week .hours .active").forEach(function(element)
-        {
-            element.classList.remove("active");
-        });
-
-        if( active_day ) mx.$("#week_" + active_day.getFullYear() + '-' + mx.WeatherHelper.formatLeadingZero(active_day.getMonth() + 1) + '-' + mx.WeatherHelper.formatLeadingZero(active_day.getDate()) ).classList.add("active");
-
-        if( mx.$(".week").classList.contains("open") ) document.getElementById("weekButton").click();
-    }
-
-    function refreshState(last_data_modified, day)
-    {
-        var xhr = new XMLHttpRequest();
-        xhr.open("POST", serviceApiUrl + "data/" );
-        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-
-        //application/x-www-form-urlencoded
-
-        window.clearTimeout(refreshTimer);
-
-        xhr.withCredentials = true;
-        xhr.onreadystatechange = function() {
-            if (this.readyState != 4) return;
-
-            if( this.status == 200 )
-            {
-                var response = JSON.parse(this.response);
-                if( response["status"] == "0" )
-                {
-                    mx.Error.confirmSuccess();
-
-                    handleState(response);
-
-                    lastModified = response["last_data_modified"]
-                    refreshTimer = window.setTimeout(function(){ refreshState(response["last_data_modified"], day) }, 60000);
-                }
-                else
-                {
-                    mx.Error.handleServerError( mx.I18N.get( "Service is currently not available")  );
-                }
-            }
-            else
-            {
-                let timeout = 15000;
-                if( this.status == 0 || this.status == 503 )
-                {
-                    mx.Error.handleError( mx.I18N.get( "Service is currently not available")  );
-                }
-                else
-                {
-                    if( this.status != 401 ) mx.Error.handleRequestError(this.status, this.statusText, this.response);
-                }
-
-                refreshTimer = window.setTimeout(function(){ refreshState(last_data_modified, day) }, 60000);
-
-                //mx.Page.handleRequestError(this.status, serviceApiUrl, function(){ refreshState(last_data_modified, day) }, timeout);
-            }
-        };
-
-        let params = { "type": "week", "fields": "dayList,weekList,currentAirTemperatureInCelsius,currentPerceivedTemperatureInCelsius,currentWindSpeedInKilometerPerHour,currentWindGustInKilometerPerHour,currentRainLastHourInMillimeter,currentRainDailyInMillimeter,currentCloudsAsSVG,currentUvIndex,astroSunrise,astroSunset", "last_data_modified": last_data_modified }
-        if( day ) params["day"] = day;
-        xhr.send(mx.Core.encodeDict( params ));
     }
 
     function initButtons()
@@ -344,12 +114,183 @@ mx.WeatherCore = (function( ret ) {
             }
         });
     }
+    function refreshWeek(day)
+    {
+        console.log("emit");
+        mx.WeatherCore.socket.emit('getWeekData', day);
+    }
+
+    ret.processData = function(changed_data)
+    {
+        data = {...data, ...changed_data};
+
+        if( "currentAirTemperatureInCelsius" in changed_data) mx.$(".current .summary .temperature .value").innerHTML = mx.WeatherHelper.formatNumber(data["currentAirTemperatureInCelsius"]) + ' °C';
+        if( "currentPerceivedTemperatureInCelsius" in changed_data) mx.$(".current .summary .perceived .value").innerHTML = mx.WeatherHelper.formatNumber(data["currentPerceivedTemperatureInCelsius"]) + ' °C';
+
+        if( "currentWindSpeedInKilometerPerHour" in changed_data || "currentWindSpeedInKilometerPerHour" in changed_data )
+        {
+            let windSpeed = mx.WeatherHelper.formatNumber(data["currentWindSpeedInKilometerPerHour"]);
+            let windGust = mx.WeatherHelper.formatNumber(data["currentWindGustInKilometerPerHour"]);
+            let wind = windSpeed;
+            if( windSpeed != windGust && data["currentWindGustInKilometerPerHour"] > 0 )
+            {
+                wind += ' (' + windGust + ')';
+            }
+            mx.$(".current .summary .wind .value").innerHTML = wind + ' km/h';
+        }
+
+        if( "currentRainLastHourInMillimeter" in changed_data || "currentRainDailyInMillimeter" in changed_data )
+        {
+            let rainValue = mx.WeatherHelper.formatNumber(data["currentRainLastHourInMillimeter"]);
+            let rainDaily = mx.WeatherHelper.formatNumber(data["currentRainDailyInMillimeter"]);
+            let rain = rainValue
+            if( rainValue != rainDaily && data["currentRainDailyInMillimeter"] > 0 )
+            {
+                rain += ' (' + rainDaily + ')';
+            }
+            mx.$(".current .summary .rain .value").innerHTML = rain + ' mm';
+        }
+
+        if( "currentCloudsAsSVG" in changed_data) mx.$(".current .cloud").innerHTML = mx.WeatherHelper.formatNumber(data["currentCloudsAsSVG"]);
+
+        if( "currentUvIndex" in changed_data) mx.$(".current .uv .value").innerHTML = mx.WeatherHelper.formatNumber(data["currentUvIndex"]);
+
+        if( "astroSunrise" in changed_data)
+        {
+            let sunrise = new Date();
+            sunrise.setTime(Date.parse(data["astroSunrise"]));
+            mx.$(".current .sunrise .value").innerHTML = mx.WeatherHelper.formatHour(sunrise);
+        }
+        if( "astroSunset" in changed_data)
+        {
+            let sunset = new Date();
+            sunset.setTime(Date.parse(data["astroSunset"]));
+            mx.$(".current .sunset .value").innerHTML = mx.WeatherHelper.formatHour(sunset);
+        }
+
+        if( "dayActive" in changed_data )
+        {
+            if( data["dayActive"] )
+            {
+                mx.WeatherCore.active_day = new Date();
+                mx.WeatherCore.active_day.setTime(Date.parse(data["dayActive"]));
+                mx.$(".today .title").innerHTML = mx.WeatherHelper.formatDay(mx.WeatherCore.active_day);
+            }
+            else
+            {
+                mx.WeatherCore.active_day = null;
+                mx.$(".today .title").innerHTML = "";
+            }
+        }
+
+        let now = new Date();
+
+        if( "dayList" in changed_data)
+        {
+            mx.$(".today .summary .temperature .value span.min").innerHTML = mx.WeatherHelper.formatNumber(data["dayMinTemperature"]);
+            mx.$(".today .summary .temperature .value span.max").innerHTML = mx.WeatherHelper.formatNumber(data["dayMaxTemperature"]);
+            mx.$(".today .summary .wind .value span").innerHTML = mx.WeatherHelper.formatNumber(data["dayMaxWindSpeed"]);
+            mx.$(".today .summary .rain .value span").innerHTML = mx.WeatherHelper.formatNumber(data["daySumRain"]);
+            mx.$(".today .summary .sun .value span").innerHTML = mx.WeatherHelper.formatDuration(data["daySumSunshine"]);
+
+            let html_rows = [];
+            let active_id = null;
+            data["dayList"].forEach(function(row)
+            {
+                let start = new Date();
+                start.setTime(Date.parse(row["start"]));
+                let end = new Date();
+                end.setTime(Date.parse(row["end"]));
+
+                let id = "day_" + start.getTime();
+                if( now.getTime() >= start.getTime() && now.getTime() <=  end.getTime() ) active_id = id;
+
+                let time = '<div class="from">' + mx.WeatherHelper.formatHour(start) + '</div>';
+                let html_row = buildRow(
+                    id,
+                    time,
+                    row["svg"],
+                    row["maxAirTemperatureInCelsius"],
+                    row["minAirTemperatureInCelsius"],
+                    row["sunshineDurationInMinutes"],
+                    row["precipitationProbabilityInPercent"],
+                    row["precipitationAmountInMillimeter"],
+                    row["windSpeedInKilometerPerHour"],
+                    row["windDirectionInDegree"],
+                    null
+                );
+                html_rows.push(html_row);
+            });
+
+            mx.$(".today .hours").innerHTML = html_rows.length > 0 ? html_rows.join("") : mx.I18N.get("No forecasts available");
+            if( active_id ) mx.$("#" + active_id ).classList.add("active");
+        }
+
+        if( "weekList" in changed_data)
+        {
+            mx.$(".week .summary .temperature .value span.min").innerHTML = mx.WeatherHelper.formatNumber(data["weekMinTemperature"]);
+            mx.$(".week .summary .temperature .value span.max").innerHTML = mx.WeatherHelper.formatNumber(data["weekMaxTemperature"]);
+            mx.$(".week .summary .wind .value span").innerHTML = mx.WeatherHelper.formatNumber(data["weekMaxWindSpeed"]);
+            mx.$(".week .summary .rain .value span").innerHTML = mx.WeatherHelper.formatNumber(data["weekSumRain"]);
+            mx.$(".week .summary .sun .value span").innerHTML = mx.WeatherHelper.formatDuration(data["weekSumSunshine"]);
+
+            let html_rows = [];
+            data["weekList"].forEach(function(row)
+            {
+                let start = new Date();
+                start.setTime(Date.parse(row["start"]));
+
+                let is_active = ( now.getDate() == start.getDate() && now.getMonth() == start.getMonth() );
+
+                let time = '<div>' + mx.WeatherHelper.formatWeekdayName(start) + '</div><div>' + mx.WeatherHelper.formatWeekdayDate(start) + '</div>';
+                let clickDate = start.getFullYear() + '-' + mx.WeatherHelper.formatLeadingZero(start.getMonth() + 1) + '-' + mx.WeatherHelper.formatLeadingZero(start.getDate());
+                let id = "week_" + clickDate;
+                let html_row = buildRow(
+                    id,
+                    time,
+                    row["svg"],
+                    row["maxAirTemperatureInCelsius"],
+                    row["minAirTemperatureInCelsius"],
+                    row["sunshineDurationInMinutes"],
+                    row["precipitationProbabilityInPercent"],
+                    row["precipitationAmountInMillimeter"],
+                    row["windSpeedInKilometerPerHour"],
+                    row["windDirectionInDegree"],
+                    clickDate
+                );
+                html_rows.push(html_row);
+            });
+
+            mx.$(".week .hours").innerHTML = html_rows.length > 0 ? html_rows.join("") : mx.I18N.get("No forecasts available");;
+
+            function clickHandler()
+            {
+                var day = this.getAttribute("mv-date");
+                refreshWeek(day);
+            }
+
+            var elements = document.querySelectorAll('div[mv-date]');
+            for( var i = 0; i < elements.length; i++)
+            {
+                var element = elements[i];
+                element.addEventListener("click",clickHandler);
+            }
+        }
+
+        mx.$$(".week .hours .active").forEach(function(element)
+        {
+            element.classList.remove("active");
+        });
+
+        if( mx.WeatherCore.active_day ) mx.$("#week_" + mx.WeatherCore.active_day.getFullYear() + '-' + mx.WeatherHelper.formatLeadingZero(mx.WeatherCore.active_day.getMonth() + 1) + '-' + mx.WeatherHelper.formatLeadingZero(mx.WeatherCore.active_day.getDate()) ).classList.add("active");
+
+        if( mx.$(".week").classList.contains("open") ) document.getElementById("weekButton").click();
+    }
 
     ret.init = function()
     {
         mx.I18N.process(document);
 
-        refreshState();
         initButtons();
 
         mx.Page.refreshUI();
@@ -358,6 +299,15 @@ mx.WeatherCore = (function( ret ) {
 })( mx.WeatherCore || {} );
 
 mx.OnDocReady.push( mx.WeatherCore.init );
+
+var processData = mx.OnDocReadyWrapper( mx.WeatherCore.processData );
+
+mx.OnSharedModWebsocketReady.push(function(){
+    mx.WeatherCore.socket = mx.ServiceSocket.init('weather_service', 'details', function(){
+        return mx.WeatherCore.active_day == null ? null : mx.WeatherCore.active_day.getFullYear() + '-' + mx.WeatherHelper.formatLeadingZero(mx.WeatherCore.active_day.getMonth() + 1) + '-' + mx.WeatherHelper.formatLeadingZero(mx.WeatherCore.active_day.getDate())
+    });
+    mx.WeatherCore.socket.on("data", (data) => processData( data ) );
+});
 
 </script>
 </head>

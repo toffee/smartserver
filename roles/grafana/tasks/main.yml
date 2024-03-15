@@ -1,38 +1,18 @@
 - name: set version
   set_fact:
-    grafana_version: '10.3.1'
+    grafana_version: '10.4.0'
     natel_discrete_plugin_version: "0.1.1"
   tags: [ 'update_notifier_config' ]    
 
-- name: prepare needed folder
-  file:
-    path: '{{item}}'
-    state: directory
-    owner: root
-    group: root
-    mode: 0750
-  with_items:
-    - "{{ global_lib }}grafana/plugins/"
-    - "{{ global_etc }}grafana/"
-    - "{{ global_etc }}grafana/provisioning/dashboards/"
-    - "{{ global_etc }}grafana/provisioning/notifiers/"
-    - "{{ global_etc }}grafana/provisioning/plugins/"
-    - "{{ global_etc }}grafana/provisioning/alerting/"
-
-#- name: synchronize shared grafana dashboards
-#  synchronize:
-#    src: "templates/dashboards/"
-#    dest: "{{ global_lib }}grafana/dashboards/"
-#    archive: no
-#    checksum: yes
-#    group: yes
-#    owner: yes
-#    perms: yes
-#    recursive: yes
-#    rsync_opts:
-#      - "--chown=root:root"
-#      - "--chmod=D750,F640"
-#  notify: "restart grafana"
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_lib }}grafana/plugins/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_etc }}grafana/provisioning/dashboards/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_etc }}grafana/provisioning/notifiers/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_etc }}grafana/provisioning/plugins/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_etc }}grafana/provisioning/alerting/" }
+  include_tasks: roles/_shared/create_directories.yml
 
 - name: check individual grafana dashboards
   shell: "ls {{config_path}}templates/grafana/dashboards/"
@@ -62,17 +42,11 @@
   template:
     src: "templates/{{item}}"
     dest: "{{ global_etc }}grafana/{{item}}"
-    owner: root
-    group: root
+    owner: "root"
+    group: "root"
     mode: 0640
   notify: "restart grafana"
   with_items:
-#    - "provisioning/datasources/opentsdb_influxdb.yaml"
-#    - "provisioning/datasources/system_info_influxdb.yaml"
-#    - "provisioning/datasources/openhab_influxdb.yaml"
-#    - "provisioning/datasources/openhab_mysql.yaml"
-#    - "provisioning/datasources/prometheus.yaml"
-#    - "provisioning/datasources/loki.yaml"
     - "provisioning/dashboards/provider.yaml"
     
 - name: install natel-discrete-panel archive
@@ -137,7 +111,7 @@
       - "saddr {{docker_grafana_ip}} daddr {{docker_alertmanager_ip}}"
 #      - "saddr {{docker_grafana_ip}} proto tcp dport 443 outerface {{default_network_interface}}" # fetching grafana plugin keys
   include_tasks: roles/firewall/shared/allow_service.yml
-  tags: [ 'firewall_config' ]
+  tags: ['firewall_config']
 
 - name: add container name
   vars:
@@ -153,6 +127,7 @@
     i18n_files: [ { language: "de", file: "templates/webui/grafana.de.json" } ]
     icons: [ 'templates/webui/icons/grafana_logo.svg', 'templates/webui/icons/grafana_logs.svg' ]
   include_tasks: roles/apache_webui/shared/add_webui.yml
+  tags: ['apache_webui_config']
 
 - name: copy apache vhost
   vars:
@@ -160,11 +135,13 @@
     usergroup: "admin"
     include: "templates/etc/apache2/_.ansible.vhost.d/grafana.inc"
   include_tasks: roles/apache/shared/add_vhost.yml
+  tags: ['apache_config']
 
 - name: copy fluentd config
   vars:
     config_file: "templates/etc/fluent/_.ansible.d/grafana.conf"
   include_tasks: roles/fluentd/shared/add_config.yml
+  tags: ['fluentd_config']
   when: "monitoring_enabled"
       
 - name: create systemd service
@@ -172,6 +149,7 @@
     container_name: "grafana"
     container_after: [ "mysql", "influxdb", "loki", "prometheus", "alertmanager" ]
   include_tasks: roles/container/shared/add_docker_service.yml
+  tags: ['systemd_watcher_config']
   
 - name: register update notifier
   vars:
@@ -183,6 +161,7 @@
       pattern: "^([0-9\\.]+)$"
     }
   include_tasks: roles/update_service/shared/add_software.yml
+  tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"
 
 - name: trigger grafana handler

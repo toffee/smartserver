@@ -13,6 +13,9 @@ mx.Widgets = (function( ret ) {
     let last_needed_size = 0;
     let last_max_size = 0;
 
+    let initialized = -1;
+    let init_timer = null;
+
     ret.get = function()
     {
         result = [];
@@ -54,13 +57,11 @@ mx.Widgets = (function( ret ) {
     }
 
     ret.init = function(innerRoot, outerRoot) {
+        widgets.forEach(function(widget){ widget._init(); });
+
         spacer_widget = mx._$(".spacer", innerRoot);
         possible_left_widgets = mx._$$(".possibleLeft", innerRoot);
-        let widgets = mx._$$(".widget", innerRoot)
-        widgets.forEach(function(widget)
-        {
-            new ResizeObserver(mx.Widgets.handleResize).observe(widget);
-        });
+        mx._$$(".widget", innerRoot).forEach(function(widget){ new ResizeObserver(mx.Widgets.handleResize).observe(widget); });
         new ResizeObserver(mx.Widgets.handleResize).observe(outerRoot);
     }
 
@@ -114,99 +115,20 @@ mx.Widgets = (function( ret ) {
             last_max_size = max_size;
         }
     }
-
-    ret.fetchContent = function(method, url, callback, data)
-    {
-        var xhr = new XMLHttpRequest();
-        xhr.open(method, url );
-        if( method == "POST" ) xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-
-        xhr.withCredentials = true;
-        xhr.onreadystatechange = function() {
-            if (this.readyState != 4) return;
-
-            if( this.status == 200 )
-            {
-                if( callback ) callback(this.response);
-            }
-            else
-            {
-                let timeout = 15000;
-
-                callback(null);
-                //mx.Page.handleRequestError(this.status, url,function(){ mx.Widgets.fetchContent(method, url, callback, data ) }, timeout);
-            }
-        };
-
-        if( data) xhr.send( data );
-        else xhr.send();
-    }
-    ret.register = function(widget, index)
-    {
-        widgets.push(widget);
-    }
-
-    ret.preload = function( callback )
-    {
-        if( widgets.length == 0 )
-        {
-            callback();
-        }
-        else
-        {
-            widgets.forEach(function(widget, index)
-            {
-                widget._preload = [];
-                for( let i = 0; i < widget.getCount(); i++ )
-                {
-                    widget._preload[i] = null;
-                }
-            });
-            widgets.forEach(function(widget)
-            {
-                widget._show = widget.show;
-                widget.show = function(index, msg)
-                {
-                    widget._preload[index] = msg;
-
-                    let missing_preloads = widgets.filter( (widget) => widget._preload.filter( (preload) => preload == null ).length > 0  );
-                    if( missing_preloads.length == 0 ) callback();
-                };
-                widget.refresh();
-            });
-        }
-    }
-
-    ret.refresh = function()
-    {
-        widgets.forEach(function(widget)
-        {
-            if( widget._preload != undefined )
-            {
-                widget.show = widget._show;
-                widget._preload.forEach( (msg,index) => widget.show(index, msg) );
-                delete widget._show;
-                delete widget._preload;
-            }
-            else
-            {
-                widget.refresh();
-            }
-        });
-    }
-
-    ret.click = function( event, index, i )
-    {
-        widgets[index].click(event, i);
-    }
-
+    ret.register = function(widget, index) { widgets.push(widget); }
+    ret.clean = function(){ widgets.forEach(function(widget){ widget._destroy(); });  }
+    ret.click = function( event, index, i ){ widgets[index].click(event, i); }
     return ret;
 })( mx.Widgets || {} );
 
-mx.Widgets.Object = function(group, config)
+mx.Widgets.Object = function(service, group, config)
 {
-    return (function( ret ) {
-        let last_msg = {};
+    let widget = (function( ret ) {
+        let data = null;
+        var last_msg = {};
+        var active = false;
+        var fetched_data = false;
+
         ret.getId = function(index) { return config[index]["id"]; }
         ret.getOrder = function(index) { return config[index]["order"]; }
         ret.getCount = function() { return config.length; }
@@ -214,15 +136,21 @@ mx.Widgets.Object = function(group, config)
         ret.hasAction = function(index) { return config[index]["click"] != undefined; }
         ret.click = function(event, index) { config[index]["click"](event); }
         ret.reset = function(){ last_msg = {}; }
-        ret.alert = function(index, msg)
-        {
-            ret.show(index, "<span class=\"error\">" + msg + "</span>");
-        }
+        ret.alert = function(index, msg){ if( active ){ ret.show(index, "<span class=\"error\">" + msg + "</span>"); } }
+        ret.isActive = function(){ return active; }
+        ret.activate = function(flag){ active=flag; }
+
+        ret._init = function(){ active=true; if(fetched_data){ widget.processData(data); } };
+        ret._destroy = function(){ active=false; };
+
+        ret._processData = function(_data){ fetched_data = true; data = {...data, ..._data}; if(active){ widget.processData(data); } }
+        ret._processAlert = function(){ fetched_data = true; data = null; if(active){ widget.processData(data); } }
+
         ret.show = function(index, msg)
         {
             let isInitialLoad = last_msg[index] == undefined
 
-            if( isInitialLoad || last_msg[index] != msg )
+            if( last_msg[index] != msg )
             {
                 let div = mx.$("#" + config[index]["id"]);
                 let old_width = div.scrollWidth;
@@ -264,4 +192,12 @@ mx.Widgets.Object = function(group, config)
         if( mx.User.memberOf(group) ) mx.Widgets.register(ret);
         return ret;
     })( {} );
+
+    mx.OnSharedModWebsocketReady.push(function(){
+        socket = mx.ServiceSocket.init(service, "widget");
+        socket.on("data", (data) => widget._processData(data) );
+        socket.on("error", (err) => widget._processAlert() );
+    });
+
+    return widget;
 }

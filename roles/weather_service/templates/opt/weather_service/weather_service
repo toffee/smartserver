@@ -1,0 +1,157 @@
+#!/usr/bin/python3
+
+import logging
+import json
+import time
+from datetime import datetime
+#from decimal import Decimal
+
+from lib.provider.meteogroup import MeteoGroup
+from lib.provider.openmeteo import OpenMeteo
+
+from lib.consumer.provider import ProviderConsumer
+from lib.consumer.station import StationConsumer
+from lib.consumer.astro import AstroConsumer
+from lib.broker.mqtt import MQTT as MQTTBroker
+from lib.broker.dummy import Dummy as DummyBroker
+from lib.db import DB
+from lib.helper.forecast import WeatherBlock
+
+from smartserver.scheduler import Scheduler
+from smartserver.server import Server, serverWeb, serverSocket
+
+from config import config
+
+
+class Handler(Server):
+    '''Handler client'''
+    def __init__(self):
+        super().__init__("weatcher_service", "0.0.0.0", "80" )
+
+        self.db = DB(config)
+        self.scheduler = Scheduler("weather_service")
+
+        self.mqtt = DummyBroker(config) if config.mosquitto_host == "dummy" else MQTTBroker(config)
+
+        if config.api_provider == 'meteogroup':
+            self.provider = MeteoGroup(config, self.db, self.mqtt)
+        elif config.api_provider == 'openmeteo':
+            self.provider = OpenMeteo(config, self.db, self.mqtt)
+        elif config.api_provider == 'listener':
+            logging.info("Publishing disabled")
+            self.provider = None
+        else:
+            logging.error("Unknown provider '{}'. Publishing disabled".format(config.api_provider))
+            self.provider = None
+
+        self.astro_consumer = AstroConsumer(config, self)
+        self.provider_consumer = ProviderConsumer(config, self.mqtt, self.db, self)
+
+        if config.mosquitto_host != "dummy":
+            self.station_consumer = StationConsumer(config, self.mqtt, self.provider_consumer)
+        else:
+            self.station_consumer = None
+
+        self.startup_timestamp = round(datetime.now().timestamp(),3)
+
+        self.initWatchedFiles( [config.icon_path], self.iconChangeTriggered )
+
+    def iconChangeTriggered(self, event):
+        self.provider_consumer.resetIconCache()
+
+    def start(self):
+        self.scheduler.start()
+        self.mqtt.start()
+        self.provider_consumer.start()
+        if self.station_consumer:
+            self.station_consumer.start()
+        self.astro_consumer.start()
+
+        if self.provider != None:
+            self.provider.start()
+
+        super().start()
+
+    def terminate(self):
+        if self.provider != None:
+            self.provider.terminate()
+
+        self.astro_consumer.terminate()
+        if self.station_consumer:
+            self.station_consumer.terminate()
+        self.provider_consumer.terminate()
+        self.mqtt.terminate()
+        self.scheduler.terminate()
+
+        super().terminate()
+
+    def run(self):
+        while self.is_running:
+            self.event.wait(60)
+            self.event.clear()
+
+    def emitWeekData(self, sid, day):
+        data = self.provider_consumer.getWeekValues(day)
+        self.emitSocketData('details:data', data, sid)
+        self.setSocketClientValue(sid, "day", day)
+
+    def notifyChangedWeekData(self):
+        if self.isSocketRoomActive("details"):
+            for sid in self.getSocketClients("details"):
+                day = self.getSocketClientValue(sid, "day")
+                data = self.provider_consumer.getWeekValues(day)
+                self.emitSocketData('details:data', data, sid)
+
+    def notifyChangedAstroData(self, field, value):
+        if not self.isSocketRoomActive("details"):
+            return
+
+        self.emitSocketData('details:data', { field: value }, "details")
+
+    def notifyChangedCurrentData(self, field, value):
+        if self.isSocketRoomActive("widget") and field in ["currentAirTemperatureInCelsius","currentCloudsAsSVG"]:
+           self.emitSocketData('widget:data', { field: value }, "widget")
+
+        if self.isSocketRoomActive("details"):
+           self.emitSocketData('details:data', { field: value }, "details")
+
+    def onSocketRoomJoin(self, sid, room, data = None):
+        super().onSocketRoomJoin(sid, room, data)
+
+        current_data = self.provider_consumer.getCurrentValues()
+
+        if room == "widget":
+            self.emitSocketData('widget:data', {"currentAirTemperatureInCelsius": current_data["currentAirTemperatureInCelsius"], "currentCloudsAsSVG": current_data["currentCloudsAsSVG"] }, room)
+
+        elif room == "details":
+            week_data = self.provider_consumer.getWeekValues(data)
+            astro_data = self.astro_consumer.getValues()
+            self.emitSocketData('details:data', current_data | week_data | astro_data, room)
+
+    def getTodayData(self):
+        return json.dumps(self.provider_consumer.getTodayOverviewValues())
+
+    def getStateMetrics(self):
+        metrics = []
+        metrics += self.scheduler.getStateMetrics()
+        metrics += self.db.getStateMetrics()
+        metrics += self.mqtt.getStateMetrics()
+        if self.provider is not None:
+            metrics += self.provider.getStateMetrics()
+        metrics += self.provider_consumer.getStateMetrics()
+        if self.station_consumer:
+            metrics += self.station_consumer.getStateMetrics()
+
+        return "{}\n".format( "\n".join(metrics) )
+
+@serverSocket.on('getWeekData')
+def getWeekData(day):
+    handler.emitWeekData(handler.getSocketClient(), day)
+
+@serverWeb.route('/todayData/', methods = ['POST'])
+def data():
+    return handler.getTodayData()
+
+handler = Handler()
+handler.start()
+

@@ -1,5 +1,4 @@
-mx.Menu.getMainGroup('admin').getSubGroup('tools').addUrl('alertmanager', '//alertmanager.{host}/','admin', 212, '{i18n_Alertmanager}', '{i18n_Alertmanager_Admin}', 'alertmanager_logo.svg', false);
-
+mx.Menu.getMainGroup('admin').getSubGroup('tools').addUrl('alertmanager', ['admin'], '//alertmanager.{host}/', { 'order': 212, 'title': '{i18n_Alertmanager}', 'info': '{i18n_Alertmanager_Admin}', 'icon': 'alertmanager_logo.svg' });
 
 mx.Alarms = (function( ret ) {
     var buttonSelector;
@@ -17,7 +16,7 @@ mx.Alarms = (function( ret ) {
             {status: {state:"active"}, labels: {severity: "error"}, receivers: ["default"]}
         ]*/
 
-        for(alarm of data.data)
+        for(alarm of data)
         {
             if( alarm.status.state != 'active' )
             {
@@ -71,7 +70,7 @@ mx.Alarms = (function( ret ) {
     {
         var id = Math.round( Date.now() / 1000 );
 
-        var url = "//" + mx.Host.getAuthPrefix() + "alertmanager." + mx.Host.getDomain() + "/api/v1/alerts?time=" + Date.now();
+        var url = "//" + mx.Host.getAuthPrefix() + "alertmanager." + mx.Host.getDomain() + "/api/v2/alerts?time=" + Date.now();
 
         var xhr = new XMLHttpRequest();
         xhr.open("GET", url );

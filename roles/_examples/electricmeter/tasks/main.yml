@@ -12,7 +12,7 @@
     group: root
     mode: 0640
 
-- name: prepare needed folder
+- name: prepare needed directories
   file:
     path: "/opt/electricmeter"
     state: directory
@@ -32,7 +32,8 @@
   vars:
     name: "Electric Meter"
     cmd: "/opt/electricmeter/strom.perl"
-    file: "ansible_electricmeter"
+    group: "electricmeter"
     minute: "*/5"
-  import_tasks: roles/cron/shared/add_cronjob.yml
+  include_tasks: roles/cron/shared/add_cronjob.yml
+  tags: ['cron_job']
   when: "is_production|bool"

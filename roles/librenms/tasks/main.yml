@@ -1,47 +1,36 @@
 - name: set version
   set_fact:
-    librenms_version: '23.11.0'
+    librenms_version: '24.2.0'
   tags: [ 'update_notifier_config' ]    
 
-- name: prepare needed folder
-  file:
-    path: '{{item.path}}'
-    state: directory
-    owner: "{{item.user}}"
-    group: "{{item.group}}"
-    mode: "{{item.mode}}"
-  with_items:
-    - { user: "1000", group: "1000", mode: "u=rwx,g=rx,o=", path: "{{global_etc}}librenms" }
-    - { user: "1000", group: "1000", mode: "u=rwx,g=rx,o=", path: "{{global_etc}}librenms/nginx" }
-    - { user: "1000", group: "1000", mode: "u=rwx,g=rwx,o=", path: "{{global_log}}librenms" }
-    - { user: "1000", group: "1000", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}librenms" }
-    - { user: "1000", group: "1000", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}librenms/alert-templates" }
-    - { user: "1000", group: "1000", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}librenms/monitoring-plugins" }
-    - { user: "1000", group: "1000", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}librenms/plugins" }
-    - { user: "1000", group: "1000", mode: "u=rwx,g=rwx,o=", path: "{{global_lib}}librenms/rrd" }
-    - { user: "1000", group: "1000", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}librenms/weathermap" }
+- name: "create user and group => user or group does not exists"
+  vars:
+    user: { name: "librenms", system: true, home: "{{global_etc}}librenms" }
+    group: { name: "librenms", system: true }
+  include_tasks: roles/user/shared/add_system_user.yml
+  when: "'librenms' not in system_users or 'librenms' not in system_groups"
 
-#- name: synchronize configs
-#  synchronize:
-#    src: "templates/etc/librenms/"
-#    dest: "{{global_etc}}librenms/"
-#    archive: no
-#    checksum: yes
-#    group: yes
-#    owner: yes
-#    perms: yes
-#    recursive: yes
-#    rsync_opts:
-#      - "--chown=1000:1000"
-#      - "--chmod=D755,F644"
-      
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['librenms'].name}}", group: "{{system_groups['librenms'].name}}", path: "{{global_etc}}librenms" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['librenms'].name}}", group: "{{system_groups['librenms'].name}}", path: "{{global_etc}}librenms/nginx" }
+      - { mode: "u=rwx,g=rwx,o=", owner: "{{system_users['librenms'].name}}", group: "{{system_groups['librenms'].name}}", path: "{{global_log}}librenms" }                     # mode sync with librenms entrypoint
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['librenms'].name}}", group: "{{system_groups['librenms'].name}}", path: "{{global_lib}}librenms" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['librenms'].name}}", group: "{{system_groups['librenms'].name}}", path: "{{global_lib}}librenms/alert-templates" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['librenms'].name}}", group: "{{system_groups['librenms'].name}}", path: "{{global_lib}}librenms/monitoring-plugins" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['librenms'].name}}", group: "{{system_groups['librenms'].name}}", path: "{{global_lib}}librenms/plugins" }
+      - { mode: "u=rwx,g=rwx,o=", owner: "{{system_users['librenms'].name}}", group: "{{system_groups['librenms'].name}}", path: "{{global_lib}}librenms/rrd" }                 # mode sync with librenms entrypoint
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['librenms'].name}}", group: "{{system_groups['librenms'].name}}", path: "{{global_lib}}librenms/weathermap" }
+  include_tasks: roles/_shared/create_directories.yml
+
 - name: copy config
   template:
     src: "templates/etc/librenms/{{item}}"
     dest: "{{global_etc}}librenms/{{item}}"
-    owner: "1000"
-    group: "1000"
-    mode: 0644
+    owner: "{{system_users['librenms'].name}}"
+    group: "{{system_groups['librenms'].name}}"
+    mode: 0640
   with_items:
     - "nginx/nginx.conf"
     - "config.php"
@@ -53,12 +42,15 @@
     image: "librenms/librenms:{{librenms_version}}"
     state: present
 #    recreate: true
+#    user: "{{system_users['librenms'].name}}:{{system_groups['librenms'].name}}"
     env:
 #      OBSERVIUM_ADMIN_USER: "admin"
 #      OBSERVIUM_ADMIN_PASS: "admin"
+      PUID: "{{system_users['librenms'].id}}"
+      PGID: "{{system_groups['librenms'].id}}"
       DB_HOST: "mysql"
-      DB_USERNAME: "{{vault_librenms_mysql_username}}"
-      DB_PASSWORD: "{{vault_librenms_mysql_password}}"
+      DB_USERNAME: "{{librenms_mysql_username}}"
+      DB_PASSWORD: "{{librenms_mysql_password}}"
       DB_DATABASE: "librenms"
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
@@ -98,14 +90,14 @@
         "saddr {{docker_librenms_ip}} daddr {{network}}",
       {% endfor %}
       ]
-  tags: [ 'firewall_config' ]
+  tags: ['firewall_config']
 
 - name: allow librenms service
   vars:
     name: "librenms"
     rules: "{{librenms_ferm_rules}}"
   include_tasks: roles/firewall/shared/allow_service.yml
-  tags: [ 'firewall_config' ]
+  tags: ['firewall_config']
 
 - name: add container name
   vars:
@@ -117,10 +109,11 @@
 - name: create database
   vars:
     database: "librenms"
-    username: "{{vault_librenms_mysql_username}}"
-    password: "{{vault_librenms_mysql_password}}"
+    username: "{{librenms_mysql_username}}"
+    password: "{{librenms_mysql_password}}"
     backup: yes
   include_tasks: roles/mysql/shared/add_database.yml
+  tags: ['cron_job','backup_restore']
   when: "mysql_enabled"
   
 # ***** FINALIZE *****
@@ -131,6 +124,7 @@
     i18n_files: [ { language: "de", file: "templates/webui/librenms.de.json" } ]
     icons: [ 'templates/webui/icons/librenms_logo.svg' ]
   include_tasks: roles/apache_webui/shared/add_webui.yml
+  tags: ['apache_webui_config']
 
 - name: copy apache vhost
   vars:
@@ -138,11 +132,13 @@
     usergroup: "admin"
     include: "templates/etc/apache2/_.ansible.vhost.d/librenms.inc"
   include_tasks: roles/apache/shared/add_vhost.yml
+  tags: ['apache_config']
 
 - name: copy fluentd config
   vars:
     config_file: "templates/etc/fluent/_.ansible.d/librenms.conf"
   include_tasks: roles/fluentd/shared/add_config.yml
+  tags: ['fluentd_config']
   when: "monitoring_enabled"
     
 - name: create systemd service
@@ -150,7 +146,8 @@
     container_name: "librenms"
     container_after: [ "redis", "mysql" ]
   include_tasks: roles/container/shared/add_docker_service.yml
-  
+  tags: ['systemd_watcher_config']
+
 - name: register update notifier
   vars:
     name: "librenms"
@@ -161,6 +158,7 @@
       pattern: "^([0-9\\.]+)$"
     }
   include_tasks: roles/update_service/shared/add_software.yml
+  tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"
 
 - name: trigger librenms handler

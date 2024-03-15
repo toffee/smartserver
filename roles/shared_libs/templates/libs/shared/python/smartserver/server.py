@@ -7,9 +7,9 @@ import traceback
 import logging
 import threading
 
-from flask import Flask, request
-from flask_socketio import SocketIO
-from werkzeug.serving import WSGIRequestHandler
+from flask import Flask, request, Response
+from flask_socketio import SocketIO, join_room, leave_room
+from werkzeug.serving import WSGIRequestHandler, make_server
 
 from datetime import datetime, timezone
 
@@ -42,6 +42,8 @@ class CustomFormatter(logging.Formatter):
         return formatter.format(record)
             
 class Server():
+    serverHandler = None
+
     def initLogger(level):
         is_daemon = not os.isatty(sys.stdin.fileno())
 
@@ -63,7 +65,15 @@ class Server():
         self.ip = ip
         self.port = port
 
+        self.socket_clients = {}
+        self.socket_rooms = {}
+
         self.filewatcher = None
+
+        self.socket_watcher_timer = None
+
+        self.socketio_emint_lock = threading.Lock()
+        self.socketio_client_lock = threading.Lock()
 
         def shutdown(signum, frame):
             self.terminate()
@@ -93,8 +103,10 @@ class Server():
             _init(self, *args, **kwargs)
             _run = self.run
 
+            #logging.info("Thread '{}' started: {} => {} => {}".format(self.name, str(_run), str(_self), sys._getframe(1).f_code.co_name))
+
             def run(*args, **kwargs):
-                _self.thread_debugger[self.name] = str(_run)
+                _self.thread_debugger[self.name] = [ str(_run), str(_self) ]
                 try:
                     _run(*args, **kwargs)
                 except:
@@ -116,40 +128,48 @@ class Server():
 
     def start(self):
         try:
+            Server.serverHandler = self
+
             WSGIRequestHandler.protocol_version = "HTTP/1.1"
-            serverSocket.run(app=serverWeb, use_reloader=False, host=self.ip, port=self.port, allow_unsafe_werkzeug=True)
-            #app.run(debug=False, use_reloader=False, threaded=True, host="0.0.0.0", port='80')
+            _run_wsgi = WSGIRequestHandler.run_wsgi
+            def run_wsgi(self) -> None:
+                try:
+                    _run_wsgi(self)
+                except AssertionError as e:
+                    # can happen on closed websocket connections
+                    if str(e) == "write() before start_response" and self.environ["QUERY_STRING"].endswith("websocket"):
+                        #if not self.connection._closed:
+                        #    logging.warn("Skipped 'write() before start_response'")
+                        return
+                    raise e
+            WSGIRequestHandler.run_wsgi = run_wsgi
+
+            #logging.info("Server listen on http://{}:{}/".format(self.ip, self.port))
+            #self.server = make_server(self.ip, self.port, serverWeb, threaded = True)
+            #self.server.passthrough_errors = True
+            #self.server.serve_forever()
+            serverWeb.run(host=self.ip, port=self.port, use_reloader=False, threaded = True, passthrough_errors = True)
+
+            #serverSocket.run(app=serverWeb, use_reloader=False, host=self.ip, port=self.port, allow_unsafe_werkzeug=True)
         except ShutdownException as e:
             pass
         except Exception as e:
+
             logging.error(traceback.format_exc())
 
         for thread in threading.enumerate():
             if thread.name == "MainThread":
                 continue
-            logging.warning("Thread '{}' is still running: {}".format(thread.name, self.thread_debugger[thread.name]))
+            logging.warning("Thread '{}' is still running: {} => {}".format(thread.name, self.thread_debugger[thread.name][0], self.thread_debugger[thread.name][1]))
 
         logging.info("Server stopped")
 
     def terminate(self):
-        logging.info("Shutdown server")
+        logging.info("Server shutdown")
 
         if self.filewatcher is not None:
             self.filewatcher.terminate()
         raise ShutdownException()
-
-    def getRequestHeader(self, field):
-        return request.headers[field] if field in request.headers else None
-
-    def getRequestValue(self, field):
-        return request.form[field] if field in request.form else None
-
-    def getRequestValues(self, field):
-        return request.form
-
-    def emitSocketData(self, topic, data):
-        with serverWeb.app_context():
-            return serverSocket.emit(topic, data)
 
     def initWatchedFiles(self, watched_data_files, callback = None ):
         if watched_data_files is not None and len(watched_data_files) > 0:
@@ -169,6 +189,112 @@ class Server():
     def confirmFileChanged(self,watched_data_file):
         self.watched_data_files[watched_data_file] = self.filewatcher.getModifiedTime(watched_data_file)
 
+    def getRequestHeader(self, field):
+        return request.headers[field] if field in request.headers else None
+
+    def getRequestValue(self, field):
+        return request.form[field] if field in request.form else None
+
+    #def getRequestValues(self, field):
+    #    return request.form
+
+    def buildStatusResult(self, code, message):
+        return {
+            "code": code,
+            "message": message
+        }
+
+    def getSocketParamValue(self, params, field):
+        return params[field] if field in params else None
+
+    def _socketWatcherInfo(self):
+        self.socket_watcher_timer = None
+        logging.info("Websocket: {} client(s) and {} room(s) active".format(len(self.socket_clients), len(self.socket_rooms)))
+
+    def _socketWatcherNotifier(self):
+        if self.socket_watcher_timer != None:
+            self.socket_watcher_timer.cancel()
+        self.socket_watcher_timer = threading.Timer(1,self._socketWatcherInfo)
+        self.socket_watcher_timer.start()
+
+    def onSocketConnect(self, sid):
+        with self.socketio_client_lock:
+            logging.info("Websocket: connect '{}'".format(sid))
+            self.socket_clients[request.sid] = {}
+        self._socketWatcherNotifier()
+
+    def onSocketDisconnect(self, sid):
+        with self.socketio_client_lock:
+            logging.info("Websocket: disconnect '{}'".format(sid))
+            for room in list(self.socket_rooms.keys()):
+                if sid not in self.socket_rooms[room]:
+                    continue
+                self._onSocketRoomLeave(sid, room)
+            del self.socket_clients[request.sid]
+        self._socketWatcherNotifier()
+
+    def onSocketRoomJoin(self, sid, room, data = None):
+        with self.socketio_client_lock:
+            logging.info("Websocket: join '{}' - '{}'".format(room, sid))
+            if room not in self.socket_rooms:
+                logging.info("Websocket: create room '{}'".format(room))
+                self.socket_rooms[room] = []
+            self.socket_rooms[room].append(sid)
+        join_room(room)
+        self._socketWatcherNotifier()
+
+    def onSocketRoomLeave(self, sid, room):
+        with self.socketio_client_lock:
+            self._onSocketRoomLeave(sid, room)
+            #if sid in self.socket_rooms[room]:
+            #else:
+            #    logging.warn("Websocket: Unknown client can't leave '{}' - '{}'".format(room, sid))
+        self._socketWatcherNotifier()
+
+    def _onSocketRoomLeave(self, sid, room):
+        logging.info("Websocket: leave '{}' - '{}'".format(room, sid))
+        try:
+            self.socket_rooms[room].remove(sid)
+            if len(self.socket_rooms[room]) == 0:
+                logging.info("Websocket: close room '{}'".format(room))
+                del self.socket_rooms[room]
+        except KeyError:
+            logging.error("Websocket: room '{}' not registered".format(room))
+        leave_room(room)
+
+    def getSocketClients(self, room = None):
+        if room is None:
+            return self.socket_clients
+        return self.socket_rooms[room] if room in self.socket_rooms else []
+
+    def setSocketClientValue(self, sid, field, value):
+        self.socket_clients[sid][field] = value
+
+    def getSocketClientValue(self, sid, field):
+        return self.socket_clients[sid][field] if field in self.socket_clients[sid] else None
+
+    def isSocketRoomActive(self, room):
+        return room in self.socket_rooms
+
+    def areSocketClientsActive(self):
+        return len(self.socket_clients) > 0
+
+    def getSocketClient(self):
+        return request.sid
+
+    def emitSocketData(self, topic, data, to = None):
+        #logging.info("Websocket: emit '{}' to '{}'".format(topic, to))
+        #with serverWeb.app_context():
+        with self.socketio_emint_lock:
+            return serverSocket.emit(topic, data, to = to)
+
+    def getStateMetrics(self):
+        return ""
+
+@serverWeb.route('/metrics/', methods = ['GET'])
+def metrics():
+    return Response(Server.serverHandler.getStateMetrics(), mimetype='text/plain')
+
 @serverSocket.on_error_default
 def on_error(e):
     logging.error(e)
@@ -176,11 +302,19 @@ def on_error(e):
 
 @serverSocket.on('connect')
 def on_connect():
-    logging.info("on_connect {}".format(request.sid))
+    Server.serverHandler.onSocketConnect(request.sid)
 
 @serverSocket.on('disconnect')
 def on_disconnect():
-    logging.info("on_disconnect {}".format(request.sid))
+    Server.serverHandler.onSocketDisconnect(request.sid)
+
+@serverSocket.on('join')
+def on_join(room, data = None):
+    Server.serverHandler.onSocketRoomJoin(request.sid, room, data)
+
+@serverSocket.on('leave')
+def on_leave(room):
+    Server.serverHandler.onSocketRoomLeave(request.sid, room)
 
 Server.initLogger(logging.INFO)
 

@@ -1,3 +1,9 @@
+cmd_software_version_check = "/opt/update_service/env/bin/python3 /opt/update_service/software_version_check"
+cmd_system_update_check = "/opt/update_service/env/bin/python3 /opt/update_service/system_update_check"
+cmd_service_restart = "systemctl restart"
+cmd_request_reboot = "reboot"
+cmd_container_cleanup = "/opt/docker/cleanup -q"
+
 software_check_email = {{ "'" + update_service_software_check_email + "'" if update_service_software_check_email is defined else 'None'}}
 update_check_email = {{ "'" + update_service_system_check_email + "'" if update_service_system_check_email is defined else 'None'}}
 
@@ -27,10 +33,10 @@ deployment_config_path = "{{deployment_config_path}}"
 deployment_inventory_path = "{{deployment_inventory_path}}"
 deployment_directory = "{{deployment_path}}"
 
-git_remote = "{{vault_deployment_config_git}}"
+git_remote = "{{deployment_config_git}}"
 
 global_config = { 
-  "github_access_token": "{{vault_deployment_token_git if vault_deployment_token_git is defined else ''}}"
+  "github_auth_token": "{{github_auth_token if github_auth_token is defined else ''}}"
 }
 
 os_type = "{{os_type}}"

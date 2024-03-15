@@ -1,5 +1,4 @@
 <?php
-require "../shared/libs/i18n.php";
 require "../shared/libs/ressources.php";
 ?>
 <html style="background-color: transparent !important;">
@@ -8,38 +7,31 @@ require "../shared/libs/ressources.php";
 <?php echo Ressources::getModules(["/shared/mod/websocket/","/system_service/"]); ?>
 <script>
 mx.UNCore = (function( ret ) {
+    ret.processData = function(data)
+    {
+        let btn = mx.$(".speedtest.button");
+        if( data["is_running"] )
+        {
+            btn.classList.add("disabled");
+            btn.innerHTML = '<span style="margin-right: 25px;">' + mx.I18N.get("Speedtest active") + '</span><span style="position: absolute;top:4px;right: 15px;"><svg style="width: 35px; height: 35px; color:black;" x="0px" y="0px" viewBox="0 0 100 100" enable-background="new 0 0 0 0" xml:space="preserve"><use href="#progress" /></svg></span>';
+        }
+        else
+        {
+            if( btn.classList.contains("disabled") ) window.parent.postMessage({ type: 'grafana', content: "reload" }, "*");
+
+            btn.classList.remove("disabled")
+            btn.innerText = mx.I18N.get("Start speedtest");
+        }
+    }
+
     ret.init = function()
     { 
         mx.I18N.process(document);
-        
-        let socket = mx.ServiceSocket.init('system_service');
-        socket.on("connect", (socket) => socket.emit('call', "speedtest"));
-        socket.on("speedtest", function(data) {
-            let btn = mx.$(".speedtest.button");
-            if( data["is_running"] )
-            {
-                btn.classList.add("disabled");
-                btn.innerHTML = '<span style="margin-right: 25px;">' + mx.I18N.get("Speedtest active") + '</span><span style="position: absolute;top:4px;right: 15px;"><svg style="width: 35px; height: 35px; color:black;" x="0px" y="0px" viewBox="0 0 100 100" enable-background="new 0 0 0 0" xml:space="preserve"><use href="#progress" /></svg></span>';
-            }
-            else
-            {
-                if( btn.classList.contains("disabled") )
-                {
-                    window.parent.document.querySelector("div.refresh-picker button").click()
-                }
-
-                btn.classList.remove("disabled")
-                btn.innerText = mx.I18N.get("Start speedtest");
-            }
-        });
     }
 
     ret.trigger = function()
     {
-        if( mx.$(".speedtest.button").classList.contains("disabled") )
-        {
-            return;
-        }
+        if( mx.$(".speedtest.button").classList.contains("disabled") ) return;
 
         var xmlHttp = new XMLHttpRequest();
         xmlHttp.open( "GET", "/system_service/api/triggerSpeedtest/", false );
@@ -49,6 +41,13 @@ mx.UNCore = (function( ret ) {
 })( mx.UNCore || {} );
 
 mx.OnDocReady.push( mx.UNCore.init );
+
+var processData = mx.OnDocReadyWrapper( mx.UNCore.processData );
+
+mx.OnSharedModWebsocketReady.push(function(){
+    let socket = mx.ServiceSocket.init('system_service', "speedtest");
+    socket.on("data", (data) => processData(data));
+});
 </script>
 </head>
 <body class="inline" style="background-color: transparent !important;">

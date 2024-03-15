@@ -2,37 +2,23 @@
 # suse group: ftp:!:476:
 # fedora user: ftp:x:14:50:FTP User:/var/ftp:/sbin/nologin
 # fedora group: ftp:x:50:
-- name: ensure user and group exists
+- name: "create user and group => user or group does not exists"
   vars:
-    user: { name: "ftp", system: true, home: "{{global_lib}}/camera_service/upload/" }
+    user: { name: "ftp", system: true, home: "{{global_lib}}camera_service/upload/" }
     group: { name: "ftp", system: true }
   include_tasks: roles/user/shared/add_system_user.yml
+  when: "'ftp' not in system_users or 'ftp' not in system_groups"
 
-- name: prepare ftp folder
-  file:
-    path: "{{global_lib}}/camera_service/upload/"
-    state: directory
-    owner: "{{system_users['ftp'].name}}"
-    group: "{{system_groups['ftp'].name}}"
-    mode: 0755
-
-#- name: check owner and group
-#  file:
-#    path: "{{global_lib}}/camera_service/upload/"
-#    state: directory
-#    owner: "{{system_users['ftp'].name}}"
-#    group: "{{system_groups['ftp'].name}}"
-#    recurse: yes
-
-- name: prepare ftp camera upload folder
-  file:
-    path: "{{global_lib}}/camera_service/upload/{{item['ftp_upload_name']}}"
-    state: directory
-    owner: "{{system_users['ftp'].name}}"
-    group: "{{system_groups['ftp'].name}}"
-    mode: 0755
-  when: "'ftp_upload_name' in item"
-  with_items: "{{camera_devices}}"
+- name: prepare needed directories
+  vars:
+    directories: |
+      [
+        { "mode": "u=rwx,g=rx,o=", "owner": "{{system_users['ftp'].name}}", "group": "{{system_groups['ftp'].name}}", "path": "{{global_lib}}camera_service/upload/" },
+        {% for item in camera_devices %}{% if 'ftp_upload_name' in item %}
+          { "mode": "u=rwx,g=rx,o=", "owner": "{{system_users['ftp'].name}}", "group": "{{system_groups['ftp'].name}}", "path": "{{global_lib}}camera_service/upload/{{item['ftp_upload_name']}}/" },
+        {% endif %}{% endfor %}
+      ]
+  include_tasks: roles/_shared/create_directories.yml
 
 - name: build docker image
   vars:
@@ -51,8 +37,8 @@
     state: present
 #    recreate: true
     env:
-      FTP_USER: "{{vault_ftp_username}}"
-      FTP_PASS: "{{vault_ftp_password}}"
+      FTP_USER: "{{camera_ftp_username}}"
+      FTP_PASS: "{{camera_ftp_password}}"
       FTP_UID: "{{system_users['ftp'].id}}"
       FTP_GID: "{{system_groups['ftp'].id}}"
       ONLY_UPLOAD: "YES"
@@ -90,14 +76,14 @@
   set_fact:
     ftp_rules: "{{ (ftp_rules | default([])) + [ 'saddr ' + docker_camera_ftp_ip + ' proto tcp sport 20 daddr ' + item ] }}"
   with_items: "{{ intern_networks }}"
-  tags: [ 'firewall_config' ]
+  tags: ['firewall_config']
 
 - name: allow ftp service
   vars:
     name: "ftp"
     rules: "{{ftp_rules}}"
   include_tasks: roles/firewall/shared/allow_service.yml
-  tags: [ 'firewall_config' ]
+  tags: ['firewall_config']
 
 #- name: clean old docker images => image does not exists
 #  shell: "docker rmi -f $(docker images --filter \"dangling=true\" -q)"
@@ -107,16 +93,18 @@
 - name: create cron job
   vars:
     name: "Camera Cleanup"
-    cmd: "find {{global_lib}}/camera_service/upload/ -name \"*.jpg\" -mmin +{{ftp_max_file_age}} -exec rm {} +"
-    file: "ansible_ftp_camera"
+    cmd: "find {{global_lib}}/camera_service/upload/ -name \"*.jpg\" -mmin +{{camera_ftp_max_file_age}} -exec rm {} +"
+    group: "camera_ftp"
     hour: "0"
     minute: "50"
   include_tasks: roles/cron/shared/add_cronjob.yml
+  tags: ['cron_job']
 
 - name: create systemd service
   vars:
     container_name: "vsftpd"
   include_tasks: roles/container/shared/add_docker_service.yml
+  tags: ['systemd_watcher_config']
 
 - name: trigger vsftpd handler
   vars:

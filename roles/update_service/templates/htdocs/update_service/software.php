@@ -1,8 +1,6 @@
 <?php
 require "../shared/libs/i18n.php";
 require "../shared/libs/ressources.php";
-
-require "config.php";
 ?>
 <html>
 <head>
@@ -10,8 +8,8 @@ require "config.php";
 <?php echo Ressources::getModules(["/shared/mod/websocket/", "/update_service/"]); ?>
 <script>
 mx.SNCore = (function( ret ) {
-  
-    var daemonApiUrl = mx.Host.getBase() + '../api/';
+    ret.socket = null;
+
     var jobtimer = null;
 
     function setLoadingGear(data)
@@ -20,52 +18,28 @@ mx.SNCore = (function( ret ) {
         jobtimer = window.setTimeout(function(){ setLoadingGear(data); }, 1000);
     }
 
-    function jobStatus(data)
-    {
-        if( data["job"] != "software_check" ) return;
-
-        if( data["state"] == "running" ) setLoadingGear(data["started"]);
-    }
-
-    function processData(data)
-    {
-        if( jobtimer ) window.clearTimeout(jobtimer);
-
-        mx.SoftwareVersionsTemplates.processData(data)
-        mx.Page.refreshUI();
-    }
-
     ret.startSoftwareCheck = function()
     {
-        var xhr = new XMLHttpRequest();
-        xhr.open("POST", daemonApiUrl + "refreshSoftwareVersionCheck/" );
-        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-        xhr.withCredentials = true;
-        xhr.onreadystatechange = function() {
-            if (this.readyState != 4) return;
-            
-            if( this.status == 200 ) 
-            {
-                var response = JSON.parse(this.response);
-                if( response["status"] == "0" ) mx.Error.confirmSuccess();
-                else mx.Error.handleServerError(response["message"]);
-            }
-            else
-            {
-                mx.Error.handleRequestError(this.status, this.statusText, this.response);
-            }
-        };
-        
-        xhr.send();
+        mx.SNCore.socket.emit("refreshSoftwareVersionCheck");
     }
-        
-    ret.init = function()
-    { 
-        let socket = mx.ServiceSocket.init('update_service');
-        socket.on("connect", (socket) => socket.emit('initSoftware'));
-        socket.on("initSoftware", (data) => processData( data ) );
-        socket.on("updateSoftware", (data) => processData( data ) );
-        socket.on("job_status", (data) => jobStatus(data) );
+
+    ret.processData = function(data)
+    {
+        if( "job_status" in data && data["job_status"]["job"] == "software_check" )
+        {
+            setLoadingGear(data["job_status"]["started"]);
+            return;
+        }
+        else if( jobtimer )
+        {
+            window.clearTimeout(jobtimer);
+        }
+
+        if( "software_versions" in data )
+        {
+            mx.SoftwareVersionsTemplates.processData(data["software_versions"])
+            mx.Page.refreshUI();
+        }
     }
 
     ret.openUrl = function(event,url)
@@ -77,9 +51,12 @@ mx.SNCore = (function( ret ) {
     return ret;
 })( mx.SNCore || {} );
     
-mx.OnDocReady.push( mx.SNCore.init );
+var processData = mx.OnDocReadyWrapper( mx.SNCore.processData );
 
-
+mx.OnSharedModWebsocketReady.push(function(){
+    mx.SNCore.socket = mx.ServiceSocket.init('update_service', 'software');
+    mx.SNCore.socket.on("data", (data) => processData( data ) );
+});
 </script>
 </head>
 <body class="software">
