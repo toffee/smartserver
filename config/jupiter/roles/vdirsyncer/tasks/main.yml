@@ -1,0 +1,72 @@
+- name: set version
+  set_fact:
+    vdirsyncer_version: '2.5.0'
+  tags: [ 'update_notifier_config' ]
+
+- name: prepare needed folder
+  file:
+    path: "{{item}}"
+    state: directory
+    owner: 1000
+    group: 1000
+    mode: 0750
+  with_items:
+    - "{{global_etc}}vdirsyncer/"
+    - "{{global_lib}}vdirsyncer/"
+    - "{{global_log}}vdirsyncer/"
+
+- name: copy config
+  template:
+    src: "templates/etc/vdirsyncer/{{item}}"
+    dest: "{{ global_etc }}vdirsyncer/{{item}}"
+    owner: 1000
+    group: 1000
+    mode: 0640
+  with_items:
+    - "config"    
+  notify: "restart vdirsyncer"
+
+- name: check started docker
+  systemd:
+    name: docker
+    state: started
+
+- name: create docker vdirsyncer container
+  docker_container:
+    name: vdirsyncer
+    image: "bleala/vdirsyncer:{{vdirsyncer_version}}"
+    state: present
+    env:
+      TZ: "{{timezone}}"
+    log_driver: journald
+    log_options:
+      tag: vdirsyncer
+    container_default_behavior: "compatibility"
+    network_mode: "host"
+    volumes:
+      - '{{global_etc}}vdirsyncer/config:/vdirsyncer/config:z'
+      - '{{global_lib}}vdirsyncer:/vdirsyncer:z'
+#      - '{{global_log}}vdirsyncer/vdirsyncer.log:/vdirsyncer/vdirsyncer.log:z'
+  notify: "restart vdirsyncer"
+  
+# ***** FINALIZE *****
+- name: copy fluentd config
+  vars:
+    config_file: "templates/etc/fluent/_.ansible.d/vdirsyncer.conf"
+  import_tasks: roles/fluentd/shared/add_config.yml
+
+- name: create systemd vdirsyncer service
+  vars:
+    container_name: "vdirsyncer"    
+  import_tasks: roles/container/shared/add_docker_service.yml
+  
+- name: register update notifier
+  vars:
+    name: "vdirsyncer"
+    type: "github"
+    url: "https://github.com/Bleala/Vdirsyncer-DOCKERIZED/releases"
+    config: {
+      repository: "Bleala/Vdirsyncer-DOCKERIZED",
+      pattern: "^([0-9\\.]+)$"
+    }
+  import_tasks: roles/update_service/shared/add_software.yml

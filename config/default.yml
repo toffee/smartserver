@@ -642,6 +642,7 @@ docker_mimic3_ip:                 "172.16.0.214"
 docker_fireflyiii_core_ip:        "172.16.0.215"
 docker_fireflyiii_importer_ip:    "172.16.0.216"
 docker_ghostfolio_ip:             "172.16.0.217"
+docker_jekyll_ip:                 "172.16.0.218"
 
 docker_vcontrold_ip:              "172.16.0.230"
 

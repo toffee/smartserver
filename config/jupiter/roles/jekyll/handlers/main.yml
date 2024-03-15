@@ -1,0 +1,9 @@
+- name: restart jekyll-serve
+  systemd:
+    name: jekyll-serve
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    masked: no
+  listen: "restart jekyll-serve"
+

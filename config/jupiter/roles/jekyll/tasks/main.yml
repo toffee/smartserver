@@ -1,0 +1,124 @@
+- name: set version
+  set_fact:
+    jekyll_version: 'stable-20240115-2119a31'
+  tags: [ 'update_notifier_config' ]
+  
+- name: prepare needed folder
+  file:
+    path: '{{item.path}}'
+    state: directory
+    owner: "{{item.user}}"
+    group: "{{item.group}}"
+    mode: "{{item.mode}}"
+  with_items:
+    - { user: "{{system_users['www'].name}}", group: "{{system_groups['www'].name}}", mode: "u=rwx,g=rx,o=rx", path: "{{nextcloud_data_path}}alina/files/kintsugi" }
+  notify:
+    - restart jekyll-serve
+
+- name: check started docker
+  systemd:
+    name: docker
+    state: started
+
+- name: build docker image
+  vars:
+    name: "jekyll"
+    image_name: "custom_jekyll"
+    image_version: "{{jekyll_version}}"
+    files:
+      - "{{config_path}}roles/jekyll/templates/container/Dockerfile"
+  include_tasks: roles/container/shared/build_docker_image.yml
+
+- name: create docker jekyll container
+  docker_container:
+    name: jekyll
+    image: "custom_jekyll:{{jekyll_version}}"
+    state: present
+    env:
+      TZ: "{{timezone}}"
+    log_driver: journald
+    log_options:
+      tag: jekyll
+    container_default_behavior: "compatibility"
+    network_mode: "host"
+    volumes:
+      - '{{nextcloud_data_path}}/alina/files/kintsugi:/site:z'
+
+- name: build docker image
+  vars:
+    name: "jekyll-serve"
+    image_name: "custom_jekyll-serve"
+    image_version: "{{jekyll_version}}"
+    files:
+      - "{{config_path}}roles/jekyll/templates/container/Dockerfile-serve"
+  include_tasks: roles/container/shared/build_docker_image.yml
+
+- name: create docker jekyll-serve container
+  docker_container:
+    name: jekyll-serve
+    image: "custom_jekyll-serve:{{jekyll_version}}"
+#    image: "bretfisher/jekyll-serve:{{jekyll_version}}"
+    state: present
+    env:
+      TZ: "{{timezone}}"
+    log_driver: journald
+    log_options:
+      tag: jekyll-serve
+    container_default_behavior: "compatibility"
+    network_mode: "default"
+    networks: 
+      - name: "isolated"
+        ipv4_address: "{{docker_jekyll_ip}}"
+    networks_cli_compatible: yes
+    volumes:
+      - '{{nextcloud_data_path}}/alina/files/kintsugi:/site:z'
+    published_ports: |
+      [
+        "4000:4000",
+        {% if default_server_ipv6 is defined %}
+          "[::]:4000:4000"
+        {% endif %}
+      ]
+  notify: "restart jekyll-serve"
+  
+- name: add container jekyll-serve name
+  vars:
+    host_name: "jekyll-serve"
+    host_ip_address: "{{docker_jekyll_ip}}"
+  import_tasks: roles/_shared/add_to_hosts.yml
+
+# ***** FINALIZE *****
+- name: register webui
+  vars:
+    name: "jekyll"
+    js_file: "templates/webui/jekyll.js"
+    icons: [ 'templates/webui/icons/jekyll_logo.svg' ]
+  import_tasks: roles/apache_webui/shared/add_webui.yml
+
+- name: copy apache vhost
+  vars:
+    sub_domain: "kintsugi"
+    usergroup: "user"
+    include: "templates/etc/apache2/_.ansible.vhost.d/kintsugi.inc"
+  include_tasks: roles/apache/shared/add_vhost.yml
+
+- name: copy fluentd config
+  vars:
+    config_file: "templates/etc/fluent/_.ansible.d/jekyll.conf"
+  import_tasks: roles/fluentd/shared/add_config.yml
+
+- name: create systemd jekyll-serve service
+  vars:
+    container_name: "jekyll-serve"
+  import_tasks: roles/container/shared/add_docker_service.yml
+
+- name: register update notifier
+  vars:
+    name: "jekyll"
+    type: "docker"
+    url: "https://hub.docker.com/r/bretfisher/jekyll-serve/tags"
+    config: {
+      repository: "bretfisher/jekyll-serve",
+      pattern: "^stable-([0-9]+)-([0-9]+)$"
+    }
+  import_tasks: roles/update_service/shared/add_software.yml

@@ -59,8 +59,13 @@
       - name: "isolated"
         ipv4_address: "{{docker_mysql_ip}}"
     networks_cli_compatible: yes
-    exposed_ports:
-      - "3306"  
+    published_ports: |
+      [
+        "3306:3306",
+        {% if default_server_ipv6 is defined %}
+          "[::]:3306:3306"
+        {% endif %}
+      ]
   register: mysql_container
   notify: "restart mysql"
 
