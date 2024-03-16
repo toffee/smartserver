@@ -60,11 +60,11 @@
       DB_PASSWORD: "{{vault_fireflyiii_mysql_password}}"
       TRUSTED_PROXIES: "**"
       MAIL_MAILER: "smtp"
-      MAIL_HOST: "{{vault_mailserver_host}}"
-      MAIL_PORT: "{{vault_mailserver_port}}"
+      MAIL_HOST: "{{mailserver_host}}"
+      MAIL_PORT: "{{mailserver_port}}"
       MAIL_ENCRYPTION: "tls"
-      MAIL_USERNAME: "{{vault_mailserver_username}}"
-      MAIL_PASSWORD: "{{vault_mailserver_password}}"
+      MAIL_USERNAME: "{{mailserver_username}}"
+      MAIL_PASSWORD: "{{mailserver_password}}"
       MAIL_FROM: "{{root_email}}"
     log_driver: journald
     log_options:
@@ -106,11 +106,11 @@
       ENABLE_MAIL_REPORT: "true"
       MAIL_DESTINATION: "{{fireflyii_importer_email}}"
       MAIL_MAILER: "smtp"
-      MAIL_HOST: "{{vault_mailserver_host}}"
-      MAIL_PORT: "{{vault_mailserver_port}}"
+      MAIL_HOST: "{{mailserver_host}}"
+      MAIL_PORT: "{{mailserver_port}}"
       MAIL_ENCRYPTION: "tls"
-      MAIL_USERNAME: "{{vault_mailserver_username}}"
-      MAIL_PASSWORD: "{{vault_mailserver_password}}"
+      MAIL_USERNAME: "{{mailserver_username}}"
+      MAIL_PASSWORD: "{{mailserver_password}}"
       MAIL_FROM_ADDRESS: "{{root_email}}"
     log_driver: journald
     log_options:
@@ -177,10 +177,11 @@
   vars:
     name: "Firefly III Importer cron job"
     cmd: "docker exec --user www-data fireflyiii-importer sh -c \"php artisan importer:auto-import /var/www/html/storage/configurations/\""
-    file: "ansible_fireflyiii"
+    group: "fireflyiii"
     hour: "8"
     minute: "30"
   import_tasks: roles/cron/shared/add_cronjob.yml
+  tags: ['cron_job']
 
 # ***** FINALIZE *****
 - name: register webui

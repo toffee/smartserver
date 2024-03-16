@@ -110,7 +110,7 @@ HCNetSDK.NET_DVR_SetValidIP(0, True)
 
 device_info = NET_DVR_DEVICEINFO_V30()
 
-user_id = HCNetSDK.NET_DVR_Login_V30("{{camera_09_ip}}".encode('utf-8'), 8000, "{{vault_camera_09_username}}".encode('utf-8'), "{{vault_camera_09_password}}".encode('utf-8'), device_info)
+user_id = HCNetSDK.NET_DVR_Login_V30("{{custom_camera_09_ip}}".encode('utf-8'), 8000, "{{custom_camera_09_username}}".encode('utf-8'), "{{custom_camera_09_password}}".encode('utf-8'), device_info)
 
 if (user_id < 0):
     log.error(

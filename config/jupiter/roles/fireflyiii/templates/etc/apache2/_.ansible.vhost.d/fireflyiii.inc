@@ -13,5 +13,5 @@
   ProxyPass http://fireflyiii-importer:8080
   ProxyPassReverse http://fireflyiii-importer:8080
   AddOutputFilterByType SUBSTITUTE text/html
-  Substitute "s|http://fireflyiii-importer:8080/|https://fireflyiii.jupiter.toffee.ro/importer/|i"
+  Substitute "s|http://fireflyiii-importer:8080/|https://fireflyiii.{{server_domain}}/importer/|i"
 </Location>
