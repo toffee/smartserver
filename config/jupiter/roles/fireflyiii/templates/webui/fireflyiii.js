@@ -1,4 +1,4 @@
-var subGroup = mx.Menu.getMainGroup('workspace').addSubGroup('financial', 180, '{i18n_Financial}','financial_logo.svg');
-subGroup.addUrl('fireflyiii', '//fireflyiii.{host}/', ['user'], 181, '{i18n_FireflyIII}', '{i18n_FireflyIII}', "fireflyiii_logo.svg", true);
-subGroup.addUrl('fireflyiii_importer', '/fireflyiii-importer/', ['user'], 182, '{i18n_FireflyIII Importer}', '{i18n_FireflyIII Importer}', "fireflyiii_logo.svg", true);
+var subGroup = mx.Menu.getMainGroup('workspace').addSubGroup('financial', { 'order': 180, 'title': '{i18n_Financial}', 'icon': 'financial_logo.svg' });
+subGroup.addUrl('fireflyiii', ['user'], '//fireflyiii.{host}/', { 'order': 181, 'title': '{i18n_FireflyIII}', 'info': '{i18n_FireflyIII}', 'icon': "fireflyiii_logo.svg", 'target': '_blank'});
+subGroup.addUrl('fireflyiii_importer', ['user'], '/fireflyiii-importer/', { 'order': 182, 'title': '{i18n_FireflyIII Importer}', 'info': '{i18n_FireflyIII Importer}', 'icon': "fireflyiii_logo.svg", 'target': '_blank'});
 

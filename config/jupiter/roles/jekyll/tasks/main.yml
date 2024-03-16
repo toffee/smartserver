@@ -34,6 +34,9 @@
     name: jekyll
     image: "custom_jekyll:{{jekyll_version}}"
     state: present
+    entrypoint: "/bin/bash"
+    interactive: true
+    tty: true
     env:
       TZ: "{{timezone}}"
     log_driver: journald
@@ -43,6 +46,7 @@
     network_mode: "host"
     volumes:
       - '{{nextcloud_data_path}}/alina/files/kintsugi:/site:z'
+      - '{{htdocs_path}}/kintsugi:/kintsugi:z'
 
 - name: build docker image
   vars:
