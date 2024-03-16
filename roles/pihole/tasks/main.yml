@@ -3,19 +3,6 @@
     pihole_version: '2024.02.2'
   tags: [ 'update_notifier_config' ]
 
-<<<<<<< HEAD
-- name: prepare needed folder
-  file:
-    path: '{{item}}'
-    state: directory
-    owner: "999"
-    group: "1000"
-    mode: 0770
-  with_items:
-    - "{{ global_etc }}pihole"
-    - "{{ global_etc }}pihole/dnsmasq.d/"
-    - "{{ global_lib }}pihole/tftpboot/"
-=======
 - name: "create user and group => user or group does not exists"
   vars:
     user: { name: "pihole", system: true, home: "{{ global_etc }}pihole/" }
@@ -30,7 +17,6 @@
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['pihole'].name}}", group: "{{system_groups['pihole'].name}}", path: "{{ global_etc }}pihole/dnsmasq.d/" }
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['pihole'].name}}", group: "{{system_groups['pihole'].name}}", path: "{{ global_lib }}pihole/" }
   include_tasks: roles/_shared/create_directories.yml
->>>>>>> master
 
 - name: generate static-dhcp.conf
   block:
