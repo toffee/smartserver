@@ -1,17 +1,13 @@
 - name: set zigbee2mqtt version
   set_fact:
-    zigbee2mqtt_version: "1.35.2"
+    zigbee2mqtt_version: "1.36.0"
  
-- name: prepare needed folder
-  file:
-    path: '{{item}}'
-    state: directory
-    owner: root
-    group: root
-    mode: 0750
-  with_items:
-    - "{{global_etc}}zigbee2mqtt"
-    - "{{global_log}}zigbee2mqtt"
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_etc }}zigbee2mqtt" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_log }}zigbee2mqtt" }
+  include_tasks: roles/_shared/create_directories.yml
 
 - name: copy config
   template:
@@ -81,7 +77,8 @@
     name: "zigbee2mqtt"
     js_file: "templates/webui/zigbee2mqtt.js"
     icons: [ 'templates/webui/icons/zigbee2mqtt_logo.svg' ]
-  import_tasks: roles/apache_webui/shared/add_webui.yml
+  include_tasks: roles/apache_webui/shared/add_webui.yml
+  tags: ['apache_webui_config']
 
 #This does not work - location in default vhost
 #See: https://stackoverflow.com/questions/11468154/tunneling-secure-websocket-connections-with-apache
