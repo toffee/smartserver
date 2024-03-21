@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    vdirsyncer_version: '2.5.0'
+    vdirsyncer_version: '2.5.2'
   tags: [ 'update_notifier_config' ]
 
 - name: prepare needed folder
@@ -66,7 +66,8 @@
     type: "github"
     url: "https://github.com/Bleala/Vdirsyncer-DOCKERIZED/releases"
     config: {
-      repository: "Bleala/Vdirsyncer-DOCKERIZED",
-      pattern: "^([0-9\\.]+)$"
+      project: "Bleala/Vdirsyncer-DOCKERIZED",
+      pattern: "^([0-9\\.]+)$",
+      version: "{{vdirsyncer_version}}"
     }
   import_tasks: roles/update_service/shared/add_software.yml
