@@ -3,17 +3,13 @@
     vdirsyncer_version: '2.5.2'
   tags: [ 'update_notifier_config' ]
 
-- name: prepare needed folder
-  file:
-    path: "{{item}}"
-    state: directory
-    owner: 1000
-    group: 1000
-    mode: 0750
-  with_items:
-    - "{{global_etc}}vdirsyncer/"
-    - "{{global_lib}}vdirsyncer/"
-    - "{{global_log}}vdirsyncer/"
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: 1000, group: 1000, path: "{{global_etc}}vdirsyncer/" }
+      - { mode: "u=rwx,g=rx,o=", owner: 1000, group: 1000, path: "{{global_lib}}vdirsyncer/" }
+      - { mode: "u=rwx,g=rx,o=", owner: 1000, group: 1000, path: "{{global_log}}vdirsyncer/" }
+  include_tasks: roles/_shared/create_directories.yml
 
 - name: copy config
   template:
@@ -38,6 +34,9 @@
     state: present
     env:
       TZ: "{{timezone}}"
+      AUTODISCOVER: "false"
+      AUTOSYNC: "true"
+      LOG: "/vdirsyncer/log/vdirsyncer.log"
     log_driver: journald
     log_options:
       tag: vdirsyncer
@@ -46,7 +45,7 @@
     volumes:
       - '{{global_etc}}vdirsyncer/config:/vdirsyncer/config:z'
       - '{{global_lib}}vdirsyncer:/vdirsyncer:z'
-#      - '{{global_log}}vdirsyncer/vdirsyncer.log:/vdirsyncer/vdirsyncer.log:z'
+      - '{{global_log}}vdirsyncer:/vdirsyncer/log:z'
   notify: "restart vdirsyncer"
   
 # ***** FINALIZE *****
