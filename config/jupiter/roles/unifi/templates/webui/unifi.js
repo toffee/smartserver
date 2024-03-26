@@ -1,2 +1,2 @@
-mx.Menu.getMainGroup('admin').getSubGroup('tools').addUrl('unifi', '//unifi.{host}/','admin', 350, '{i18n_Unifi}', '{i18n_Unifi}', 'unifi_logo.svg', true);
+mx.Menu.getMainGroup('admin').getSubGroup('tools').addUrl('unifi', ['admin'], '//unifi.{host}/', { 'order':  350, 'title': '{i18n_Unifi}', 'info': '{i18n_Unifi}', 'icon': 'unifi_logo.svg', 'target': '_blank'});
                                           

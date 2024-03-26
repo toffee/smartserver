@@ -1,29 +1,38 @@
+#https://www.zigbee2mqtt.io/devices/HG06106B.html#lidl-hg06106b
 '0x842e14fffe0f44bb':
   friendly_name: 'lidl_HG06106B'
-  
+
+#https://www.zigbee2mqtt.io/devices/HG06335_HG07310.html
 '0xbc33acfffe35929c':
   friendly_name: 'lidl_HG06335'
-  
+
+#https://www.zigbee2mqtt.io/devices/1743230P7.html
 '0x00178801091e3b5b':
   friendly_name: 'bollard_kitchen'
 
+#https://www.zigbee2mqtt.io/devices/1743230P7.html
 '0x00178801091e3c84':
   friendly_name: 'bollard_chill'
-  
+
+#https://www.zigbee2mqtt.io/devices/1743230P7.html
 '0x00178801091de99a':
   friendly_name: 'bollard_entrance'
-  
+
+#https://www.zigbee2mqtt.io/devices/1743030P7.html
 '0x00178801085a062a':
   friendly_name: 'balcony_ciresilor'
 
+#https://www.zigbee2mqtt.io/devices/1743030P7.html
 '0x00178801091e4cb1':
   friendly_name: 'balcony_garden'
-
+#https://www.zigbee2mqtt.io/devices/HG07834A_HG09155A.html
 '0x0c4314fffe76d3e1':
   friendly_name: 'spot_edith'
-  
+
+#https://www.zigbee2mqtt.io/devices/929002471601.html
 '0x001788010cfbfa7e':
   friendly_name: 'sphere_L'
-  
+
+#https://www.zigbee2mqtt.io/devices/7602031P7.html
 '0x001788010cb18da9':
   friendly_name: 'bowl'

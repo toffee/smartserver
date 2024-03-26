@@ -120,9 +120,10 @@
   vars:
     name: "jekyll"
     type: "docker"
-    url: "https://hub.docker.com/r/bretfisher/jekyll-serve/tags"
+    url: "https://hub.docker.com/r/bretfisher/jekyll/tags"
     config: {
-      repository: "bretfisher/jekyll-serve",
-      pattern: "^stable-([0-9]+)-([0-9]+)$"
+      repository: "bretfisher/jekyll",
+      pattern: "^stable-([0-9]+)-([0-9a-z]+)$",
+      version: "{{jekyll_version}}"
     }
   import_tasks: roles/update_service/shared/add_software.yml
