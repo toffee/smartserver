@@ -176,7 +176,7 @@
 - name: create cron job
   vars:
     name: "Firefly III Importer cron job"
-    cmd: "docker exec --user www-data fireflyiii-importer sh -c \"php artisan importer:auto-import /var/www/html/storage/configurations/\""
+    cmd: "docker exec --user www-data fireflyiii-importer sh -c \"php artisan importer:auto-import /var/www/html/storage/configurations/; exit 0\""
     group: "fireflyiii"
     hour: "8"
     minute: "30"
@@ -188,7 +188,7 @@
   vars:
     name: "fireflyiii"
     js_file: "templates/webui/fireflyiii.js"
-    icons: [ 'templates/webui/icons/fireflyiii_logo.svg' ]
+    icons: [ 'templates/webui/icons/fireflyiii_logo.svg', 'templates/webui/icons/financial_logo.svg' ]
   import_tasks: roles/apache_webui/shared/add_webui.yml
 
 - name: copy apache config

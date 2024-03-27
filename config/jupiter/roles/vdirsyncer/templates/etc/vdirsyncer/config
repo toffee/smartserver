@@ -3,24 +3,22 @@
 status_path = "/vdirsyncer/status/"
 
 ### Pairs ###
-[pair card_ds_local]
-a = "card_ds_daniel"
-b = "card_local_daniel_ds"
-collections = ["from a", "from b"]
-#conflict_resolution = "b wins"
+#[pair card_ds_local]
+#a = "card_ds_daniel"
+#b = "card_local_daniel_ds"
+#collections = ["from a", "from b"]
 
-[pair card_nextcloud_local_all]
+[pair card_nextcloud_local_daniel_contacts]
 a = "card_nextcloud_daniel"
 b = "card_local_daniel_nextcloud"
-collections = ["from a", "from b"]
-conflict_resolution = "b wins"
+collections = [["contacts", "contacts", "contacts"]]
 
 # BE CAREFUL: https://evertpot.com/google-carddav-issues/
-[pair card_gl_local]
-a = "card_gl_daniel"
-b = "card_local_daniel_nextcloud"
-collections = [["personal", "default", "contacts"]]
-conflict_resolution = "b wins"
+#[pair card_gl_local]
+#a = "card_gl_daniel"
+#b = "card_local_daniel_gl"
+#collections = [["personal", "default", "contacts"]]
+#conflict_resolution = "b wins"
 
 ### Storages ###
 [storage card_local_daniel_nextcloud]
@@ -33,20 +31,25 @@ type = "filesystem"
 path = "/vdirsyncer/ds/daniel/contacts/"
 fileext = ".vcf"
 
+[storage card_local_daniel_gl]
+type = "filesystem"
+path = "/vdirsyncer/gl/daniel/contacts"
+fileext = ".vcf"
+
 [storage card_ds_daniel]
 type = "carddav"
 url = "https://ds.toffee.ro/carddav/daniel"
 username = "daniel"
-password = "Odeon21"
+password = "{{custom_vdirsyncer_ds_daniel_password}}"
 
 [storage card_nextcloud_daniel]
 type = "carddav"
 url = "https://nextcloud.jupiter.toffee.ro/"
 username = "daniel"
-password = "Cir3sil0r"
+password = "{{custom_vdirsyncer_nextcloud_daniel_password}}"
 
 [storage card_gl_daniel]
 type = "google_contacts"
 token_file = "/vdirsyncer/google_carddav"
-client_id = "{{vault_vdirsyncer_google_client_id}}"
-client_secret = "{{vault_vdirsyncer_google_client_secret}}"
+client_id = "{{custom_vdirsyncer_google_client_id}}"
+client_secret = "{{custom_vdirsyncer_google_client_secret}}"

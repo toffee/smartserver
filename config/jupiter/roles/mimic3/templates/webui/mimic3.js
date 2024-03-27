@@ -1,2 +1,1 @@
-mx.Menu.getMainGroup('admin').getSubGroup('tools').addUrl('mimic3', '/mimic3/', 'admin', 360, '{i18n_Mimic3}', '{i18n_Mimic3}', "mimic3_logo.svg", false);
-                                          
+mx.Menu.getMainGroup('admin').getSubGroup('tools').addUrl('mimic3', ['admin'], '/mimic3/', { 'order': 360, 'title': '{i18n_Mimic3}', 'info': '{i18n_Mimic3}', 'icon': "mimic3_logo.svg"});
