@@ -263,6 +263,7 @@ default_variables: {
     # Roles:
     # - 'postgres'
     postgres_enabled:                         { "default": no },
+    postgres_password:                        { dependency: "{{postgres_enabled}}" },
 
     # Roles:
     # - 'redis'

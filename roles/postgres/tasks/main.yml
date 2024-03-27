@@ -1,19 +1,22 @@
 - name: set version
   set_fact:
-    postgres_version: "16.1-alpine3.19"
+    postgres_version: "16.2-alpine3.19"
   tags: [ 'update_notifier_config' ]
+
+- name: "create user and group => user or group does not exists"
+  vars:
+    user: { name: "postgres", system: true, home: "{{ global_etc }}postgres" }
+    group: { name: "postgres", system: true }
+  include_tasks: roles/user/shared/add_system_user.yml
+  when: "'postgres' not in system_users or 'postgres' not in system_groups"
   
-- name: prepare needed folder
-  file:
-    path: '{{item}}'
-    state: directory
-    owner: "root"
-    group: root
-    mode: 0750
-  with_items:
-    - '{{ global_etc }}postgres'
-    - '{{ global_lib }}postgres'
-    - '{{backup_path}}postgres'
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['postgres'].name}}", group: "{{system_groups['postgres'].name}}", path: "{{ global_etc }}postgres" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['postgres'].name}}", group: "{{system_groups['postgres'].name}}", path: "{{ global_lib }}postgres" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ database_backup_path }}postgres" }
+  include_tasks: roles/_shared/create_directories.yml
 
 - name: synchronize config
   synchronize:
@@ -26,22 +29,27 @@
     perms: yes
     recursive: yes
     rsync_opts:
-      - "--chown=root:root"
+      - "--chown={{system_users['postgres'].name}}:{{system_groups['postgres'].name}}"
       - "--chmod=D750,F640"
   notify: "restart postgres"
 
-- name: check started docker
-  systemd:
-    name: docker
-    state: started
+- name: build docker image
+  vars:
+    name: "postgres"
+    image_name: "custom_postgres"
+    image_version: "{{postgres_version}}"
+    files:
+      - roles/postgres/templates/container/Dockerfile
+  include_tasks: roles/container/shared/build_docker_image.yml
 
 - name: create docker container
   docker_container:
     name: postgres
-    image: "postgres:{{postgres_version}}"
+    image: "custom_postgres:{{postgres_version}}"
     state: present
+    user: "{{system_users['postgres'].name}}:{{system_groups['postgres'].name}}"
     env:
-      POSTGRES_PASSWORD: "{{vault_postgres_password}}"
+      POSTGRES_PASSWORD: "{{postgres_password}}"
       TZ: "{{timezone}}"
     log_driver: journald
     log_options:
@@ -55,8 +63,13 @@
       - name: "isolated"
         ipv4_address: "{{docker_postgres_ip}}"
     networks_cli_compatible: yes
-    exposed_ports:
-      - "5432" 
+    published_ports: |
+      [
+        "5432:5432",
+        {% if default_server_ipv6 is defined %}
+          "[::]:5432:5432"
+        {% endif %}
+      ]
   register: postgres_container
   notify: "restart postgres"
 
@@ -67,16 +80,41 @@
   import_tasks: roles/_shared/add_to_hosts.yml
 
 # ***** FINALIZE *****
+- name: create cron job
+  vars:
+    name: "Postgres Clean Backup"
+    cmd: "find {{database_backup_path}}postgres/ -name \"*.sql.bz2\" -mtime +30 -exec rm {} +"
+    group: "postgres"
+    log: "dump_cleanup"
+    hour: "1"
+    minute: "45"
+  include_tasks: roles/cron/shared/add_cronjob.yml
+  tags: ['cron_job']
+
+- name: create cron job
+  vars:
+    name: "Postgres Core Backup"
+    cmd: "set -o pipefail && docker exec postgres sh -c \"pg_dumpall\" | bzip2 -c > {{database_backup_path}}postgres/postgres_$(date +\\%Y-\\%m-\\%d).sql.bz2"
+    group: "postgres"
+    log: "dump_postgres"
+    hour: "2"
+    minute: "0"
+  include_tasks: roles/cron/shared/add_cronjob.yml
+  tags: ['cron_job']
+
 - name: copy fluentd config
   vars:
     config_file: "templates/etc/fluent/_.ansible.d/postgres.conf"
   import_tasks: roles/fluentd/shared/add_config.yml
-
+  tags: ['fluentd_config']
+  when: "monitoring_enabled"
+  
 - name: create systemd service
   vars:
     container_name: "postgres"
   import_tasks: roles/container/shared/add_docker_service.yml
-    
+  tags: ['systemd_watcher_config']
+   
 - name: register update notifier
   vars:
     name: "postgres"
@@ -87,6 +125,8 @@
       pattern: "^([0-9\\.]+)-alpine([0-9\\.]+)$"
     }
   import_tasks: roles/update_service/shared/add_software.yml
+  tags: ['update_notifier_config']
+  when: "update_service_software_check_enabled"
 
 - name: trigger postgres handler
   vars:
@@ -94,6 +134,6 @@
     service: "postgres.service"
   import_tasks: roles/_shared/service_check.yml
 
-#- name: check postgres service
-#  import_tasks: roles/postgres/shared/wait_until_ready.yml
-#  when: postgres_container.changed
+- name: check postgres service
+  include_tasks: roles/postgres/shared/wait_until_ready.yml
+  when: postgres_container.changed
