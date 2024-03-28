@@ -1,0 +1,44 @@
+- name: "postgres : add_database : check service"
+  include_tasks: roles/postgres/shared/wait_until_ready.yml
+  
+- name: "postgres : add_database : check databases"
+  shell: "docker exec postgres sh -c \"psql -c \\\"SELECT datname FROM pg_database;\\\"\""
+  register: postgres_database_exists
+  changed_when: "database not in postgres_database_exists.stdout"
+
+- name: "postgres : add_database : create missing user => database does not exists"
+  shell: "docker exec postgres sh -c \"psql -c \\\"CREATE USER {{username}} WITH ENCRYPTED PASSWORD '{{password}}';\\\" \""
+  when: "database not in postgres_database_exists.stdout"
+
+- name: "postgres : add_database : create missing databases => database does not exists"
+  shell: "docker exec postgres sh -c \"psql -c \\\"CREATE DATABASE {{database}} OWNER {{username}};\\\"\""
+  when: "database not in postgres_database_exists.stdout"
+
+- name: "postgres : add_database : grant permissions to user => database does not exists"
+  shell: "docker exec postgres sh -c \"psql -c \\\"GRANT ALL PRIVILEGES ON DATABASE {{database}} TO {{username}};\\\"\""
+  when: "database not in postgres_database_exists.stdout"
+
+- name: "postgres : add_database : create cron job"
+  vars:
+    name: "Postgres {{database | capitalize}} Backup"
+    cmd: "set -o pipefail && docker exec postgres sh -c \"pg_dump {{database}}\" | bzip2 -c > {{database_backup_path}}postgres/{{database}}_$(date +\\%Y-\\%m-\\%d).sql.bz2"
+    group: "postgres"
+    log: "dump_{{database}}"
+    hour: "2"
+    minute: "0"
+  include_tasks: roles/cron/shared/add_cronjob.yml
+  tags: ['cron_job']
+  when: "backup"
+
+- name: "postgres : add_database : register result state"
+  set_fact:
+    database_added: "{{ database not in postgres_database_exists.stdout }}"
+
+- name: "postgres : add_database : copy backup restore script"
+  template:
+    src: "roles/postgres/templates/restore/postgres.sh"
+    dest: "{{database_backup_path}}postgres_{{database}}.sh"
+    owner: root
+    group: root
+    mode: 0750
+  tags: ['backup_restore']

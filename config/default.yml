@@ -264,6 +264,9 @@ default_variables: {
     # - 'postgres'
     postgres_enabled:                         { "default": no },
     postgres_password:                        { dependency: "{{postgres_enabled}}" },
+    pgadmin_username:                         { default: "{{root_email}}",
+                                                dependency: "{{postgres_enabled}}" },
+    pgadmin_password:                         { dependency: "{{postgres_enabled}}" },
 
     # Roles:
     # - 'redis'
@@ -648,22 +651,34 @@ default_variables: {
     # This is an opensource personal finance manager
     # Roles:
     # - 'fireflyiii'
-    vault_fireflyiii_api_key:                 { "optional": "true" },
-    vault_fireflyiii_mysql_username:          { "default": "fireflyiii" },
-    vault_fireflyiii_mysql_password:          { "optional": "true" },
+    fireflyiii_enabled:                       { default: no,                                                       # disabled by default
+                                                requirement: "mysql_enabled" },
+    fireflyiii_api_key:                       { dependency: "{{fireflyiii_enabled}}" },
+    fireflyiii_mysql_username:                { "default": "fireflyiii",
+                                                dependency: "{{fireflyiii_enabled}}" },
+    fireflyiii_mysql_password:                { dependency: "{{fireflyiii_enabled}}" },
+    fireflyiii_pat:                           { dependency: "{{fireflyiii_enabled}}" },
+    fireflyiii_nordigen_id:                   { dependency: "{{fireflyiii_enabled}}" },
+    fireflyiii_nordigen_key:                  { dependency: "{{fireflyiii_enabled}}" },
+    fireflyii_importer_email:                 { "default": "{{root_email}}",
+                                                dependency: "{{fireflyiii_enabled}}" },
     # **** END FIREFLY III                                                             ***
     # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<    
 
-
     # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     # **** BEGIN GHOSTFOLIO                                                            ***
-    # This is an opensource personal finance manager
+    # This is an opensource personal portofolio manager
     # Roles:
-    # - 'fireflyiii'
-    vault_ghostfolio_token_salt:              { "optional": "true" },
-    vault_ghostfolio_jwt_key:                 { "optional": "true" },
-    vault_ghostfolio_postgres_username:       { "default": "ghostfolio" },
-    vault_ghostfolio_postgres_password:       { "optional": "true" },
+    # - 'ghostfolio'
+    ghostfolio_enabled:                       { default: no,                                                       # disabled by default
+                                                requirement: "postgres_enabled,redis_enabled" },
+    ghostfolio_token_salt:                    { dependency: "{{ghostfolio_enabled}}" },
+    ghostfolio_jwt_key:                       { dependency: "{{ghostfolio_enabled}}" },
+    ghostfolio_postgres_db:                   { "default": "ghostfolio",
+                                                dependency: "{{ghostfolio_enabled}}" },
+    ghostfolio_postgres_username:             { "default": "ghostfolio",
+                                                dependency: "{{ghostfolio_enabled}}" },
+    ghostfolio_postgres_password:             { dependency: "{{ghostfolio_enabled}}" },
     # **** END GHOSTFOLIO                                                              ***
     # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 }
