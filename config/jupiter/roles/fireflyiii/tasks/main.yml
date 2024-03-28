@@ -51,13 +51,13 @@
     state: present
     env:
       TZ: "{{timezone}}"
-      APP_KEY: "{{vault_fireflyiii_api_key}}"
+      APP_KEY: "{{fireflyiii_api_key}}"
       DB_HOST: "mysql"
       DB_PORT: "3306"
       DB_CONNECTION: "mysql"
       DB_DATABASE: "fireflyiii"
-      DB_USERNAME: "{{vault_fireflyiii_mysql_username}}"
-      DB_PASSWORD: "{{vault_fireflyiii_mysql_password}}"
+      DB_USERNAME: "{{fireflyiii_mysql_username}}"
+      DB_PASSWORD: "{{fireflyiii_mysql_password}}"
       TRUSTED_PROXIES: "**"
       MAIL_MAILER: "smtp"
       MAIL_HOST: "{{mailserver_host}}"
@@ -98,10 +98,10 @@
       FIREFLY_III_URL: "http://{{docker_fireflyiii_core_ip}}:8080"
       VANITY_URL: "https://fireflyiii.{{server_domain}}"
 #      FIREFLY_III_CLIENT_ID: "{{vault_fireflyiii_client_id}}"
-      FIREFLY_III_ACCESS_TOKEN: "{{vault_fireflyiii_pat}}"
+      FIREFLY_III_ACCESS_TOKEN: "{{fireflyiii_pat}}"
       TRUSTED_PROXIES: "**"
-      NORDIGEN_ID: "{{vault_fireflyiii_nordigen_id}}"
-      NORDIGEN_KEY: "{{vault_fireflyiii_nordigen_key}}"
+      NORDIGEN_ID: "{{fireflyiii_nordigen_id}}"
+      NORDIGEN_KEY: "{{fireflyiii_nordigen_key}}"
       NORDIGEN_SANDBOX: "false"
       ENABLE_MAIL_REPORT: "true"
       MAIL_DESTINATION: "{{fireflyii_importer_email}}"
@@ -167,8 +167,8 @@
 - name: create database
   vars:
     database: "fireflyiii"
-    username: "{{vault_fireflyiii_mysql_username}}"
-    password: "{{vault_fireflyiii_mysql_password}}"
+    username: "{{fireflyiii_mysql_username}}"
+    password: "{{fireflyiii_mysql_password}}"
     backup: yes
   import_tasks: roles/mysql/shared/add_database.yml
   

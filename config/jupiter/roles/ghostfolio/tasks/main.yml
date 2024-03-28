@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    ghostfolio_version: '2.63.2'
+    ghostfolio_version: '2.67.0'
   tags: [ 'update_notifier_config' ]
 
 - name: check started docker
@@ -15,12 +15,12 @@
     state: present
     env:
       TZ: "{{timezone}}"
-      ACCESS_TOKEN_SALT: "{{vault_ghostfolio_token_salt}}"
+      ACCESS_TOKEN_SALT: "{{ghostfolio_token_salt}}"
       POSTGRES_DB: "ghostfolio"
-      POSTGRES_USER: "{{vault_ghostfolio_postgres_username}}"
-      POSTGRES_PASSWORD: "{{vault_ghostfolio_postgres_password}}"
-      DATABASE_URL: "postgresql://{{vault_ghostfolio_postgres_username}}:{{vault_ghostfolio_postgres_password}}@postgres:5432/ghostfolio?connect_timeout=300&sslmode=prefer"
-      JWT_SECRET_KEY: "{{vault_ghostfolio_jwt_key}}"
+      POSTGRES_USER: "{{ghostfolio_postgres_username}}"
+      POSTGRES_PASSWORD: "{{ghostfolio_postgres_password}}"
+      DATABASE_URL: "postgresql://{{ghostfolio_postgres_username}}:{{ghostfolio_postgres_password}}@postgres:5432/{{ghostfolio_postgres_db}}?connect_timeout=300&sslmode=prefer"
+      JWT_SECRET_KEY: "{{ghostfolio_jwt_key}}"
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
     log_driver: journald
@@ -63,22 +63,15 @@
     host_ip_address: "{{docker_ghostfolio_ip}}"
   import_tasks: roles/_shared/add_to_hosts.yml
 
-# ***** POSTGRES DATABASE ****
-#
-#CREATE DATABASE ghostfolio;
-#CREATE USER ghostfolio WITH ENCRYPTED PASSWORD 'xxx';
-#GRANT ALL PRIVILEGES ON DATABASE ghostfolio TO ghostfolio;
-#\c ghostfolio postgres
-# You are now connected to database "ghostfolio" as user "postgres".
-#GRANT ALL ON SCHEMA public TO ghostfolio;
-
-#- name: create database
-#  vars:
-#    database: "fireflyiii"
-#    username: "{{vault_ghostfolio_postgres_username}}"
-#    password: "{{vault_ghostfolio_postgres_password}}"
-#    backup: yes
-#  import_tasks: roles/mysql/shared/add_database.yml
+- name: create database
+  vars:
+    database: "{{ghostfolio_postgres_db}}"
+    username: "{{ghostfolio_postgres_username}}"
+    password: "{{ghostfolio_postgres_password}}"
+    backup: yes
+  import_tasks: roles/postgres/shared/add_database.yml
+  tags: ['cron_job','backup_restore']
+  when: "postgres_enabled"
   
 # ***** FINALIZE *****
 - name: register webui
