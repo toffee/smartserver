@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    pgadmin_version: "8.2"
+    pgadmin_version: "8.4"
   tags: [ 'update_notifier_config' ]
   
 - name: prepare needed folder
@@ -36,8 +36,8 @@
     image: "dpage/pgadmin4:{{pgadmin_version}}"
     state: present
     env:
-      PGADMIN_DEFAULT_EMAIL: "{{root_email}}"
-      PGADMIN_DEFAULT_PASSWORD: "{{vault_pgadmin_password}}"
+      PGADMIN_DEFAULT_EMAIL: "{{pgadmin_username}}"
+      PGADMIN_DEFAULT_PASSWORD: "{{pgadmin_password}}"
       PGADMIN_LISTEN_PORT: "5050"
       TZ: "{{timezone}}"
     log_driver: journald

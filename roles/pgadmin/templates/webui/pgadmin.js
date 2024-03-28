@@ -1,1 +1,1 @@
-mx.Menu.getMainGroup('admin').getSubGroup('tools').addUrl('pgadmin', '/pgadmin4/', 'admin', 221, '{i18n_pgAdmin}', '{i18n_pgAdmin}', "pgadmin_logo.svg", true);
+mx.Menu.getMainGroup('admin').getSubGroup('tools').addUrl('pgadmin', ['admin'], '/pgadmin4/', { 'order': 221, 'title': '{i18n_pgAdmin}', 'info': '{i18n_pgAdmin}', 'icon': "pgadmin_logo.svg", 'target': '_blank' });
