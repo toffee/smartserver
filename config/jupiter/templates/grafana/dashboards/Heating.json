@@ -286,7 +286,7 @@
               "type": "fill"
             }
           ],
-          "measurement": "pGF_Livingroom_Air_Sensor_Temperature_Value",
+          "measurement": "Temperature_GF_Livingroom",
           "orderByTime": "ASC",
           "policy": "default",
           "refId": "A",
@@ -324,7 +324,7 @@
               "type": "fill"
             }
           ],
-          "measurement": "pFF_Bedroom_Air_Sensor_Temperature_Value",
+          "measurement": "Temperature_FF_Bedroom",
           "orderByTime": "ASC",
           "policy": "default",
           "refId": "B",
