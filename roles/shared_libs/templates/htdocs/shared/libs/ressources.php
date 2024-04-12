@@ -26,6 +26,24 @@ class Ressources
         return $content;
     }
 
+    public static function getI18NContentAsObject($directories)
+    {
+        $lang = Ressources::getLang();
+        $i18n_result = array();
+        foreach ($directories as $dir)
+        {
+            $i18n_file = $dir . '/i18n/' . $lang . '.json';
+            if( !is_file( $i18n_file ) ) continue;
+
+            $stream = fopen($i18n_file, 'r');
+            $_content = stream_get_contents($stream);
+            $data = json_decode($_content, true);
+            $i18n_result = array_merge($i18n_result, $data);
+            fclose($stream);
+        }
+        return $i18n_result;
+    }
+
     private static function getContent($path,$suffix)
     {
         $len = strlen($suffix);
@@ -154,33 +172,35 @@ class Ressources
         return "On" . $func_name . "Ready";
     }
 
-    public static function getModule($path, $async=True)
+    public static function getModule($path, $async=True, $types=["js","css"])
     {
         $html = "";
         $dir = __DIR__ . "/../.." . $path;
-        if( is_dir($dir."css/") ) $html .= '    <link href="' . Ressources::preparePath("css", $path, [".css"] ) . '" rel="stylesheet">'."\n";
-        if( is_dir($dir."js/") ) $html .= '    <script' . ( $async ? " async": "" ) . ' src="' . Ressources::preparePath("js", $path, [".js"] ) . '"></script>'."\n";
+        if( in_array("css", $types) && is_dir($dir."css/") ) $html .= '    <link href="' . Ressources::preparePath("css", $path, [".css"] ) . '" rel="stylesheet">'."\n";
+        if( in_array("js", $types) && is_dir($dir."js/") ) $html .= '    <script' . ( $async ? " async": "" ) . ' src="' . Ressources::preparePath("js", $path, [".js"] ) . '"></script>'."\n";
         return $html;
     }
 
-    public static function getModules($paths, $async=True)
+    public static function getModules($paths, $async=True, $types=["js","css"])
     {
+        if( !in_array("/shared/", $paths) ) array_unshift( $paths, "/shared/" );
+
         $html = "<script>";
         $html .= "if(typeof mx === 'undefined') var mx = {};";
         $html .= "mx = {...mx, ...{ OnDocReadyWrapper: function(callback){ let args = []; let obj = [function(){ args.push(arguments); }, callback, args]; mx._OnDocReadyWrapper.push(obj); return function(){ obj[0](...arguments); }; }";
-        $html .= ", _OnDocReadyWrapper: [], OnDocReady: [], OnScriptReady: [], OnReadyTrigger: function(){ mx.OnReadyCounter -= 1; }, OnReadyCounter: " . (count($paths) + 1);
+        $html .= ", _OnDocReadyWrapper: [], OnDocReady: [], OnScriptReady: [], OnReadyTrigger: function(){ mx.OnReadyCounter -= 1; }, OnReadyCounter: " . (count($paths));
+
         foreach ($paths as $path)
         {
             $html .= ", " . Ressources::prepareModuleReadyName($path) . ": []";
         }
         $html .= ", Translations: [] } };\n";
         $html .= "    </script>\n";
-        $html .= Ressources::getModule("/shared/", $async);
+
         foreach ($paths as $path)
         {
-            $html .= Ressources::getModule($path, $async);
+            $html .= Ressources::getModule($path, $async, $types);
         }
-
         return $html;
     }
 
