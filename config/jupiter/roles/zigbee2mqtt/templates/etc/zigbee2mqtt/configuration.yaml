@@ -17,7 +17,18 @@ mqtt:
 # Serial settings
 serial:
   # Location of CC2531 USB sniffer
-  port: /dev/ttyOpenHabZigbee
+  #port: /dev/ttyOpenHabZigbee
+
+  # Location of SLZB-06
+  port: tcp://{{zigbee_adapter_ip}}:6638
+  baudrate: 115200
+  adapter: zstack
+  # Disable green led?
+  disable_led: false
+  
+# Set output power to max 20
+advanced:
+  transmit_power: 20
 
 devices: devices.yaml
 groups: groups.yaml

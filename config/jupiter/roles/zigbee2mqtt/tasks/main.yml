@@ -20,6 +20,7 @@
     - "configuration.yaml"
     - "devices.yaml"
     - "groups.yaml"
+  notify: "restart zigbee2mqtt"
 
 - name: build docker image
   vars:
@@ -61,6 +62,7 @@
     name: "zigbee2mqtt"
     rules:
       - "saddr {{docker_zigbee2mqtt_ip}} daddr {{docker_mosquitto_ip}}"
+      - "saddr {{docker_zigbee2mqtt_ip}} daddr {{zigbee_adapter_ip}}"
       - "saddr {{docker_zigbee2mqtt_ip}} proto tcp dport 443"
   import_tasks: roles/firewall/shared/allow_service.yml
   tags: [ 'firewall_config' ]
