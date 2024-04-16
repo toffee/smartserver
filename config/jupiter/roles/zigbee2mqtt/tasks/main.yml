@@ -51,8 +51,8 @@
     volumes:
       - '{{global_etc}}zigbee2mqtt:/app/data:z'
       - '{{global_log}}zigbee2mqtt:/app/data/log:z'
-    devices:
-      - '/dev/ttyOpenHabZigbee:/dev/ttyOpenHabZigbee:rwm'
+#    devices:
+#      - '/dev/ttyOpenHabZigbee:/dev/ttyOpenHabZigbee:rwm'
     published_ports:
       - "8084:8084"
   notify: "restart zigbee2mqtt"
