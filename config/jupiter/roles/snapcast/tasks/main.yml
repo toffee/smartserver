@@ -1,6 +1,6 @@
 - name: set snapcats version
   set_fact:
-    snapcast_version: "0.27.0"
+    snapcast_version: "0.28.0"
   tags: [ 'update_notifier_config' ]
 
 - name: prepare needed folder
@@ -17,6 +17,7 @@
   zypper:
     name: [
         gcc12-c++
+      , cmake-full
       , libboost_headers1_75_0-devel
       , soxr-devel
       , alsa-devel
@@ -39,11 +40,14 @@
   
 - name: "build snapcast client"
   shell: |
-    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 50
-    make
-    make installfiles
+    mkdir build
+    cd build
+    cmake .. -DBUILD_CLIENT=ON -DBUILD_SERVER=OFF -DBUILD_WITH_PULSE=OFF
+    cmake --build .
+    install -s -D -g root -o root ../bin/snapclient /usr/bin/snapclient
+    install -D -g root -o root ../client/snapclient.1 /usr/share/man/man1/snapclient.1
   args:
-    chdir: "{{global_build}}snapcast/client"
+    chdir: "{{global_build}}snapcast"
   when: "snapcast_git.changed"
   
 - name: copy files

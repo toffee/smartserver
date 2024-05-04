@@ -36,3 +36,7 @@
 #https://www.zigbee2mqtt.io/devices/7602031P7.html
 '0x001788010cb18da9':
   friendly_name: 'bowl'
+
+#https://www.zigbee2mqtt.io/devices/8718699703424.html
+'0x001788010d0ccb7d':
+  friendly_name: 'lightstrip_victor'
