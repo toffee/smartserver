@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    postgres_version: "16.2-alpine3.19"
+    postgres_version: "16.3-alpine3.19"
   tags: [ 'update_notifier_config' ]
 
 - name: "create user and group => user or group does not exists"
