@@ -33,6 +33,14 @@
 '0x001788010cfbfa7e':
   friendly_name: 'sphere_L'
 
+#https://www.zigbee2mqtt.io/devices/9290024688.html
+'0x001788010db01504':
+  friendly_name: 'sphere_M'
+
+#https://www.zigbee2mqtt.io/devices/9290024688.html
+'0x001788010dad0e06':
+  friendly_name: 'sphere_S'
+
 #https://www.zigbee2mqtt.io/devices/7602031P7.html
 '0x001788010cb18da9':
   friendly_name: 'bowl'
