@@ -19,6 +19,7 @@ from server.watcher.software_version import SoftwareVersionWatcher
 
 from smartserver.server import Server, serverWeb, serverSocket
 from smartserver import logfile
+from smartserver.filewatcher import FileWatcher
 
 from config import config
 
@@ -77,6 +78,9 @@ class Handler(Server):
         super().terminate()
 
     def fileChangeTriggered(self, event):
+        #if event["type"] not in [ FileWatcher.EVENT_TYPE_WRITTEN, FileWatcher.EVENT_TYPE_MOVED_TO, FileWatcher.EVENT_TYPE_MOVED_FROM, FileWatcher.EVENT_TYPE_DELETED ]:
+        #    return
+
         if event["path"] == config.outdated_roles_state_dir.rstrip("/"):
             self.dependency_watcher.notifyChange(event)
         elif event["path"] == config.system_update_state_file:
