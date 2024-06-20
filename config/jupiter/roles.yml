@@ -33,4 +33,4 @@
 - { import_role: { name: "config/jupiter/roles/ghostfolio" }, tags: [ 'ghostfolio' ] }
 - { import_role: { name: "config/jupiter/roles/vdirsyncer" }, tags: [ 'vdirsyncer' ] }
 - { import_role: { name: "config/jupiter/roles/jekyll" }, tags: [ 'jekyll' ] }
-- { import_role: { name: "config/jupiter/roles/hugo" }, tags: [ 'hugo' ] }
+#- { import_role: { name: "config/jupiter/roles/hugo" }, tags: [ 'hugo' ] }
