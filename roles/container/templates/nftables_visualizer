@@ -1,0 +1,555 @@
+#!/usr/bin/python3
+
+import subprocess
+import json
+import socket
+import re
+import ipaddress
+import json
+from textwrap import wrap
+
+from smartserver.processlist import Processlist
+
+class Network:
+    def __init__(self,id,name,driver,scope):
+        self.id = id
+        self.name = name
+        self.driver = driver
+        self.scope = scope
+        self.connection_r = {}
+        self.subnet = ""
+        self.gateway = ""
+        self.bridge = ""
+        self.is_internal = False
+
+    def addDetails(self,subnet,gateway,bridge,is_internal):
+        self.subnet = subnet
+        self.gateway = gateway
+        self.bridge = bridge
+        self.is_internal = is_internal
+
+    def addConnection(self,connection):
+        key = connection.ip + " " + connection.container.type + ' ' + connection.container.name
+        self.connection_r[key] = connection
+
+    def getConnection(self, container):
+        for connection in self.connection_r.values():
+            if connection.container == container:
+                return connection
+        return None
+
+class Container:
+    def __init__(self, type, name, sandboxKey, pids, interfaceResult):
+        self.type = type
+        self.name = name
+        self.sandboxKey = sandboxKey
+        self.pids = pids
+        self.interfaceResult = interfaceResult
+
+        self.ports = []
+
+    def addPort(self, port, protocol):
+        self.ports.append({"port": port, 'protocol': protocol})
+
+class Connection:
+    def __init__(self,container, ip, veth):
+        self.container = container
+        self.ip = ip
+        self.veth = veth
+
+        self.ports = []
+
+    def addPort(self, port, protocol, access):
+        self.ports.append({"port": port, 'protocol': protocol, 'access': access})
+
+class Chain:
+    def __init__(self,name):
+        self.name = name
+        self.rule_r = []
+
+    def addRule(self, sourceIp, sourcePorts, targetIp, targetPorts, mode, type, interface):
+        self.rule_r.append({"chain": self.name, "sourceIp": sourceIp, "sourcePorts": sourcePorts, "targetIp": targetIp, "targetPorts": targetPorts, "mode": mode, "type": type, "interface": interface })
+
+def execCommand(cmd, cwd=None ):
+    return subprocess.run([ cmd ], shell=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=cwd )
+
+def messureLength(value):
+    return len(re.sub(r"\033\[[^m]*m","",value))
+
+def convertSetToArray(value):
+    return value['set'] if isinstance(value, dict) and 'set' in value else [value]
+
+def detectAccess(ip, host_ip, interface = None):
+    return "intern" if ip == host_ip or interface == "macvlan" else "local"
+
+# Collect ip addresses
+ip_list = execCommand("ip a").stdout.decode("utf-8")
+
+# Collect network links
+link_list = execCommand("ip link").stdout.decode("utf-8")
+
+# Collect host data
+host_ip = execCommand("ip route get 1.1.1.1 | grep -oP 'src \K\S+'").stdout.decode("utf-8").strip()
+host_gateway = execCommand("ip route | grep default").stdout.decode("utf-8").split()[2]
+host_device = re.findall("^.*{}.*".format(host_ip), ip_list, flags=re.MULTILINE)[0].split()[-1]
+host_subnet = execCommand("ip route | grep 'src {}'".format(host_ip)).stdout.decode("utf-8").split()[0]
+
+# Collect networks
+network_r = {}
+result = execCommand("podman network ls --format='json'")
+networks_json = json.loads(result.stdout.decode("utf-8"))
+for network_json in networks_json:
+    network = Network(network_json['id'],network_json['name'],network_json['driver'],"local")
+    network_r[network.name]=network
+
+# Collect network details
+networks_result = execCommand("podman network inspect {}".format(" ".join(list(network_r.keys()))))
+networks_json = json.loads(networks_result.stdout.decode("utf-8"))
+for network_json in networks_json:
+    network = network_r[network_json['name']]
+
+    subnet = network_json['subnets'][0]['subnet']
+    gateway = network_json['subnets'][0]['gateway']
+    is_internal = network_json['internal']
+
+    result = re.findall("^.*{}.*".format(gateway), ip_list, flags=re.MULTILINE)
+    if len(result)>0:
+        bridge_device = re.findall("^.*{}.*".format(gateway), ip_list, flags=re.MULTILINE)[0].split()[-1]
+    else:
+        bridge_device = host_device
+    network.addDetails(subnet,gateway,bridge_device,is_internal)
+
+network = Network('host', 'host', 'host',"local")
+network.addDetails(host_subnet,host_gateway,host_device,False)
+network_r[network.name]=network
+
+container_r = {}
+pid_map_r = {}
+
+dns_map_r = {}
+dns_reverse_r = {}
+
+# Collect container details
+result = execCommand("podman ps -a --format='{{.Names}}'")
+container_names = result.stdout.decode("utf-8").split("\n")
+containers_result = execCommand("podman inspect {}".format(" ".join(container_names)))
+containers_json = json.loads(containers_result.stdout.decode("utf-8"))
+for container_json in containers_json:
+    #container_json_dict[container_json["Name"][1:]] = container_json
+
+    name = container_json['Name']
+
+    if name in container_r:
+        container = container_r[name]
+    else:
+        sandboxKey = container_json['NetworkSettings']['SandboxKey']
+        interfaceResult = execCommand("nsenter --net={} ip a".format(sandboxKey))
+        pids = [ str(container_json["State"]["Pid"]), str(container_json["State"]["ConmonPid"]) ]
+
+        container = Container("Container", name, sandboxKey, pids, interfaceResult.stdout.decode("utf-8").strip())
+        container_r[name] = container
+
+        for portKey in container_json['NetworkSettings']['Ports']:
+            port,protocol = portKey.split("/")
+            container.addPort(port, protocol)
+
+            #if container_json['NetworkSettings']['Ports'][portKey] is not None:
+            #    hostIp = container_json['NetworkSettings']['Ports'][portKey][0]['HostIp']
+            #    hostPort = container_json['NetworkSettings']['Ports'][portKey][0]['HostPort']
+            #    container.addPublishedPort(hostIp, hostPort, protocol)
+
+
+    for networkName in container_json['NetworkSettings']['Networks']:
+        network = network_r[networkName]
+
+        veth = ""
+        if network.name == 'host':
+            ip = host_ip
+            veth = "host"
+        else:
+            interfaceList = re.findall("inet.*", container.interfaceResult, flags=re.MULTILINE)
+            network_subnet = ipaddress.ip_network(network.subnet, strict=False)
+            for interface in interfaceList:
+                columns = interface.split(" ")
+                interface_subnet = ipaddress.ip_network(columns[1], strict=False)
+                if network_subnet == interface_subnet:
+                    container_ns_result = execCommand("nsenter --net={} ip link show | grep -oP '{}@if\K[0-9]*'".format(container.sandboxKey,columns[6]))
+                    peer_ifindex = container_ns_result.stdout.decode("utf-8").strip()
+                    if peer_ifindex:
+                        result = re.findall("^{}: ([^:]*):".format(peer_ifindex), link_list, flags=re.MULTILINE)
+                        if len(result)>0:
+                            veth = result[0]
+                    break
+
+            ip = container_json['NetworkSettings']['Networks'][networkName]['IPAddress']
+            if ip == "":
+                ip = "0.0.0.0"
+
+            if name not in dns_map_r:
+                dns_map_r[name] = []
+            dns_map_r[name].append(ip)
+            dns_reverse_r[ip] = name
+
+            if network.name == 'macvlan':
+                veth = "macvlan"
+
+        connection = Connection(container, ip, veth)
+        for port in container.ports:
+            connection.addPort( port['port'], port['protocol'], detectAccess(ip, host_ip, veth) )
+
+        network.addConnection(connection)
+
+# Collect nftables chains
+nftables_data = execCommand("nft -j list ruleset").stdout.decode("utf-8")
+nftables_rules = json.loads(nftables_data)
+
+chain_r = {}
+for line in nftables_rules['nftables']:
+    if 'rule' not in line:
+        continue
+
+    chain_name = line['rule']['chain']
+
+    if chain_name not in chain_r:
+        chain = Chain(chain_name)
+        chain_r[chain_name] = chain
+    else:
+        chain = chain_r[chain_name]
+
+    source_ips = [None]
+    source_ports = None
+    target_ips = [None]
+    target_ports = None
+    mode = "DROP"
+    type = None # tcp or udp
+    interface = None
+
+    for part in line['rule']['expr']:
+        if 'match' in part:
+            if part['match']['op'] != '==':
+                continue
+
+            if 'payload' in part['match']['left']:
+                protocol = part['match']['left']['payload']['protocol']
+                field = part['match']['left']['payload']['field']
+                value = part['match']['right']
+
+                if field == 'saddr':
+                    source_ips = convertSetToArray(value)
+                elif field == 'daddr':
+                    target_ips = convertSetToArray(value)
+                elif field == 'sport':
+                    source_ports = list(map(str, convertSetToArray(value)))
+                    type = protocol
+                elif field == 'dport':
+                    target_ports = list(map(str, convertSetToArray(value)))
+                    type = protocol
+            elif 'meta' in part['match']['left']:
+                key = part['match']['left']['meta']['key']
+                if key == 'l4proto':
+                    protocols = part['match']['right']['set'] if 'set' in part['match']['right'] else part['match']['right']
+                    if len(protocols) == 1:
+                        type = protocols[0]
+                elif key == 'oif':
+                    interface = part['match']['right']
+
+        elif 'accept' in part:
+            mode = "ACCEPT"
+
+    for source_ip in source_ips:
+        for target_ip in target_ips:
+            if source_ip is not None and 'prefix' in source_ip:
+                source_ip = source_ip['prefix']['addr'] + '/' + str(source_ip['prefix']['len'])
+
+            if target_ip is not None and 'prefix' in target_ip:
+                target_ip = target_ip['prefix']['addr'] + '/' + str(target_ip['prefix']['len'])
+
+            chain.addRule(source_ip, source_ports, target_ip, target_ports, mode, type, interface)
+
+# collect all pids from containers
+pid_container_map = {}
+ppid_map = {}
+pid_list = execCommand("ps -e -o pid,ppid --no-headers").stdout.decode("utf-8").strip().split("\n")
+for pid_row in pid_list:
+    pid, ppid = re.split("\s+", pid_row.strip())
+    if ppid not in ppid_map:
+        ppid_map[ppid] = []
+    ppid_map[ppid].append(pid)
+
+def collectChildPIDs(ppid_map, ppid, all_pids):
+    all_pids.append(ppid)
+
+    if ppid not in ppid_map:
+        return
+
+    for pid in ppid_map[ppid]:
+        collectChildPIDs(ppid_map, pid, all_pids)
+
+for name in container_r:
+    container = container_r[name]
+    all_pids = []
+    for pid in container.pids:
+        collectChildPIDs(ppid_map, pid, all_pids)
+
+    for pid in all_pids:
+        pid_container_map[pid] = container
+
+# collect all open ports
+ss_list = execCommand("ss -l -t -u -p -n").stdout.decode("utf-8").strip().split("\n")
+for ss_data in ss_list:
+    #ss_data = ss_data.split(" ")
+
+    match = re.match("^(udp|tcp)\s+(UNCONN|LISTEN)\s+.*?\s+([^\s]*?\:[0-9]+)\s+(.*)", ss_data)
+    if not match:
+        continue
+
+    host, port = match[3].rsplit(":", 1)
+    protocol = match[1]
+
+    match = re.match("^.*?pid=([0-9]+)", match[4])
+    pid = match[1] if match else None
+
+    #print("found: {}:{} as pid {}".format(host, port, pid))
+
+    if host == '*' or host == "0.0.0.0":
+        host = host_ip
+    elif host[0] == '[' and host[-1] == ']':
+        match = re.match("^\[\:\:.+?\:([0-9\.]+)\]", host)
+        if not match:
+            continue
+        host = match.group(1)
+
+    if host not in [host_ip,"127.0.0.1"]:
+        #print("skip: {}:{} as pid {}".format(host, port, pid))
+        continue
+
+    # currently it is not possible to get pid from wireguard_mobile in host mode
+    # maybe migrate wireguard_mobile to a container in isolated network
+    if pid is None:
+        container = container_r["wireguard_mobile"]
+    else:
+        if pid not in pid_container_map:
+            service = Processlist.getComm(pid)
+            if service[0:6] == "python":
+                service = Processlist.getCmdLine(pid).rsplit("/", 1)[1]
+
+            container = Container("Service", service, None, None, None)
+            container_r[name] = container
+            pid_container_map[pid] = container
+        else:
+            container = pid_container_map[pid]
+
+    network = network_r['host']
+    connection = network.getConnection(container)
+    if not connection:
+        connection = Connection(container, host_ip, "forwarded" if container.type == "Container" else "host")
+        network.addConnection(connection)
+
+    connection.addPort(port, protocol, detectAccess(host, host_ip))
+
+TYPE_HEADLINE = 0
+TYPE_NETWORK = 1
+TYPE_CONTAINER = 2
+
+colors = {
+    TYPE_HEADLINE: [0,"1;37","1;37","1;37","1;37","1;37","1;37"],
+    TYPE_NETWORK: [0,"0;30;47","1;37;43","1;37;45","1;37;45","0;100","0;30;46"],
+    TYPE_CONTAINER: [0,"0;37","0;33","1;35","1;35","0;39","0;36"]
+}
+
+port_colors = {
+    "local": "0;37",
+    "intern": "0;32",
+    "extern": "0;91"
+}
+
+MAX_OUTGOING_LENGTH = 58
+MAX_PORT_LENGTH = 57
+
+# Prepare column values
+rows = [[TYPE_HEADLINE,"Type","Name","Network","Outgoing allowed","\033[1;37mPorts / Incomming (\033[0;37mlocal\033[0m\033[1;37m, \033[0;32mintern\033[0m\033[1;37m, \033[0;91mextern\033[0m\033[1;37m) traffic allowed\033[0m","Interface"]]
+
+sorted_network_r = list(network_r)
+#sorted_network_r.sort(key=lambda item: socket.inet_aton(network_r[item].gateway) if network_r[item].gateway else socket.inet_aton("0.0.0.0"), reverse=False)
+
+for network in sorted_network_r:
+    network = network_r[network]
+
+    if len(network.connection_r) == 0:
+        continue
+
+    subnet_msg = u"{}{}".format(network.subnet," (internal)" if network.is_internal else "")
+
+    rows.append([TYPE_NETWORK,"Network",network.name,network.gateway,subnet_msg,"",network.bridge])
+
+    key_r = list(network.connection_r.keys())
+
+    key_r.sort(key=lambda item: network.connection_r[item].container.name, reverse=False)
+    #key_r.sort(key=lambda item: socket.inet_aton(network.connection_r[item].ip), reverse=False)
+
+    for key in key_r:
+        connection = network.connection_r[key]
+        container = connection.container
+
+        openPorts = {}
+        for port in connection.ports:
+            value = str(port["port"])+"/"+port["protocol"]
+            openPorts[value] = {
+              "value": value,
+              "port": port["port"],
+              "access": port["access"]
+            }
+
+        outgoingValue = []
+        for chain in chain_r:
+            if chain not in [ 'SMARTSERVER_FORWARD', 'SMARTSERVER_INPUT' ]:
+                continue
+
+            rule_r = chain_r[chain].rule_r
+
+            for rule in rule_r:
+
+                if rule['sourceIp'] == connection.ip:
+                    if rule['targetIp'] == network.subnet:
+                        targetIp = "subnet"
+                    elif rule['targetIp'] is None:
+                        targetIp = "*"
+                    else:
+                        targetIp = rule['targetIp']
+
+                        if targetIp in dns_reverse_r:
+                            targetIp = dns_reverse_r[targetIp]
+
+                    value = ""
+
+                    if rule['sourcePorts'] is not None:
+                        sourcePorts = rule['sourcePorts']
+                        value += ":" + ( sourcePorts[0] if len(sourcePorts) == 1 else "[" + ",".join(sourcePorts) + "]" )
+                    if rule['interface'] is not None:
+                        value += ":" + rule['interface']
+
+                    if value != "":
+                        value += " ➞ "
+
+                    value += targetIp
+
+                    if rule['targetPorts'] is not None:
+                        targetPorts = rule['targetPorts']
+                        value += ":" + ( targetPorts[0] if len(targetPorts) == 1 else "[" + ",".join(targetPorts) + "]" )
+
+                    outgoingValue.append(value)
+                elif rule['sourceIp'] is not None and ipaddress.ip_address(connection.ip) in ipaddress.ip_network(rule['sourceIp']):
+                    targetIp = "*" if rule['targetIp'] is None else rule['targetIp']
+                    outgoingValue.append(targetIp)
+
+                #if container.name == "wireguard_cloud":
+                #    print("{} {} {} {}".format(container.name,chain, openPorts,rule))
+
+                if network.driver == "host" and rule['targetPorts'] is not None:
+                    activeChain = 'SMARTSERVER_INPUT' if network.name == 'host' and connection.veth != "forwarded" else 'SMARTSERVER_FORWARD'
+
+                    if chain == activeChain:
+                        for key in openPorts:
+
+                            data = openPorts[key]
+                            sourceIp = rule['sourceIp'].split('/')[0] if rule['sourceIp'] is not None else rule['sourceIp']
+
+                            if rule['mode'] == "DROP":
+                                if data['port'] in rule['targetPorts']:
+                                    data["access"] = "local"
+                                    data["port"] += " (" + sourceIp + ")"
+                            else:
+                                if data['port'] in rule['targetPorts'] and (sourceIp is None or not ipaddress.ip_address(sourceIp).is_private):
+                                    data["access"] = "extern"
+
+        outgoingValue = list(set(outgoingValue))
+        outgoingValue.sort()
+        outgoingValueRows = wrap( ", ".join(outgoingValue), MAX_OUTGOING_LENGTH )
+
+        openPortsValues = list(set(openPorts.keys()))
+        openPortsValues.sort(key=lambda x: int(x.split('/')[0]))
+        openPortsRows = wrap( ", ".join(openPortsValues), MAX_PORT_LENGTH )
+
+        firstRow = True
+        while len(outgoingValueRows) > 0 or len(openPortsRows) > 0:
+            outgoingString = ""
+            if len(outgoingValueRows) > 0:
+                outgoingString = outgoingValueRows.pop(0).strip(',')
+
+            openPortsArray = []
+            if len(openPortsRows) > 0:
+                openPortsString = openPortsRows.pop(0).strip(',')
+                openPortsAsValue = openPortsString.split(",")
+                for openPortAsValue in openPortsAsValue:
+                    openPortsArray.append(openPorts[openPortAsValue.strip()])
+
+            if firstRow:
+                rows.append([TYPE_CONTAINER, container.type, container.name, connection.ip, outgoingString, openPortsArray, connection.veth])
+                firstRow = False
+            else:
+                rows.append([TYPE_CONTAINER, "", "", "", outgoingString, openPortsArray, ""])
+
+# Calculate column sizes
+columnLength = [0] * len(rows[0])
+for row in rows:
+    for i in range(1,len(row)):
+        if isinstance(row[i], str):
+            length = messureLength(row[i])
+            if length > columnLength[i]:
+                columnLength[i] = length
+
+#print(columnLength)
+
+#columnLength[4] = MAX_OUTGOING_LENGTH
+
+# Visualize
+active_background = ""
+for row in rows:
+    row_type = row[0]
+    if row_type == TYPE_HEADLINE:
+        print("")
+        _colors = colors[row_type]
+        active_background = ""
+    elif row_type == TYPE_NETWORK:
+        print("")
+        _colors = colors[row_type]
+        active_background = ""
+    else:
+        _colors = colors[TYPE_CONTAINER]
+        if row[1] != "":
+            active_background = ";48;2;⟨50⟩;⟨50⟩;⟨50⟩" if active_background == "" else ""
+
+    print("\033[{}{}m {} \033[0m".format(_colors[1], active_background, row[1].ljust(columnLength[1])),end="")
+    print("\033[{}{}m {} \033[0m".format(_colors[2], active_background, row[2].ljust(columnLength[2])),end="")
+    print("\033[{}{}m {} \033[0m".format(_colors[3], active_background, row[3].ljust(columnLength[3])),end="")
+
+    is_not_container_row = row_type != TYPE_CONTAINER
+
+    if is_not_container_row:
+        print("\033[{}{}m {} \033[0m".format(_colors[4], active_background, row[4].ljust(columnLength[4])),end="")
+    else:
+        print("\033[0;91{}m {} \033[0m".format(active_background, row[4].ljust(columnLength[4])),end="")
+
+    if is_not_container_row:
+        print("\033[{}{}m {} \033[0m".format(_colors[5], active_background, row[5].ljust(columnLength[5])),end="")
+    else:
+        values = []
+        length = 0
+        for port in row[5]:
+            color = port_colors[port["access"]]
+            value = "\033[{}{}m{}\033[0m".format(color, active_background, port["value"])
+            length += len(port["value"]) + 2
+            values.append(value)
+
+        if len(values)>0:
+            value = "\033[{}m \033[0m".format(active_background) + "\033[{}m, \033[0m".format(active_background).join(values) + "\033[{}m \033[0m".format(active_background)
+        else:
+            value = ""
+
+        print(value + "\033[{}m".format(active_background) + "".ljust(columnLength[5] - length + 2) + "\033[0m",end="")
+        #print(value,end="")
+
+    print("\033[{}{}m {}\033[0m".format(_colors[6], active_background, row[6].ljust(columnLength[6])),end="")
+
+    print("")
+print("")

@@ -33,23 +33,15 @@
       - "--chmod=D750,F640"
   notify: "restart mysql"
 
-- name: build docker image
-  vars:
-    name: "mysql"
-    image_name: "custom_mysql"
-    image_version: "{{mysql_version}}"
-    files:
-      - roles/mysql/templates/container/Dockerfile
-  include_tasks: roles/container/shared/build_docker_image.yml
-
-- name: create docker container
-  docker_container:
+- name: create podman container
+  containers.podman.podman_container:
     name: mysql
-    image: "custom_mysql:{{mysql_version}}"
+    image: "mariadb:{{mysql_version}}"
     state: present
-#    recreate: true
+    security_opt:
+      - label=disable
 #    command: "--innodb-read-only-compressed=OFF" # => FIX for nextcloud, https://github.com/nextcloud/docker/issues/1492
-    user: "{{system_users['mysql'].name}}:{{system_groups['mysql'].name}}"
+    user: "{{system_users['mysql'].id}}:{{system_groups['mysql'].id}}"
     env:
       MYSQL_ROOT_HOST: "%"
       MYSQL_ROOT_PASSWORD: ""
@@ -59,31 +51,30 @@
     log_options:
       tag: mysql
     volumes:
-      - '{{ global_etc }}mysql:/etc/mysql:z'
-      - '{{ global_lib }}mysql:/var/lib/mysql:z'
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks:
-      - name: "isolated"
-        ipv4_address: "{{docker_mysql_ip}}"
-    networks_cli_compatible: yes
-    published_ports: |
-      [
-        "3306:3306",
-        {% if default_server_ipv6 is defined %}
-          "[::]:3306:3306"
-        {% endif %}
-      ]
-  register: mysql_container
+      - '{{ global_etc }}mysql:/etc/mysql'
+      - '{{ global_lib }}mysql:/var/lib/mysql'
+    network: "isolated"
+    ip: "{{podman_mysql_ip}}"
+    exposed_ports:
+      - "3306"  
+  register: "podman_container_state"
   notify: "restart mysql"
 
-- name: add container name
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
+  vars:
+    container_name: "mysql"
+    container_changed: "{{podman_container_state.changed}}"
+  include_tasks: roles/container/shared/handle_podman_service.yml
+  tags: ['systemd_watcher_config']
+
+- name: add service name
   vars:
     host_name: "mysql"
-    host_ip_address: "{{docker_mysql_ip}}"
+    host_ip_address: "{{podman_mysql_ip}}"
   include_tasks: roles/_shared/add_to_hosts.yml
 
-# ***** FINALIZE *****
+# ***** DEPENDENCY CONFIGS *****
 - name: create cron job
   vars:
     name: "MySQL Clean Backup"
@@ -98,7 +89,7 @@
 - name: create cron job
   vars:
     name: "MySQL Core Backup"
-    cmd: "set -o pipefail && docker exec mysql sh -c \"/usr/bin/mysqldump mysql -u root --quick --single-transaction -h 127.0.0.1\" | bzip2 -c > {{database_backup_path}}mysql/mysql_$(date +\\%Y-\\%m-\\%d).sql.bz2"
+    cmd: "set -o pipefail && podman exec mysql sh -c \"/usr/bin/mysqldump mysql -u root --quick --single-transaction -h 127.0.0.1\" | bzip2 -c > {{database_backup_path}}mysql/mysql_$(date +\\%Y-\\%m-\\%d).sql.bz2"
     group: "mysql"
     log: "dump_mysql"
     hour: "1"
@@ -112,12 +103,6 @@
   include_tasks: roles/fluentd/shared/add_config.yml
   tags: ['fluentd_config']
   when: "monitoring_enabled"
-
-- name: create systemd service
-  vars:
-    container_name: "mysql"
-  include_tasks: roles/container/shared/add_docker_service.yml
-  tags: ['systemd_watcher_config']
     
 - name: register update notifier
   vars:
@@ -132,19 +117,13 @@
   tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"
 
-- name: trigger mysql handler
-  vars:
-    notify: "restart mysql"
-    service: "mysql.service"
-  include_tasks: roles/_shared/service_check.yml
-
 - name: check mysql service
   include_tasks: roles/mysql/shared/wait_until_ready.yml
-  when: mysql_container.changed
+  when: podman_container_state.changed
 
 - name: check mysql upgrade
-  shell: "docker exec mysql sh -c \"/usr/bin/mysql_upgrade\""
-  when: mysql_container.changed
+  shell: "podman exec mysql sh -c \"/usr/bin/mysql_upgrade\""
+  when: podman_container_state.changed
   
 # ***** SHARED DATABASE ****
 - name: create database
@@ -157,18 +136,18 @@
   tags: ['cron_job','backup_restore']
   
 - name: "check healthcheck user"
-  shell: "docker exec mysql sh -c \"mysql -u root -h 127.0.0.1 -e 'SELECT User FROM mysql.user'\""
+  shell: "podman exec mysql sh -c \"mysql -u root -h 127.0.0.1 -e 'SELECT User FROM mysql.user'\""
   register: mysql_user_exists
   changed_when: "system_users['mysql'].name not in mysql_user_exists.stdout"
 
 - name: "create healthcheck user => user does not exists"
-  shell: "docker exec mysql sh -c \"mysql -u root -h 127.0.0.1 -e \\\"CREATE USER IF NOT EXISTS '{{system_users['mysql'].name}}'@'%'\\\"\""
+  shell: "podman exec mysql sh -c \"mysql -u root -h 127.0.0.1 -e \\\"CREATE USER IF NOT EXISTS '{{system_users['mysql'].name}}'@'%'\\\"\""
   when: "system_users['mysql'].name not in mysql_user_exists.stdout"
 
 - name: "refresh privileges => user does not exists"
-  shell: "docker exec mysql sh -c \"mysqladmin -u root -h 127.0.0.1 flush-privileges\""
+  shell: "podman exec mysql sh -c \"mysqladmin -u root -h 127.0.0.1 flush-privileges\""
   when: "system_users['mysql'].name not in mysql_user_exists.stdout"
 
 #- name: "grant healthcheck user permissions => user does not exists"
-#  shell: "docker exec mysql sh -c \"mysql -u root -h 127.0.0.1 -e \\\"GRANT USAGE TO '{{system_users['mysql'].name}}'@'%';\\\"\""
+#  shell: "podman exec mysql sh -c \"mysql -u root -h 127.0.0.1 -e \\\"GRANT USAGE TO '{{system_users['mysql'].name}}'@'%';\\\"\""
 #  when: "system_users['mysql'].name not in mysql_user_exists.stdout"

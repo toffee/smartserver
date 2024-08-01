@@ -15,41 +15,18 @@
     mode: 0640
   notify: "restart samba"
 
-- name: build docker image
+- name: build podman image
   vars:
-    name: "samba"
+    container_name: "samba"
     image_name: "custom_samba"
     image_version: "{{alpine_version}}"
-    files:
+    image_files:
       - roles/samba/templates/container/Dockerfile
-  include_tasks: roles/container/shared/build_docker_image.yml
+  include_tasks: roles/container/shared/build_podman_image.yml
   
-- name: create docker container
-  docker_container:
-    name: samba
-    image: "custom_samba:{{alpine_version}}"
-    state: present
-#    recreate: true
-    env:
-      TZ: "{{timezone}}"
-    log_driver: journald
-    log_options:
-      tag: samba
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks:
-      - name: "isolated"
-    networks_cli_compatible: yes
-    volumes:
-      - '{{ global_etc }}samba:/etc/samba:z'
-      - '{{ global_lib }}samba:/var/lib/samba:z'
-      - '{{nextcloud_data_path}}:{{nextcloud_data_path}}:z'
-      - '{{base_path}}:{{base_path}}:z'
-      - '{{data_path}}:{{data_path}}:z'
-      - '/etc/group:/etc/group:ro,z'
-      - '/etc/passwd:/etc/passwd:ro,z'
-      - '/etc/shadow:/etc/shadow:ro,z'
-    published_ports: |
+- name: prepare published_ports
+  set_fact:
+    samba_published_ports: |
       [
         "137:137/udp",
         "138:138/udp",
@@ -58,20 +35,52 @@
         {% if default_server_ipv6 is defined %}
           "[::]:137:137/udp",
           "[::]:138:138/udp",
-          "[::]:137:137/tcp",
-          "[::]:138:138/tcp",
+          "[::]:139:139/tcp",
+          "[::]:445:445/tcp",
         {% endif %}
       ]
+  tags: ['firewall_config']
+  
+- name: create podman container
+  containers.podman.podman_container:
+    name: samba
+    image: "custom_samba:{{alpine_version}}"
+    state: present
+    security_opt:
+      - label=disable
+    env:
+      TZ: "{{timezone}}"
+    log_driver: journald
+    log_options:
+      tag: samba
+    network: "isolated"
+    ip: "{{podman_samba_ip}}"
+    volumes:
+      - '{{ global_etc }}samba:/etc/samba'
+      - '{{ global_lib }}samba:/var/lib/samba'
+      - '{{nextcloud_data_path}}:{{nextcloud_data_path}}'
+#      - '{{base_path}}:{{base_path}}'
+#      - '{{data_path}}:{{data_path}}'
+#      - '/etc/group:/etc/group:ro'
+      - '/etc/passwd:/etc/passwd:ro'
+#      - '/etc/shadow:/etc/shadow:ro'
+    published_ports: "{{samba_published_ports}}"
+  register: "podman_container_state"
   notify: "restart samba"
 
-- name: create systemd service
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
   vars:
     container_name: "samba"
-  include_tasks: roles/container/shared/add_docker_service.yml
+    container_changed: "{{podman_container_state.changed}}"
+  include_tasks: roles/container/shared/handle_podman_service.yml
   tags: ['systemd_watcher_config']
 
-- name: trigger samba handler
+- name: allow service
   vars:
-    notify: "restart samba"
-    service: "samba.service"
-  include_tasks: roles/_shared/service_check.yml
+    service_name: "samba"
+    nat_rules: { ip: "{{podman_samba_ip}}", ports: "{{samba_published_ports}}" }
+  include_tasks: roles/firewall/shared/allow_service_nftables.yml
+  tags: ['firewall_config']
+  when: "nftables_enabled"
+

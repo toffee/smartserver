@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    netdata_version: "1.46.1"
+    netdata_version: "1.46.3"
   tags: [ 'update_notifier_config' ]
 
 - name: prepare needed directories
@@ -41,13 +41,8 @@
     - "netdata.conf"
   notify: "restart netdata"
 
-- name: check started docker
-  systemd:
-    name: docker
-    state: started
-
-- name: create docker container
-  docker_container:
+- name: create podman container
+  containers.podman.podman_container:
     name: netdata
     image: "netdata/netdata:v{{netdata_version}}"
     state: present
@@ -67,12 +62,12 @@
     capabilities:
       - SYS_PTRACE
       - SYS_ADMIN
-    security_opts:
+    security_opt:
       - "apparmor:unconfined"
+      - label=disable
     pid_mode: "host"
     privileged: yes
-    container_default_behavior: "compatibility"
-    network_mode: "host"
+    network: "host"
     volumes:
       - '/etc/passwd:/host/etc/passwd:ro'
       - '/etc/group:/host/etc/group:ro'
@@ -84,31 +79,38 @@
       - '/run/dbus:/run/dbus:ro'
       - '/var/lib/smartmontools/:/var/lib/smartmontools/:ro'
 
-      - '/var/run/docker.sock:/var/run/docker.sock:ro'
       - '/var/log:/host/var/log:ro'
 
-      - '{{ global_lib }}netdata:/var/lib/netdata:z'
-      - '{{ global_lib }}netdata/cache:/var/cache/netdata:z'
+      - '{{ global_lib }}netdata:/var/lib/netdata'
+      - '{{ global_lib }}netdata/cache:/var/cache/netdata'
 
-      - "{{ global_etc }}netdata/.environment:/etc/netdata/.environment:ro,z"
-      - "{{ global_etc }}netdata/netdata.conf:/etc/netdata/netdata.conf:ro,z"
-      - "{{ global_etc }}netdata/health_alarm_notify.conf:/etc/netdata/health_alarm_notify.conf:ro,z"
-      - "{{ global_etc }}netdata/python.d.conf:/etc/netdata/python.d.conf:ro,z"
-      - "{{ global_etc }}netdata/go.d.conf:/etc/netdata/go.d.conf:ro,z"
+      - "{{ global_etc }}netdata/.environment:/etc/netdata/.environment:ro"
+      - "{{ global_etc }}netdata/netdata.conf:/etc/netdata/netdata.conf:ro"
+      - "{{ global_etc }}netdata/health_alarm_notify.conf:/etc/netdata/health_alarm_notify.conf:ro"
+      - "{{ global_etc }}netdata/python.d.conf:/etc/netdata/python.d.conf:ro"
+      - "{{ global_etc }}netdata/go.d.conf:/etc/netdata/go.d.conf:ro"
 
-      - "{{ global_etc }}netdata/health.d/disks.conf:/etc/netdata/health.d/disks.conf:ro,z"
-      - "{{ global_etc }}netdata/health.d/net.conf:/etc/netdata/health.d/net.conf:ro,z"
-      - "{{ global_etc }}netdata/health.d/fping.conf:/etc/netdata/health.d/fping.conf:ro,z"
-      - "{{ global_etc }}netdata/health.d/udp_errors.conf:/etc/netdata/health.d/udp_errors.conf:ro,z"
+      - "{{ global_etc }}netdata/health.d/disks.conf:/etc/netdata/health.d/disks.conf:ro"
+      - "{{ global_etc }}netdata/health.d/net.conf:/etc/netdata/health.d/net.conf:ro"
+      - "{{ global_etc }}netdata/health.d/fping.conf:/etc/netdata/health.d/fping.conf:ro"
+      - "{{ global_etc }}netdata/health.d/udp_errors.conf:/etc/netdata/health.d/udp_errors.conf:ro"
 
-      - "{{ global_etc }}netdata/cloud.d/cloud.conf:/etc/netdata/cloud.d/cloud.conf:ro,z"
-    #exposed_ports:
-    # - "19999"
-    # - "127.0.0.1:19999:19999"  
-#  notify: "restart netdata"
+      - "{{ global_etc }}netdata/cloud.d/cloud.conf:/var/lib/netdata/cloud.d/cloud.conf:ro"
+    exposed_ports:
+     - "19999"
+     - "8125"
+  register: "podman_container_state"
+  notify: "restart netdata"
 
-# https://github.com/Tecnativa/docker-socket-proxy
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
+  vars:
+    container_name: "netdata"
+    container_changed: "{{podman_container_state.changed}}"
+  include_tasks: roles/container/shared/handle_podman_service.yml
+  tags: ['systemd_watcher_config']
 
+# ***** DEPENDENCY CONFIGS *****
 - name: copy helper
   template:
     src: "templates{{item}}"
@@ -148,7 +150,6 @@
   tags: ['cron_job']
   when: "monitoring_enabled"
 
-# ***** FINALIZE *****
 - name: register prometheus metrics
   vars:
     name: "netdata"
@@ -156,19 +157,6 @@
   include_tasks: roles/prometheus/shared/add_config.yml
   tags: ['prometheus_config']
   when: "monitoring_enabled"
-
-- name: register systemd service watcher
-  vars:
-    name: "netdata"
-  include_tasks: roles/systemd_watcher/shared/add_watcher.yml
-  tags: ['systemd_watcher_config']
-  when: "monitoring_enabled"
-
-- name: create systemd service
-  vars:
-    container_name: "netdata"
-  include_tasks: roles/container/shared/add_docker_service.yml
-  tags: ['systemd_watcher_config']
 
 - name: register update notifier
   vars:
@@ -182,9 +170,3 @@
   include_tasks: roles/update_service/shared/add_software.yml
   tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"
-
-- name: trigger netdata handler
-  vars:
-    notify: "restart netdata"
-    service: "netdata.service"
-  include_tasks: roles/_shared/service_check.yml

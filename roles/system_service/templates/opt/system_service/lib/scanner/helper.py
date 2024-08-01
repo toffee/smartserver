@@ -56,7 +56,7 @@ class Helper():
         return None
 
     def arpscan(interface, network, isRunningCallback = None):
-        returncode, result = command.exec2(["/usr/local/bin/arp-scan", "--numeric", "--plain", "--timeout=2000", "--retry=1", "--interface", interface, network], isRunningCallback=isRunningCallback)
+        returncode, result = command.exec2(["/usr/bin/arp-scan", "--numeric", "--plain", "--timeout=2000", "--retry=1", "--interface", interface, network], isRunningCallback=isRunningCallback)
         if returncode != 0:
             raise Exception("Cmd 'arpscan' was not successful")
 
@@ -84,7 +84,7 @@ class Helper():
     def nmap(ip, isRunningCallback = None):
         services = {}
 
-        # using "--defeat-rst-ratelimit" will hit the limit of netfilter (iptables) conntrack table
+        # using "--defeat-rst-ratelimit" will hit the limit of netfilter conntrack table
         #returncode, result = command.exec2(["/usr/bin/nmap", "-n", "-p-", "-sSU", "-PN", "--defeat-rst-ratelimit", "--max-retries", "2", ip], isRunningCallback=isRunningCallback)
 
         # TCP scan 2 retries

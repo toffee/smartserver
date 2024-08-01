@@ -33,57 +33,9 @@
   when: is_suse
   notify: "restart virtualbox" 
   
-- name: build docker image
-  vars:
-    name: "ci_service"
-    image_name: "custom_ci_service"
-    image_version: "{{alpine_version}}"
-    files:
-      - roles/ci_service/templates/container/Dockerfile
-      - roles/ci_service/templates/container/entrypoint.sh
-  include_tasks: roles/container/shared/build_docker_image.yml
-
-- name: create docker container
-  docker_container:
-    name: ci_service
-    image: "custom_ci_service:{{alpine_version}}"
-    state: present
-#    recreate: true
-    env:
-      TZ: "{{timezone}}"
-    log_driver: journald
-    log_options:
-      tag: ci_service
-    pid_mode: "host"
-    privileged: "true"
-    container_default_behavior: "compatibility"
-    network_mode: "host"
-    #networks:
-    #  - name: "isolated"
-    #    ipv4_address: "{{docker_ci_service_ip}}"
-    networks_cli_compatible: yes
-    volumes:
-      - '{{global_opt}}shared/python:/opt/shared/python:ro,z'
-      - '{{global_opt}}ci_service/:{{global_opt}}ci_service:ro,z'
-      - "{{global_build}}ci_job/:{{global_build}}ci_job/:rw,z"
-      - "{{global_tmp}}:{{global_tmp}}:rw,z"
-      - "{{global_lib}}ci_service/:{{global_lib}}ci_service/:rw,z"
-      - "{{global_log}}ci_service/:{{global_log}}ci_service/:rw,z"
-  notify: "restart ci_service"
-
-#- name: allow ci service
-#  vars:
-#    name: "ci_service"
-#    rules:
-#      - "saddr {{docker_prometheus_ip}} daddr {{docker_ci_service_ip}}"
-#      - "saddr {{docker_ci_service_ip}} proto tcp dport 443 outerface {{default_network_interface}}"
-#      - "saddr {{docker_ci_service_ip}} proto tcp dport 443 daddr {{docker_ci_service_ip}}"
-#  include_tasks: roles/firewall/shared/allow_service.yml
-#  tags: ['firewall_config']
-
 - name: install vagrant binary
   unarchive:
-    src: "https://releases.hashicorp.com/vagrant/2.3.7/vagrant_2.3.7_linux_amd64.zip"
+    src: "https://releases.hashicorp.com/vagrant/2.4.1/vagrant_2.4.1_linux_amd64.zip"
     dest: "{{global_opt}}ci_service"
     remote_src: yes
     creates: "{{global_opt}}ci_service/vagrant"
@@ -119,6 +71,89 @@
     mode: 0750
   notify: "restart ci_service"
 
+- name: build podman image
+  vars:
+    container_name: "ci_service"
+    image_name: "custom_ci_service"
+    image_version: "{{alpine_version}}"
+    image_files:
+      - roles/ci_service/templates/container/Dockerfile
+      - roles/ci_service/templates/container/entrypoint.sh
+  include_tasks: roles/container/shared/build_podman_image.yml
+
+- name: create podman container
+  containers.podman.podman_container:
+    name: ci_service
+    image: "custom_ci_service:{{alpine_version}}"
+    state: present
+    security_opt:
+      - label=disable
+    env:
+      TZ: "{{timezone}}"
+    log_driver: journald
+    log_options:
+      tag: ci_service
+    pid_mode: "host"
+    privileged: "true"
+    network: "isolated"
+    ip: "{{podman_ci_service_ip}}"
+    volumes:
+      - '{{global_opt}}shared/python:/opt/shared/python:ro'
+      - '{{global_opt}}ci_service/:{{global_opt}}ci_service:ro'
+      - "{{global_build}}ci_job/:{{global_build}}ci_job/:rw"
+      - "{{global_tmp}}:{{global_tmp}}:rw"
+      - "{{global_lib}}ci_service/:{{global_lib}}ci_service/:rw"
+      - "{{global_log}}ci_service/:{{global_log}}ci_service/:rw"
+  register: "podman_container_state"
+  notify: "restart ci_service"
+
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
+  vars:
+    container_name: "ci_service"
+    container_changed: "{{podman_container_state.changed}}"
+  include_tasks: roles/container/shared/handle_podman_service.yml
+  tags: ['systemd_watcher_config']
+
+- name: allow service
+  vars:
+    service_name: "ci_service"
+    container_to_container_rules:
+      - { saddr: "{{podman_prometheus_ip}}", daddr: "{{podman_ci_service_ip}}", protocol: "tcp", dport: "80", comment: "prometheus => ci_service" }
+    container_to_host_rules:
+      - { saddr: "{{podman_ci_service_ip}}", protocol: "tcp", dport: "443", comment: "apache access" }
+    container_to_outside_rules:
+      - { saddr: "{{podman_ci_service_ip}}", protocol: "tcp", dport: "443", oif: "{{default_network_interface}}", comment: "ci_service => 'github'" }
+  include_tasks: roles/firewall/shared/allow_service_nftables.yml
+  tags: ['firewall_config']
+  when: "nftables_enabled"
+  
+- name: allow service
+  vars:
+    firewall_name: "ci_service"
+    firewall_rules:
+      - "saddr {{podman_prometheus_ip}} daddr {{podman_ci_service_ip}}"
+      - "saddr {{podman_ci_service_ip}} proto tcp dport 443 outerface {{default_network_interface}}"
+      - "saddr {{podman_ci_service_ip}} proto tcp dport 443 daddr {{default_server_ip}}"
+  include_tasks: roles/firewall/shared/allow_service.yml
+  tags: ['firewall_config']
+  when: "not nftables_enabled"
+
+- name: register service watcher
+  vars:
+    watcher_name: "vboxdrv"
+  include_tasks: roles/systemd_watcher/shared/add_watcher.yml
+  tags: ['systemd_watcher_config']
+  when: "monitoring_enabled"
+
+- name: trigger vboxdrv handler
+  vars:
+    notify: "restart virtualbox"
+    service: "vboxdrv"
+    process: "lsmod | grep vbox"
+  include_tasks: roles/_shared/service_process_check.yml
+
+# ***** DEPENDENCY CONFIGS *****
 - name: synchronize webui
   synchronize:
     src: "templates/htdocs/ci_service"
@@ -146,7 +181,7 @@
 - name: create check cron job
   vars:
     name: "Continues integration job"
-    cmd: "docker exec ci_service sh -c \"{{global_opt}}ci_service/ci_job_handler start > /dev/null\""
+    cmd: "podman exec ci_service sh -c \"{{global_opt}}ci_service/ci_job_handler start > /dev/null\""
     group: "ci_service"
     log: "job"
     minute: "*/5"
@@ -165,7 +200,6 @@
   include_tasks: roles/cron/shared/add_cronjob.yml
   tags: ['cron_job']
 
-# ***** FINALIZE *****
 - name: register prometheus rules & metrics
   vars:
     name: "ci_service"
@@ -178,12 +212,7 @@
 - name: copy service apache config
   vars:
     service_name: "ci_service"
-    service_host: "127.0.0.1:8506"
-    service_additional_config: |
-        <Location /ci_service/metrics/>
-          ProxyPass http://127.0.0.1:8506/metrics/
-          ProxyPassReverse http://127.0.0.1:8506/metrics/
-        </Location>
+    service_host: "{{podman_ci_service_ip}}"
   include_tasks: roles/shared_libs/shared/add_apache_service_config.yml
   tags: ['apache_config']
 
@@ -194,29 +223,3 @@
   include_tasks: roles/shared_libs/shared/add_fluentd_service_config.yml
   tags: ['fluentd_config']
   when: "monitoring_enabled"
-
-- name: create systemd service
-  vars:
-    container_name: "ci_service"
-  include_tasks: roles/container/shared/add_docker_service.yml
-  tags: ['systemd_watcher_config']
- 
-- name: register service watcher
-  vars:
-    name: "vboxdrv"
-  include_tasks: roles/systemd_watcher/shared/add_watcher.yml
-  tags: ['systemd_watcher_config']
-  when: "monitoring_enabled"
-  
-- name: trigger vboxdrv handler
-  vars:
-    notify: "restart virtualbox"
-    service: "vboxdrv.service"
-    process: "lsmod | grep vbox"
-  include_tasks: roles/_shared/service_process_check.yml
-  
-- name: trigger ci_service handler
-  vars:
-    notify: "restart ci_service"
-    service: "ci_service.service"
-  include_tasks: roles/_shared/service_check.yml

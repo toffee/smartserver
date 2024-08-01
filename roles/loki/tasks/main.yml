@@ -20,61 +20,65 @@
     - "loki/local-config.yaml"
   notify: "restart loki"
   
-- name: build docker image
-  vars:
-    name: "loki"
-    image_name: "custom_loki"
-    image_version: "{{loki_version}}"
-    files:
-      - roles/loki/templates/container/Dockerfile
-  include_tasks: roles/container/shared/build_docker_image.yml
-    
-- name: create docker container
-  docker_container:
+- name: create podman container
+  containers.podman.podman_container:
     name: loki
-    image: "custom_loki:{{loki_version}}"
+    image: "grafana/loki:{{loki_version}}"
     state: present
-#    user: "root:root"
-#    recreate: true
-    user: "{{system_users['loki'].name}}:{{system_groups['loki'].name}}"
+    security_opt:
+      - label=disable
+    user: "{{system_users['loki'].id}}:{{system_groups['loki'].id}}"
     env:
       TZ: "{{timezone}}"
-#    entrypoint:
-#      - "/bin/sh"
-#      - "-c"
-#      - "\"/usr/bin/loki -log.level=debug -config.file=/etc/loki/local-config.yaml 2>&1\""
     log_driver: journald
     log_options:
       tag: loki
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks:
-      - name: "isolated"
-        ipv4_address: "{{docker_loki_ip}}"
-    networks_cli_compatible: yes
+    network: "isolated"
+    ip: "{{podman_loki_ip}}"
     volumes:
-      - '{{global_etc}}loki:/etc/loki:z'
-      - '{{global_lib}}loki:/loki:z'
+      - '{{global_etc}}loki:/etc/loki'
+      - '{{global_lib}}loki:/loki'
     exposed_ports:
      - "3100"
+  register: "podman_container_state"
   notify: "restart loki"
-      
-- name: allow loki service
+
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
   vars:
-    name: "loki"
-    rules:
-      - "saddr {{docker_prometheus_ip}} daddr {{docker_loki_ip}}"
-      - "saddr {{docker_loki_ip}} daddr {{docker_alertmanager_ip}}"
+    container_name: "loki"
+    container_changed: "{{podman_container_state.changed}}"
+    container_after: [ "alertmanager" ]
+  include_tasks: roles/container/shared/handle_podman_service.yml
+  tags: ['systemd_watcher_config']
+      
+- name: allow service
+  vars:
+    service_name: "loki"
+    container_to_container_rules:
+      - { saddr: "{{podman_prometheus_ip}}", daddr: "{{podman_loki_ip}}", protocol: "tcp", dport: "3100", comment: "prometheus => loki" }
+      - { saddr: "{{podman_loki_ip}}", daddr: "{{podman_alertmanager_ip}}", protocol: "tcp", dport: "9093", comment: "prometheus => alertmanager" }
+  include_tasks: roles/firewall/shared/allow_service_nftables.yml
+  tags: ['firewall_config']
+  when: "nftables_enabled"
+
+- name: allow service
+  vars:
+    firewall_name: "loki"
+    firewall_rules:
+      - "saddr {{podman_prometheus_ip}} daddr {{podman_loki_ip}}"
+      - "saddr {{podman_loki_ip}} daddr {{podman_alertmanager_ip}}"
   include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
+  when: "not nftables_enabled"
 
 - name: add container name
   vars:
     host_name: "loki"
-    host_ip_address: "{{docker_loki_ip}}"
+    host_ip_address: "{{podman_loki_ip}}"
   include_tasks: roles/_shared/add_to_hosts.yml
 
-# ***** FINALIZE *****
+# ***** DEPENDENCY CONFIGS *****
 - name: register prometheus rules & metrics
   vars:
     name: "loki"
@@ -107,13 +111,6 @@
   tags: ['fluentd_config']
   when: "monitoring_enabled"
 
-- name: create systemd service
-  vars:
-    container_name: "loki"
-    container_after: [ "alertmanager" ]
-  include_tasks: roles/container/shared/add_docker_service.yml
-  tags: ['systemd_watcher_config']
-  
 - name: register grafana configs
   vars:
     name: "loki"
@@ -137,9 +134,3 @@
   include_tasks: roles/update_service/shared/add_software.yml
   tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"
-
-- name: trigger loki handler
-  vars:
-    notify: "restart loki"
-    service: "loki.service"
-  include_tasks: roles/_shared/service_check.yml

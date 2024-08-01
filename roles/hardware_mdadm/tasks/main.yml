@@ -64,12 +64,12 @@
 
 - name: register systemd service watcher
   vars:
-    name: "mdmonitor"
+    watcher_name: "mdmonitor"
   include_tasks: roles/systemd_watcher/shared/add_watcher.yml
   tags: ['systemd_watcher_config']
 
 - name: trigger mdmonitor handler
   vars:
     notify: "restart mdmonitor"
-    service: "mdmonitor.service"
+    service: "mdmonitor"
   include_tasks: roles/_shared/service_check.yml

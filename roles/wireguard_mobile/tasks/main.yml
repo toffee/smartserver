@@ -132,22 +132,23 @@
   with_items: "{{vpn_gates}}"
   tags: [ 'user' ]
   
-- name: build docker image
+- name: build podman image
   vars:
-    name: "wireguard_mobile"
+    container_name: "wireguard_mobile"
     image_name: "custom_wireguard_mobile"
     image_version: "{{alpine_version}}"
-    files:
+    image_files:
       - roles/wireguard_mobile/templates/container/Dockerfile
       - roles/wireguard_mobile/templates/container/entrypoint.sh
-  include_tasks: roles/container/shared/build_docker_image.yml
+  include_tasks: roles/container/shared/build_podman_image.yml
   
-- name: create docker container
-  docker_container:
+- name: create podman container
+  containers.podman.podman_container:
     name: wireguard_mobile
     image: "custom_wireguard_mobile:{{alpine_version}}"
     state: present
-#    recreate: true
+    security_opt:
+      - label=disable
     env:
       TZ: "{{timezone}}"
     log_driver: journald
@@ -156,31 +157,42 @@
     capabilities:
       - NET_ADMIN
       - SYS_MODULE
-    container_default_behavior: "compatibility"
-    network_mode: "host"
+    network: "host"
 #    networks:
 #      - name: "mobile_vpn"
 #    networks_cli_compatible: yes
     volumes:
-      - '{{global_etc}}wireguard_mobile:/etc/wireguard:z'
-#    published_ports:
-#      - "{{mobile_vpn_internal_port}}:{{mobile_vpn_internal_port}}/udp"
+      - '{{global_etc}}wireguard_mobile:/etc/wireguard'
+#    exposed_ports:
+#      - "{{mobile_vpn_internal_port}}/udp"
+  register: "podman_container_state"
   notify: "restart wireguard_mobile"
 
-#- name: clean old docker images => image does not exists
-#  shell: "docker rmi -f $(docker images --filter \"dangling=true\" -q)"
-#  when: "'custom_wireguard_mobile' not in image_exists.stdout"
-  
-# ***** FINALIZE *****
-# todo => enable forwarding if needed to allow vpn client to access complete network
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
+  vars:
+    container_name: "wireguard_mobile"
+    container_changed: "{{podman_container_state.changed}}"
+    container_pre_exec: "modprobe wireguard"
+  include_tasks: roles/container/shared/handle_podman_service.yml
 
-## iptables -A FORWARD -i wg0 -j ACCEPT # => not needed, because we trust this network always
-
-# https://gist.github.com/insdavm/b1034635ab23b8839bf957aa406b5e39
-# https://www.cyberciti.biz/faq/how-to-set-up-wireguard-firewall-rules-in-linux/
-# iptables -t nat -I POSTROUTING -s {{vpn_gate_client_privatekeys[item]}} -o {{default_network_interface}} -j MASQUERADE
-
-# sysctl net.ipv4.ip_forward=1
+- name: allow wireguard_mobile service
+  vars:
+    service_name: "wireguard_mobile"
+    container_to_outside_rules:
+      - { saddr: "{ {{ vpn_admin_ips | join(', ')}} }", protocol: "udp", comment: "vpn admin clients" }
+    network_to_host_rules:
+      - { protocol: "udp", dport: "{{mobile_vpn_internal_port}}", comment: "open vpn port" }
+    masquerading_rules: |
+        [
+            { "saddr": "{{vpn_mobile_network}}/24", "oif": "{{default_network_interface}}" }
+            {% if macvlan_range | length > 0 %}
+              , { "saddr": "{{vpn_mobile_network}}/24", "oifname": "mac0" }
+            {% endif %}
+        ]
+  include_tasks: roles/firewall/shared/allow_service_nftables.yml
+  tags: ['firewall_config']
+  when: "nftables_enabled"
 
 - name: prepare mobile vpn admin ip rules
   set_fact:
@@ -192,22 +204,12 @@
       "daddr {{default_server_ip}} proto udp dport {{mobile_vpn_internal_port}}"
       ]
   tags: ['firewall_config']
+  when: "not nftables_enabled"
 
 - name: allow mobile vpn service
   vars:
-    name: "wireguard_mobile"
-    rules: "{{vpn_admin_ip_rules}}"
+    firewall_name: "wireguard_mobile"
+    firewall_rules: "{{vpn_admin_ip_rules}}"
   include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
-
-- name: create systemd service
-  vars:
-    container_name: "wireguard_mobile"
-  include_tasks: roles/container/shared/add_docker_service.yml
-  tags: ['systemd_watcher_config']
-
-- name: trigger wireguard_mobile handler
-  vars:
-    notify: "restart wireguard_mobile"
-    service: "wireguard_mobile.service"
-  include_tasks: roles/_shared/service_check.yml
+  when: "not nftables_enabled"

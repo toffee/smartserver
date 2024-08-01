@@ -1,176 +1,115 @@
-#https://kofler.info/docker-unter-centos-8-und-fedora-31-installieren/
-
-- name: make sure docker from distro is not installed => is_rhel or is_fedora
-  yum:
-    name: [
-      moby-engine
-      #,docker
-      #,docker-client
-      #,docker-common
-      #,docker-latest
-      #,docker-logrotate
-      #,container-selinux
-      #,docker-selinux
-      #,docker-engine-selinux
-      #,docker-engine
-    ]
-    state: absent
-  when: is_rhel or is_fedora
-
-- name: make sure dnf-plugins.core installed => is_rhel or is_fedora
-  dnf:
-    name: dnf-plugins-core
-    state: present
-  when: is_rhel or is_fedora
-
-- name: remove old packages => is_rhel or is_fedora
-  yum:
-    name: [
-        docker
-        , docker-client
-        , docker-client-latest
-        , docker-common
-        , docker-latest
-        , docker-latest-logrotate
-        , docker-logrotate
-        , docker-selinux
-        , docker-engine-selinux
-        , docker-engine
-    ]
-    state: absent
-  when: is_rhel or is_fedora
-
-- name: install docker repository => is_rhel or is_fedora
-  command: dnf config-manager --add-repo https://download.docker.com/linux/{{'centos' if is_rhel else 'fedora'}}/docker-ce.repo
-  args:
-    warn: no
-  changed_when: no
-  when: is_rhel or is_fedora
-
 - name: install required packages => is_rhel or is_fedora
   yum:
     name: [
-        docker-ce
-        , docker-ce-cli 
-        , containerd.io #-1.4.6 # 1.4.8 does not work
-        , python3-docker  # used by ansible docker module
-        , podman
-        , hostname
+        podman
     ]
     state: present
   when: is_rhel or is_fedora
-  
-- name: remove old packages => is_ubuntu
-  apt:
-    name: [
-        docker 
-        , docker-engine 
-        , docker.io 
-        , containerd 
-        , runc
-    ]
-    state: absent
-  when: is_ubuntu
-
-- name: add docker gpg key => is_ubuntu
-  apt_key:
-    url: https://download.docker.com/linux/ubuntu/gpg
-    state: present
-  when: is_ubuntu
-        
-- name: install docker repository => is_ubuntu
-  apt_repository:
-    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ansible_distribution_release}} stable"
-    state: present
-  when: is_ubuntu
 
 - name: install required packages => is_ubuntu
   apt:
     name: [
-        docker-ce 
-        , docker-ce-cli 
-        , containerd.io
-        , python3-docker
-        , podman
-        , hostname
+        podman
     ]
     state: present
   when: is_ubuntu
 
-#- name: add suse zypper repository
-#  zypper_repository:
-#    name: Docker
-#    repo: 'https://download.opensuse.org/repositories/Virtualization:/containers/{{ansible_distribution_version}}/'
-#    auto_import_keys: yes
-#    priority: "50"
-#    state: present
-#  when: is_suse
+- name: check netavark => is_ubuntu
+  shell: "/usr/lib/podman/netavark version | grep 'version' | grep -Po '[0-9\\.]*'"
+  changed_when: "netavark_version.stdout != '1.11.0'"
+  register: netavark_version
+  when: "nftables_enabled and is_ubuntu"
+
+  # With old netavark version, firewall_driver 'none' is not possible
+- name: upgrade netavark => is_ubuntu
+  shell: "wget -O - https://github.com/containers/netavark/releases/download/v1.11.0/netavark.gz | gzip -d > /usr/lib/podman/netavark && chown root:root /usr/lib/podman/netavark && chmod 755 /usr/lib/podman/netavark"
+  when: "nftables_enabled and is_ubuntu and netavark_version.stdout != '1.11.0'"
 
 - name: install required packages => is_suse
   zypper:
     name: [
-        docker
-#        , docker-buildx
-#        , python2-docker   # used by ansible docker module => python2 is used because "/usr/lib/python3.6/site-packages/ansible/modules/cloud/docker_container.py" is using python2 (vagrant suse version is using it)
-        , python3-docker    # used by ansible docker module
-        , podman
-        , hostname          # used by container visualizer cli
-#        , cni
-#        , podman>=1.6.2
-#        , cni>=0.7.1
-#        , cni-plugins>=0.8.3
+        podman
     ]
     state: present
   when: is_suse
+
+#https://bugs.launchpad.net/ubuntu/+source/libpod/+bug/2040483
+- name: teardown apparmor for containers on ubuntu temporary
+  shell: "{{item}}"
+  with_items:
+    - "ln -s /etc/apparmor.d/runc /etc/apparmor.d/disable/"
+    - "apparmor_parser -R /etc/apparmor.d/runc"
+    - "ln -s /etc/apparmor.d/crun /etc/apparmor.d/disable/"
+    - "apparmor_parser -R /etc/apparmor.d/crun"
+    - "ln -s /etc/apparmor.d/podman /etc/apparmor.d/disable/"
+    - "apparmor_parser -R /etc/apparmor.d/podman"
+  when: is_ubuntu
 
 ##### DOCKER #####
 - name: prepare needed directories
   vars:
     directories:
-      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "/etc/docker/" }
-      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "/opt/docker" }
-      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "/opt/docker/config" }
-      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{global_lib}}docker" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "/opt/container" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "/opt/container/config" }
       - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{global_lib}}libpod/storage/" }          # podman
       - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{global_lib}}containers/storage/" }      # podman
       - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{global_tmp}}libpod/" }                  # podman
       - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{global_tmp}}containers/storage/" }      # podman
   include_tasks: roles/_shared/create_directories.yml
 
-- name: set docker selinux configuration => is_rhel or is_fedora
+- name: set container selinux configuration => is_rhel or is_fedora
   sefcontext:
-    target: "{{global_lib}}docker"
-    ftype: "d"
-    setype: "container_var_lib_t"
+    target: "{{item}}"
+    ftype: "a"
+    setype: "container_ro_file_t"
     seuser: "system_u"
     state: present
+  with_items:
+ #   - "{{global_lib}}libpod/storage(/.*)?"
+    - "{{global_lib}}containers/storage(/.*)?"
   register: sefcontext_result
   when: is_rhel or is_fedora
 
 - name: reload selinux configuration => (is_rhel or is_fedora) and sefcontext changed
-  shell: "restorecon {{global_lib}}docker"
+  shell: "restorecon -irv {{item}}"
+  with_items:
+#    - "{{global_lib}}libpod/storage/"
+    - "{{global_lib}}containers/storage/"
   when: (is_rhel or is_fedora) and sefcontext_result.changed
 
-- name: copy daemon config
+# ***** NESSECARRY UNTIL PODMAN 5 ********
+# because "firewall_driver" setting in containers.conf is ignored
+# second part is inside podman_service template
+# ****************************************
+- name: force none firewall driver
+  lineinfile:
+    path: /etc/environment
+    regexp: '^NETAVARK_FW\s*='
+    line: 'NETAVARK_FW=none'
+  when: "nftables_enabled"
+
+- name: copy podman config
   template:
-    src: "templates/etc/docker/daemon.json"
-    dest: "/etc/docker/daemon.json"
+    src: "templates{{item}}"
+    dest: "{{item}}"
     owner: root
     group: root
     mode: 0640
-  register: docker_config_result
-  notify: "restart docker"
+  with_items:
+    - "/etc/containers/containers.conf"
+    - "/etc/containers/registries.conf"
+    - "/etc/containers/storage.conf"
 
 - name: copy fluentd config
   vars:
-    config_file: "templates/etc/fluent/_.ansible.d/docker.conf"
+    config_file: "templates/etc/fluent/_.ansible.d/podman.conf"
   include_tasks: roles/fluentd/shared/add_config.yml
   tags: ['fluentd_config']
   when: "monitoring_enabled"
 
-- name: synchronize docker tools
+- name: synchronize container tools
   synchronize:
-    src: "templates/opt/docker"
+    src: "templates/opt/container"
     dest: "/opt/"
     archive: no
     checksum: yes
@@ -182,20 +121,36 @@
       - "--chown=root:root"
       - "--chmod=D750,F750"
 
-- name: copy docker tools config
-  template:
-    src: "templates/config.py"
-    dest: "/opt/docker/config/config.py"
+- name: copy nftables tools
+  copy:
+    src: "templates/{{item.src}}"
+    dest: "/opt/container/{{item.dest}}"
     owner: root
     group: root
     mode: 0750
+  with_items:
+      - { src: "nftables_visualizer", dest: "visualizer" }
+  when: "nftables_enabled"
 
-#### PODMAN ####
-# !!!!remote deployment does not work
-#- name: install roles from ansible galaxy
-#  local_action: command ansible-galaxy collection install containers.podman
-#  register: ag_result
-#  changed_when: "'Installing' in ag_result.stdout"
+- name: copy legacy iptables tools
+  copy:
+    src: "templates/{{item.src}}"
+    dest: "/opt/container/{{item.dest}}"
+    owner: root
+    group: root
+    mode: 0750
+  with_items:
+      - { src: "iptables_clean.sh", dest: "clean_iptables.sh" }
+      - { src: "iptables_visualizer", dest: "visualizer" }
+  when: "not nftables_enabled"
+
+- name: copy container tools config
+  template:
+    src: "templates/config.py"
+    dest: "/opt/container/config/config.py"
+    owner: root
+    group: root
+    mode: 0750
 
 - name: set podman config
   lineinfile:
@@ -210,31 +165,7 @@
     - { file: 'libpod.conf', field: 'static_dir', value: '{{global_lib}}libpod/storage/' }
     - { file: 'libpod.conf', field: 'tmp_dir', value: '{{global_tmp}}libpod/' }
     - { file: 'libpod.conf', field: 'cgroup_manager', value: "systemd" }
-    - { file: 'storage.conf', field: 'driver', value: 'overlay' }
-    - { file: 'storage.conf', field: 'runroot', value: '{{global_tmp}}containers/storage/' }
-    - { file: 'storage.conf', field: 'graphroot', value: '{{global_lib}}containers/storage/' }
 
-- name: copy fluentd config => is_suse
-  vars:
-    config_file: "templates/etc/fluent/_.ansible.d/podman.conf"
-  include_tasks: roles/fluentd/shared/add_config.yml
-  tags: ['fluentd_config']
-  when: "monitoring_enabled"
-  
-#http://download.opensuse.org/repositories/devel:/kubic/openSUSE_Tumbleweed/x86_64/
-#- name: clone dnsname git
-#  git:
-#    accept_hostkey: yes
-#    repo: 'https://github.com/containers/dnsname/'
-#    dest: '{{global_build}}podman_dnsname/'
-#    version: "master"
-#  register: dnsname_git
-  
-#- name: compile and install dnsname
-#  shell: "cd {{global_build}}podman_dnsname/ && make install PREFIX=/usr"
-#  when: dnsname_git.changed
-#### OTHER ####
-    
 # https://success.docker.com/article/node-using-swap-memory-instead-of-host-memory
 # vm.swappiness = 0   # Swap is disabled. In earlier versions, this meant that the kernel would swap only to avoid an out of memory condition, but in later versions this is achieved by setting to 1.
 # vm.swappiness = 1   # Kernel version 3.5 and over, as well as kernel version 2.6.32-303 and over: Minimum amount of swapping without disabling it entirely.
@@ -256,38 +187,32 @@
   shell: sysctl -p
   when: sysctlchanged.changed
 
-- name: force docker stop => docker_config_result changed
-  systemd:
-    state: stopped
-    name: docker
-  when: docker_config_result.changed
-
-# needs to be started to create docker_network
-- name: starting docker
-  systemd:
-    state: started
-    name: docker
-    
-# bridge network to allow containers host access without beeing in networkmode "host"
-- name: create isolated docker network
-  docker_network:
-    name: "isolated"
-    ipam_config:
-      - subnet: "{{docker_base_network}}/24"
-        gateway: "{{docker_base_gateway}}"
-    ipam_driver_options:
-      "com.docker.network.bridge.enable_icc": "false"
-#    appends: yes
-
 ##### MACVLAN #####
+# to avoid message '(udev-worker)[19262]: veth20: Could not generate persistent MAC address: No data available'
+- name: check systemd network config direcory
+  file:
+    path: '/etc/systemd/network/'
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+
+- name: copy veth network config tools
+  copy:
+    src: "templates/etc/systemd/network/98-default.link"
+    dest: "/etc/systemd/network/98-default.link"
+    owner: root
+    group: root
+    mode: 0644
+
 - name: create macvlan network
-  docker_network:
+  containers.podman.podman_network:
     name: 'macvlan'
-    enable_ipv6: "{{ 'true' if default_server_ipv6 is defined else 'false' }}"
-    driver: macvlan
-    driver_options:
+    driver: "macvlan"
+    ipv6: "{{ 'true' if default_server_ipv6 is defined else 'false' }}"
+    opt:
       parent: '{{default_network_interface}}'
-    ipam_config: |
+    net_config: |
       [
         { "subnet": "{{default_server_network}}", "gateway": "{{default_server_gateway}}" }
         {% if default_server_ipv6 is defined %}
@@ -295,33 +220,19 @@
         {% endif %}
       ]
 
-# needed, because macvlan in a VM has no internet access, but pihole needs internet access during startup
-#- name: macvlan routing => not is_production
-#  shell: |
-#    ip a | grep br-macvlan > /dev/null
-#    if [ $? -eq 1 ]; then
-#      ip link add br-macvlan link {{default_network_interface}} type macvlan mode bridge
-#      ip addr add {{default_server_network}} dev br-macvlan
-#      ip link set dev br-macvlan up
-#      iptables -t filter -I FORWARD --in-interface br-macvlan --out-interface {{ansible_default_ipv4.interface}} --source {{server_network}} --destination {{ansible_default_ipv4.address}} -j ACCEPT
-#      iptables -t filter -I FORWARD --in-interface {{ansible_default_ipv4.interface}} --out-interface br-macvlan --source {{ansible_default_ipv4.network}}/24 --destination {{server_network}} -j ACCEPT
-#      iptables -t nat -I POSTROUTING -o {{ansible_default_ipv4.interface}} -j MASQUERADE
-#      echo "created"
-#    else
-#      echo "skipped"
-#    fi
-#  changed_when: macvlan_result.stdout != 'skipped'
-#  register: macvlan_result
-#  when: "macvlan_range | length > 0 and not is_production"
-
-#- name: test
-#  debug:
-#    msg: "{{macvlan_result}}"
+- name: create isolated podman network
+  containers.podman.podman_network:
+    name: "isolated"
+    #driver: "ipvlan"
+    internal: no
+    ipv6: "{{ 'true' if default_server_ipv6 is defined else 'false' }}"
+    subnet: "{{podman_base_network}}"
+    gateway: "{{podman_base_gateway}}"
 
 - name: copy macvlan_bridge cmd
   template:
     src: "templates/create_macvlan_bridge.sh"
-    dest: "/opt/docker/create_macvlan_bridge.sh"
+    dest: "/opt/container/create_macvlan_bridge.sh"
     owner: root
     group: root
     mode: 0750
@@ -341,7 +252,7 @@
 # ***** FINALIZE *****
 - name: register systemd service watcher
   vars:
-    name: "macvlan_bridge"
+    watcher_name: "macvlan_bridge"
   include_tasks: roles/systemd_watcher/shared/add_watcher.yml
   tags: ['systemd_watcher_config']
   when: "monitoring_enabled and macvlan_range | length > 0"
@@ -349,32 +260,31 @@
 - name: trigger macvlan_bridge handler
   vars:
     notify: "restart macvlan_bridge"
-    service: "macvlan_bridge.service"
+    service: "macvlan_bridge"
   include_tasks: roles/_shared/service_check.yml
   when: "macvlan_range | length > 0"
 
 - name: register systemd service watcher
   vars:
-    name: "docker"
+    watcher_name: "podman"
   include_tasks: roles/systemd_watcher/shared/add_watcher.yml
   tags: ['systemd_watcher_config']
   when: "monitoring_enabled"
 
-- name: trigger docker handler
+- name: create iptables rule cron job
   vars:
-    notify: "restart docker"
-    service: "docker.service"
-  include_tasks: roles/_shared/service_check.yml
+    name: "IPTables netavark leftover check"
+    cmd: "/opt/container/clean_iptables.sh check"
+    group: "container"
+    log: "iptables_check"
+    minute: "*/5"
+  include_tasks: roles/cron/shared/add_cronjob.yml
+  tags: ['cron_job']
+  when: "not nftables_enabled"
 
-#- name: register systemd service watcher
-#  vars:
-#    name: "podman.socket"
-#  include_tasks: roles/systemd_watcher/shared/add_watcher.yml
-#  tags: ['systemd_watcher_config']
-#  when: "monitoring_enabled"
-
-#- name: trigger podman handler
-#  vars:
-#    notify: "restart podman"
-#    service: "podman.socket"
-#  include_tasks: roles/_shared/service_check.yml
+- name: enable podman
+  systemd:
+    name: podman
+    daemon_reload: yes
+    enabled: yes
+    masked: no

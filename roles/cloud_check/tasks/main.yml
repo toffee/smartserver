@@ -1,50 +1,9 @@
 - name: prepare needed directories
   vars:
     directories:
-      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{global_etc}}cloud_check/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{global_opt}}cloud_check/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{global_opt}}cloud_check/config/" }
   include_tasks: roles/_shared/create_directories.yml
-
-- name: build docker image
-  vars:
-    name: "cloud_check"
-    image_name: "custom_cloud_check"
-    image_version: "{{alpine_version}}"
-    files:
-      - roles/cloud_check/templates/container/Dockerfile
-  include_tasks: roles/container/shared/build_docker_image.yml
-
-- name: create docker container
-  docker_container:
-    name: cloud_check
-    image: "custom_cloud_check:{{alpine_version}}"
-    state: present
-#    recreate: true
-    env:
-      TZ: "{{timezone}}"
-    log_driver: journald
-    log_options:
-      tag: cloud_check
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks:
-      - name: "isolated"
-        ipv4_address: "{{docker_cloud_check_ip}}"
-    networks_cli_compatible: yes
-    volumes:
-      - '{{global_etc}}cloud_check/:/etc/cloud_check:z'
-      - '{{cloud_path}}/remote:/cloud/remote:z,rshared'
-  notify: "restart cloud_check"
-
-- name: allow cloud_check service
-  vars:
-    name: "cloud_check"
-    rules:
-      - "saddr {{docker_prometheus_ip}} daddr {{docker_cloud_check_ip}}"
-      - "saddr {{docker_cloud_check_ip}} daddr {{docker_cloud_mosquitto_ip}}"
-      - "saddr {{docker_cloud_check_ip}} proto tcp dport 80 outerface {{default_network_interface}}"
-      - "saddr {{docker_cloud_check_ip}} proto icmp outerface {{default_network_interface}}"
-  include_tasks: roles/firewall/shared/allow_service.yml
-  tags: ['firewall_config']
 
 - name: copy config
   template:
@@ -54,7 +13,7 @@
     group: root
     mode: 0640
   with_items:
-    - { src: "/config.py", dest: "{{global_etc}}cloud_check/config.py" }
+    - { src: "/config.py", dest: "{{global_opt}}cloud_check/config/config.py" }
   notify: "restart cloud_check"
 
 - name: copy service
@@ -63,12 +22,77 @@
     dest: "{{item.dest}}"
     owner: root
     group: root
-    mode: 0640
+    mode: 0750
   with_items:
-    - { src: "/etc/daemon.py", dest: "{{global_etc}}cloud_check/daemon.py" }
+    - { src: "/opt/cloud_check/cloud_check", dest: "{{global_opt}}cloud_check/cloud_check" }
   notify: "restart cloud_check"
 
-# ***** FINALIZE *****
+- name: build podman image
+  vars:
+    container_name: "cloud_check"
+    image_name: "custom_cloud_check"
+    image_version: "{{alpine_version}}"
+    image_files:
+      - roles/cloud_check/templates/container/Dockerfile
+      - roles/cloud_check/templates/container/entrypoint.sh
+  include_tasks: roles/container/shared/build_podman_image.yml
+
+- name: create podman container
+  containers.podman.podman_container:
+    name: cloud_check
+    image: "custom_cloud_check:{{alpine_version}}"
+    state: present
+    security_opt:
+      - label=disable
+    env:
+      TZ: "{{timezone}}"
+    log_driver: journald
+    log_options:
+      tag: cloud_check
+    network: "isolated"
+    ip: "{{podman_cloud_check_ip}}"
+    volumes:
+      - '{{global_opt}}cloud_check/:/opt/cloud_check'
+      - '{{cloud_path}}/remote:/cloud/remote:rshared'
+  register: "podman_container_state"
+  notify: "restart cloud_check"
+
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
+  vars:
+    container_name: "cloud_check"
+    container_changed: "{{podman_container_state.changed}}"
+    container_after: [ "cloud_mosquitto" ]
+  include_tasks: roles/container/shared/handle_podman_service.yml
+  tags: ['systemd_watcher_config']
+
+- name: allow service
+  vars:
+    service_name: "cloud_check"
+    container_to_container_rules:
+      - { saddr: "{{podman_prometheus_ip}}", daddr: "{{podman_cloud_check_ip}}", protocol: "tcp", dport: "80", comment: "prometheus => cloud_check" }
+      - { saddr: "{{podman_cloud_check_ip}}", daddr: "{{vpn_cloud_services.local.mosquitto}}", protocol: "tcp", dport: [ "1883", "9001" ], comment: "cloud_check => cloud_mosquitto" }
+    container_to_outside_rules:
+      - { saddr: "{{podman_cloud_check_ip}}", protocol: "tcp", dport: "80", oif: "{{default_network_interface}}", comment: "cloud_check => http endpoint of other clouds" }
+      - { saddr: "{{podman_cloud_check_ip}}", protocol: "icmp", oif: "{{default_network_interface}}", comment: "cloud_check => icmp endpoint of other clouds" }
+      - { saddr: "{{podman_cloud_check_ip}}", daddr: "{{vpn_cloud_services['local']['mosquitto']}}", protocol: "tcp", dport: "1883", comment: "cloud_check => cloud mosquitto" }
+  include_tasks: roles/firewall/shared/allow_service_nftables.yml
+  tags: ['firewall_config']
+  when: "nftables_enabled"
+  
+- name: allow service
+  vars:
+    firewall_name: "cloud_check"
+    firewall_rules:
+      - "saddr {{podman_prometheus_ip}} daddr {{podman_cloud_check_ip}}"
+      - "saddr {{podman_cloud_check_ip}} daddr {{vpn_cloud_services.local.mosquitto}}"
+      - "saddr {{podman_cloud_check_ip}} proto tcp dport 80 outerface {{default_network_interface}}"
+      - "saddr {{podman_cloud_check_ip}} proto icmp outerface {{default_network_interface}}"
+  include_tasks: roles/firewall/shared/allow_service.yml
+  tags: ['firewall_config']
+  when: "not nftables_enabled"
+
+# ***** DEPENDENCY CONFIGS *****
 - name: register prometheus rules & metrics
   vars:
     name: "cloud_check"
@@ -77,16 +101,3 @@
   include_tasks: roles/prometheus/shared/add_config.yml
   tags: ['prometheus_config']
   when: "monitoring_enabled"
-
-- name: create systemd service
-  vars:
-    container_name: "cloud_check"
-    container_after: [ "cloud_mosquitto" ]
-  include_tasks: roles/container/shared/add_docker_service.yml
-  tags: ['systemd_watcher_config']
-
-- name: trigger cloud_check handler
-  vars:
-    notify: "restart cloud_check"
-    service: "cloud_check.service"
-  include_tasks: roles/_shared/service_check.yml

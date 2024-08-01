@@ -53,60 +53,72 @@
     - "_.ansible.d/fluentd.conf"
   notify: "restart fluentd"
 
-- name: build docker image
+- name: build podman image
   vars:
-    name: "fluentd"
+    container_name: "fluentd"
     image_name: "custom_fluentd"
     image_version: "{{fluentd_version}}"
-    files:
+    image_files:
       - roles/fluentd/templates/container/Dockerfile
-  include_tasks: roles/container/shared/build_docker_image.yml
+  include_tasks: roles/container/shared/build_podman_image.yml
 
-- name: create docker container
-  docker_container:
+- name: create podman container
+  containers.podman.podman_container:
     name: fluentd
     image: "custom_fluentd:{{fluentd_version}}"
     state: present
     user: "root:root"
+    security_opt:
+      - label=disable
     env:
       TZ: "{{timezone}}"
       LD_PRELOAD: "" # fix SEGFAULT => https://github.com/fluent/fluentd-docker-image/issues/378
     log_driver: journald
     log_options:
       tag: fluentd
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks:
-      - name: "isolated"
-        ipv4_address: "{{docker_fluentd_ip}}"
-    networks_cli_compatible: yes
+    network: "isolated"
+    ip: "{{podman_fluentd_ip}}"
     volumes:
-      - '{{ global_etc }}fluentd:/fluentd/etc/:z'
-      - '{{ global_log }}:{{ global_log }}:z'
-      - '/run/log/journal:/run/log/journal:z'
+      - '{{ global_etc }}fluentd:/fluentd/etc/'
+      - '{{ global_log }}:{{ global_log }}'
+      - '/run/log/journal:/run/log/journal'
+  register: "podman_container_state"
   notify: "restart fluentd"
-    
-- name: allow fluentd service
-  vars:
-    name: "fluentd"
-    rules:
-      - "saddr {{docker_fluentd_ip}} daddr {{docker_loki_ip}}"
-  include_tasks: roles/firewall/shared/allow_service.yml
-  tags: ['firewall_config']
-  
-- name: add container name
-  vars:
-    host_name: "fluentd"
-    host_ip_address: "{{docker_fluentd_ip}}"
-  include_tasks: roles/_shared/add_to_hosts.yml
 
-- name: create systemd service
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
   vars:
     container_name: "fluentd"
+    container_changed: "{{podman_container_state.changed}}"
     container_after: [ "loki" ]
-  include_tasks: roles/container/shared/add_docker_service.yml
+  include_tasks: roles/container/shared/handle_podman_service.yml
   tags: ['systemd_watcher_config']
-  
+
+- name: allow service
+  vars:
+    service_name: "fluentd"
+    container_to_container_rules:
+      - { saddr: "{{podman_fluentd_ip}}", daddr: "{{podman_loki_ip}}", protocol: "tcp", dport: "3100", comment: "fluentd => loki" }
+  include_tasks: roles/firewall/shared/allow_service_nftables.yml
+  tags: ['firewall_config']
+  when: "nftables_enabled"
+
+- name: allow service
+  vars:
+    firewall_name: "fluentd"
+    firewall_rules:
+      - "saddr {{podman_fluentd_ip}} daddr {{podman_loki_ip}}"
+  include_tasks: roles/firewall/shared/allow_service.yml
+  tags: ['firewall_config']
+  when: "not nftables_enabled"
+
+- name: add service name
+  vars:
+    host_name: "fluentd"
+    host_ip_address: "{{podman_fluentd_ip}}"
+  include_tasks: roles/_shared/add_to_hosts.yml
+
+# ***** DEPENDENCY CONFIGS *****
 - name: register update notifier
   vars:
     name: "fluentd"
@@ -120,16 +132,3 @@
   tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"
 
-# ***** FINALIZE *****
-- name: register systemd service watcher
-  vars:
-    name: "fluentd"
-  include_tasks: roles/systemd_watcher/shared/add_watcher.yml
-  tags: ['systemd_watcher_config']
-  when: "monitoring_enabled"
-
-- name: trigger fluentd handler
-  vars:
-    notify: "restart fluentd"
-    service: "fluentd.service"
-  include_tasks: roles/_shared/service_check.yml

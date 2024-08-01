@@ -15,58 +15,6 @@
   register: group_dialout_id
   changed_when: no
 
-- name: build docker image
-  vars:
-    name: "vcontrold"
-    image_name: "custom_vcontrold"
-    image_version: "{{alpine_version}}-{{vcontrold_version}}"
-    files:
-      - roles/vcontrold/templates/container/Dockerfile
-  include_tasks: roles/container/shared/build_docker_image.yml
-
-- name: create docker container
-  docker_container:
-    name: vcontrold
-    image: "custom_vcontrold:{{alpine_version}}-{{vcontrold_version}}"
-    state: present
-#    recreate: true
-    env:
-      TZ: "{{timezone}}"
-    log_driver: journald
-    log_options:
-      tag: vcontrold
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks:
-      - name: "isolated"
-        ipv4_address: "{{docker_vcontrold_ip}}"
-    networks_cli_compatible: yes
-    volumes:
-      - '{{global_etc}}vcontrold/:/etc/vcontrold:ro,z'
-      - '{{global_log}}vcontrold/:{{global_log}}vcontrold:z'
-    devices:
-      - "/dev/ttyVControlD:/dev/ttyVControlD:rwm"
-    exposed_ports:
-      - "3002"
-  notify: "restart vcontrold"
-
-- name: allow vcontrol service
-  vars:
-    name: "vcontrold"
-    rules: [ "saddr {{docker_vcontrold_ip}} daddr {{docker_mosquitto_ip}}" ]
-  include_tasks: roles/firewall/shared/allow_service.yml
-  tags: ['firewall_config']
-
-- name: set logrotate job
-  vars:
-    logrotate_path: "{{global_log}}vcontrold/*.log"
-  copy:
-    content: "{{ lookup('template', 'templates/logrotate') }}"
-    dest: "/etc/logrotate.d/ansible_vcontrol"
-    owner: root
-    group: root
-    mode: 0640
-
 - name: copy config and service
   template:
     src: "templates{{item.src}}"
@@ -86,13 +34,75 @@
     udev_rules_trigger: "restart vcontrold"
   include_tasks: roles/_shared/synchronize_udev_rules.yml
 
-# ***** FINALIZE *****
-- name: create systemd service
+- name: build podman image
   vars:
     container_name: "vcontrold"
+    image_name: "custom_vcontrold"
+    image_version: "{{alpine_version}}-{{vcontrold_version}}"
+    image_files:
+      - roles/vcontrold/templates/container/Dockerfile
+  include_tasks: roles/container/shared/build_podman_image.yml
+
+- name: create podman container
+  containers.podman.podman_container:
+    name: vcontrold
+    image: "custom_vcontrold:{{alpine_version}}-{{vcontrold_version}}"
+    state: present
+    security_opt:
+      - label=disable
+    env:
+      TZ: "{{timezone}}"
+    log_driver: journald
+    log_options:
+      tag: vcontrold
+#    ipc: "private" # needed to avoid ansible change flag
+    network: "isolated"
+    ip: "{{podman_vcontrold_ip}}"
+    volumes:
+      - '{{global_etc}}vcontrold/:/etc/vcontrold:ro'
+      - '{{global_log}}vcontrold/:{{global_log}}vcontrold'
+    device:
+      - "/dev/ttyVControlD:/dev/ttyVControlD:rwm"
+    exposed_ports:
+      - "3002"
+  register: "podman_container_state"
+  notify: "restart vcontrold"
+
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
+  vars:
+    container_name: "vcontrold"
+    container_changed: "{{podman_container_state.changed}}"
     container_after: [ "mosquitto" ]
-  include_tasks: roles/container/shared/add_docker_service.yml
-  tags: ['systemd_watcher_config']
+  include_tasks: roles/container/shared/handle_podman_service.yml
+
+- name: allow service
+  vars:
+    service_name: "vcontrold"
+    container_to_container_rules:
+      - { saddr: "{{podman_vcontrold_ip}}", daddr: "{{podman_mosquitto_ip}}", protocol: "tcp", dport: [ "1883", "9001" ], comment: "vcontrold => mosquitto" }
+  include_tasks: roles/firewall/shared/allow_service_nftables.yml
+  tags: ['firewall_config']
+  when: "nftables_enabled"
+
+- name: allow service
+  vars:
+    firewall_name: "vcontrold"
+    firewall_rules: [ "saddr {{podman_vcontrold_ip}} daddr {{podman_mosquitto_ip}}" ]
+  include_tasks: roles/firewall/shared/allow_service.yml
+  tags: ['firewall_config']
+  when: "not nftables_enabled"
+
+# ***** DEPENDENCY CONFIGS *****
+- name: set logrotate job
+  vars:
+    logrotate_path: "{{global_log}}vcontrold/*.log"
+  copy:
+    content: "{{ lookup('template', 'templates/logrotate') }}"
+    dest: "/etc/logrotate.d/ansible_vcontrol"
+    owner: root
+    group: root
+    mode: 0640
 
 - name: register update notifier
   vars:
@@ -107,9 +117,3 @@
   include_tasks: roles/update_service/shared/add_software.yml
   tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"
-
-- name: trigger vcontrold handler
-  vars:
-    notify: "restart vcontrold"
-    service: "vcontrold.service"
-  include_tasks: roles/_shared/service_check.yml

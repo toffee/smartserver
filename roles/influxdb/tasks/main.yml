@@ -1,7 +1,7 @@
 - name: set version
   set_fact:
     influxdb_branch: '2.7'
-    influxdb_version: '2.7.6'
+    influxdb_version: '2.7.8'
   tags: [ 'update_notifier_config' ]    
 
 - name: "create user and group => user or group does not exists"
@@ -14,30 +14,21 @@
 - name: prepare needed directories
   vars:
     directories:
-      - { mode: "u=rwx,g=rwx,o=rw", owner: "{{system_users['influxdb'].name}}", group: "{{system_groups['influxdb'].name}}", path: "{{ global_etc }}influxdb" } # mode sync with influxdb entrypoint.sh
+      - { mode: "u=rwx,g=rwx,o=rx", owner: "{{system_users['influxdb'].name}}", group: "{{system_groups['influxdb'].name}}", path: "{{ global_etc }}influxdb" } # mode sync with influxdb entrypoint.sh
       - { mode: "u=rwx,g=,o=", owner: "{{system_users['influxdb'].name}}", group: "{{system_groups['influxdb'].name}}", path: "{{ global_lib }}influxdb" }      # mode sync with influxdb entrypoint.sh
       - { mode: "u=rwx,g=rx,o=",  owner: "{{system_users['influxdb'].name}}", group: "{{system_groups['influxdb'].name}}", path: "{{database_backup_path}}influxdb" }
-      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_build }}influxdb" }
+      - { mode: "u=rwx,g=rwx,o=", owner: "root", group: "root", path: "{{ global_build }}influxdb" }
   include_tasks: roles/_shared/create_directories.yml
 
-- name: build docker image
-  vars:
-    name: "influxdb"
-    image_name: "custom_influxdb"
-    image_version: "{{influxdb_version}}"
-    files:
-      - roles/influxdb/templates/container/Dockerfile
-  include_tasks: roles/container/shared/build_docker_image.yml
-
-- name: create docker container
-  docker_container:
+- name: create podman container
+  containers.podman.podman_container:
     name: influxdb
-    image: "custom_influxdb:{{influxdb_version}}"
+    image: "influxdb:{{influxdb_version}}-alpine"
     state: present
-#    recreate: true
-    entrypoint: "sh -c \"/entrypoint.sh influxd 2>&1\""
-    command_handling: "compatibility"
-    user: "{{system_users['influxdb'].name}}:{{system_groups['influxdb'].name}}"
+    security_opt:
+      - label=disable
+    entrypoint: '["sh", "-c", "/entrypoint.sh influxd 2>&1" ]'
+    user: "{{system_users['influxdb'].id}}:{{system_groups['influxdb'].id}}"
     env:
       DOCKER_INFLUXDB_INIT_MODE: "setup"
       DOCKER_INFLUXDB_INIT_USERNAME: "{{influxdb_admin_username}}"
@@ -53,28 +44,32 @@
     log_driver: journald
     log_options:
       tag: influxdb
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks:
-      - name: "isolated"
-        ipv4_address: "{{docker_influxdb_ip}}"
-    networks_cli_compatible: yes
+    network: "isolated"
+    ip: "{{podman_influxdb_ip}}"
     volumes:
-      - '{{ global_etc }}influxdb:/etc/influxdb2:z'
-      - '{{ global_lib }}influxdb:/var/lib/influxdb2:z'
-      - '{{database_backup_path}}influxdb:/var/lib/influxdb_backup:z'
+      - '{{ global_etc }}influxdb:/etc/influxdb2'
+      - '{{ global_lib }}influxdb:/var/lib/influxdb2'
+      - '{{database_backup_path}}influxdb:/var/lib/influxdb_backup'
     exposed_ports:
      - "8086"
-  register: influxdb_container_result
+  register: "podman_container_state"
   notify: "restart influxdb"
 
-- name: add container name
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
+  vars:
+    container_name: "influxdb"
+    container_changed: "{{podman_container_state.changed}}"
+  include_tasks: roles/container/shared/handle_podman_service.yml
+  tags: ['systemd_watcher_config']
+
+- name: add service name
   vars:
     host_name: "influxdb"
-    host_ip_address: "{{docker_influxdb_ip}}"
+    host_ip_address: "{{podman_influxdb_ip}}"
   include_tasks: roles/_shared/add_to_hosts.yml
 
-# ***** FINALIZE *****
+# ***** DEPENDENCY CONFIGS *****
 - name: create cron job
   vars:
     name: "Influxdb Cleanup"
@@ -110,12 +105,6 @@
   tags: ['fluentd_config']
   when: "monitoring_enabled"
     
-- name: create systemd service
-  vars:
-    container_name: "influxdb"
-  include_tasks: roles/container/shared/add_docker_service.yml
-  tags: ['systemd_watcher_config']
-  
 - name: register update notifier
   vars:
     name: "influxdb"
@@ -129,23 +118,17 @@
   tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"
 
-- name: trigger influxdb handler
-  vars:
-    notify: "restart influxdb"
-    service: "influxdb.service"
-  include_tasks: roles/_shared/service_check.yml
-
 # CHECK local cli token => only needed if a new container is created and data folder already exists
 - name: check influxdb service
   include_tasks: roles/influxdb/shared/wait_until_ready.yml
-  when: "influxdb_container_result.changed"
+  when: "podman_container_state.changed"
   
 - name: check cli config
-  shell: "docker exec influxdb sh -c \"influx config list\""
+  shell: "podman exec influxdb sh -c \"influx config list\""
   register: influxdb_config_result
   changed_when: False
-  when: "influxdb_container_result.changed"
+  when: "podman_container_state.changed"
   
 - name: create cli config token => config does not exists
-  shell: "docker exec influxdb sh -c \"influx config create --config-name default --host-url http://localhost:8086 --org default-org --token '{{influxdb_admin_token}}' --active\""
-  when: "influxdb_container_result.changed and '\tdefault\t' not in influxdb_config_result.stdout"
+  shell: "podman exec influxdb sh -c \"influx config create --config-name default --host-url http://localhost:8086 --org default-org --token '{{influxdb_admin_token}}' --active\""
+  when: "podman_container_state.changed and '\tdefault\t' not in influxdb_config_result.stdout"

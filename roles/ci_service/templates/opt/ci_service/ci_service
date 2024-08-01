@@ -30,7 +30,7 @@ watched_data_files = [
 class Handler(Server):
     def __init__(self):
 
-        super().__init__("ci_service", config.service_ip, config.service_port )
+        super().__init__("ci_service", "0.0.0.0", "80")
         
         self.startup_timestamp = round(datetime.now().timestamp(),3)
         
@@ -76,9 +76,11 @@ class Handler(Server):
 
         leftovers = virtualbox.getMachineLeftovers(config.lib_dir, {})
         if len(leftovers) > 0:
-            self.self.has_leftovers = True
+            self.has_leftovers = True
             for leftover in leftovers:
                 logging.error(u"Leftover - name: '{}', path: '{}'".format(leftover,leftovers[leftover]))
+        else:
+            self.has_leftovers = False
 
     def notifyChangedExecutorRunnerState(self, is_running):
         if self.isSocketRoomActive("widget"):
@@ -198,7 +200,7 @@ class Handler(Server):
 
     def processStart(self):
         result = []
-        if not info.Info.isDefaultConnectionActive():
+        if not info.Info.isDefaultConnectionActive(config.server_host):
             result.append("Skip job, because default isp connection is inactive")
         elif self.job_executor.isRunning():
             if self.job_executor.isTerminated():

@@ -7,7 +7,7 @@
 - name: check mysql service
   include_tasks: roles/mysql/shared/wait_until_ready.yml
   when: "mysql_enabled"
-    
+
 - name: check redis service
   include_tasks: roles/redis/shared/wait_until_ready.yml
   when: "redis_enabled"
@@ -17,7 +17,7 @@
 
 # ***** DISABLE APPS *****
 - name: disable apps
-  shell: "docker exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:disable {{item}}\""
+  shell: "podman exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:disable {{item}}\""
   register: app_disable_result
   changed_when: "'disabled' in app_disable_result.stdout"
 #  failed_when: "'disabled' not in app_disable_result.stdout and 'such app enabled' not in app_disable_result.stdout"
@@ -30,12 +30,12 @@
 
 # ***** INSTALL APPS *****
 - name: check installed apps
-  shell: "docker exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:list\""
+  shell: "podman exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:list\""
   changed_when: no
   register: app_list_result
 
 - name: install core apps
-  shell: "docker exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:install {{item}}\""
+  shell: "podman exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:install {{item}}\""
   register: app_install_result
   failed_when: "'installed' not in app_install_result.stdout and 'enabled' not in app_install_result.stdout and 'already exists' not in app_install_result.stdout"
   changed_when: "'enabled' in app_install_result.stdout"
@@ -56,26 +56,26 @@
     - keeweb
 
 - name: install additional_apps
-  shell: "docker exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:install {{item.app}}\""
+  shell: "podman exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:install {{item.app}}\""
   register: app_install_result
   failed_when: "'installed' not in app_install_result.stdout and 'enabled' not in app_install_result.stdout and 'already exists' not in app_install_result.stdout"
   changed_when: "'enabled' in app_install_result.stdout"
   when: "'- ' + item.app + ':' not in app_list_result.stdout"
   with_items: "{{nextcloud_additional_apps}}"
 
-#docker exec php sh -c "php -f {{htdocs_path}}nextcloud/occ update:check"
+#podman exec php sh -c "php -f {{htdocs_path}}nextcloud/occ update:check"
 - name: check available app updates
-  shell: "docker exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:update --showonly\""
+  shell: "podman exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:update --showonly\""
   changed_when: no
   register: app_update_available_result
-  
+
 #- name: show available app updates
 #  debug:
-#    msg: "docker exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:update {{item.split()[0]}}\""
+#    msg: "podman exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:update {{item.split()[0]}}\""
 #  with_items: "{{app_update_available_result.stdout_lines}}"
 
 - name: update apps
-  shell: "docker exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:update {{item.split()[0]}}\""
+  shell: "podman exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:update {{item.split()[0]}}\""
   register: app_update_process_result
   changed_when: "'updated' in app_update_process_result.stdout"
   with_items: "{{app_update_available_result.stdout_lines}}"
@@ -87,7 +87,7 @@
 
 # ***** CONFIGURE apps *****
 - name: read app configs
-  shell: "docker exec mysql sh -c \"mysql -u root -h 127.0.0.1 nextcloud -e \\\"SELECT appid,configkey,configvalue FROM oc_appconfig;\\\"\""
+  shell: "podman exec mysql sh -c \"mysql -u root -h 127.0.0.1 nextcloud -e \\\"SELECT appid,configkey,configvalue FROM oc_appconfig;\\\"\""
   changed_when: no
   register: app_config_result
 
@@ -95,8 +95,6 @@
   set_fact:
     app_configs:
       - { app: "user_saml", name: "type", value: "environment-variable" }
-      - { app: "user_saml", name: "general-uid_mapping", value: "REMOTE_USERNAME" }
-      - { app: "user_saml", name: "saml-attribute-mapping-displayName_mapping", value: "REMOTE_USERFULLNAME" }
 
       - { app: "updatenotification", name: "notify_groups", value: "[]" }
 
@@ -105,32 +103,9 @@
 #      - { app: "richdocuments", name: "installed_version", value: "" }
 #      - { app: "richdocuments", name: "public_wopi_url", value: "" }
       - { app: "richdocuments", name: "types", value: "prevent_group_restriction" }
-      - { app: "richdocuments", name: "wopi_allowlist", value: "{{docker_libreoffice_ip}}" }
+      - { app: "richdocuments", name: "wopi_allowlist", value: "{{podman_libreoffice_ip}}" }
       - { app: "richdocuments", name: "wopi_url", value: "https://libreoffice.{{server_domain}}" }
       - { app: "richdocuments", name: "uiDefaults-UIMode", value: "tabbed" }
-
-#      - { app: "onlyoffice", name: "DocumentServerInternalUrl", value: "" }
-#      - { app: "onlyoffice", name: "DocumentServerUrl", value: "https://onlyoffice.{{server_domain}}/" }
-#      - { app: "onlyoffice", name: "StorageUrl", value: "" }
-#      - { app: "onlyoffice", name: "customizationChat", value: "false" }
-#      - { app: "onlyoffice", name: "customizationCompactHeader", value: "true" }
-#      - { app: "onlyoffice", name: "customizationForcesave", value: "true" }
-#      - { app: "onlyoffice", name: "customizationFeedback", value: "false" }
-#      - { app: "onlyoffice", name: "customizationHelp", value: "true" }
-#      - { app: "onlyoffice", name: "customizationReviewDisplay", value: "original" }
-#      - { app: "onlyoffice", name: "customizationToolbarNoTabs", value: "true" }
-#      - { app: "onlyoffice", name: "defFormats", value: '{"csv":"true","doc":"true","docm":"false","docx":"true","dotx":"true","epub":"false","html":"false","odp":"true","ods":"true","odt":"true","otp":"false","ots":"false","ott":"false","pdf":"false","potm":"false","potx":"false","ppsm":"false","ppsx":"true","ppt":"false","pptm":"false","pptx":"false","rtf":"true","txt":"true","xls":"true","xlsm":"false","xlsx":"true","xltm":"false","xltx":"false"}' }
-#      - { app: "onlyoffice", name: "editFormats", value: '{"csv":"true","odp":"false","ods":"false","odt":"false","rtf":"false","txt":"true"}' }
-#      - { app: "onlyoffice", name: "enabled", value: "yes" }
-#      - { app: "onlyoffice", name: "groups", value: "[]" }
-#      - { app: "onlyoffice", name: "preview", value: "false" }
-#      - { app: "onlyoffice", name: "sameTab", value: "false" }
-#      - { app: "onlyoffice", name: "settings_error", value: "" }
-#      - { app: "onlyoffice", name: "types", value: "prevent_group_restriction" }
-#      - { app: "onlyoffice", name: "verify_peer_off", value: "false" }
-#      - { app: "onlyoffice", name: "versionHistory", value: "true" }
-
-#      - { app: "jsloader", name: "snippet", value: "document.domain='{{server_domain}}'; if( window.parent != window && window.parent == window.top ){ var found = document.location.hostname.match(/(fa|ba)(.|-).*/); var script = document.createElement('script'); script.src = 'https://' + ( found ? found[1] + '.' : '' ) + '{{server_domain}}' + '/main/listener/frame.js'; document.head.appendChild(script); }" }
 
       - { app: "previewgenerator", name: "squareSizes", value: "256" }
       - { app: "previewgenerator", name: "widthSizes", value: "256" }
@@ -140,24 +115,37 @@
 
       - { app: "text", name: "workspace_available", value: "0" }
 
-- name: prepare app configs
-  set_fact:
-    prepared_app_configs: "{{ prepared_app_configs | default([]) + [ { 'app': item.app, 'name': item.name, 'value': item.value | replace(\"'\", \"\\'\" ) | replace('\"', '\\\\\\\"') } ] }}"
-  when: "item.app + \"\\t\" + item.name + \"\\t\" + item.value not in app_config_result.stdout "
-  with_items: "{{app_configs}}"
-      
 - name: set app config
-  shell: "docker exec mysql sh -c \"mysql -u root -h 127.0.0.1 nextcloud -e \\\"INSERT INTO oc_appconfig (appid, configkey, configvalue) VALUES ('{{item.app}}', '{{item.name}}', '{{item.value}}') ON DUPLICATE KEY UPDATE configvalue='{{item.value}}';\\\"\""
+  shell: "podman exec php sh -c \"php {{htdocs_path}}nextcloud/occ config:app:set --value='{{item.value}}' {{item.app}} {{item.name}}\""
   register: change_app_config_result
   failed_when: change_app_config_result.rc != 0
-  with_items: "{{prepared_app_configs}}"
-  when: "prepared_app_configs is defined"
+  when: "item.app + \"\\t\" + item.name + \"\\t\" + item.value not in app_config_result.stdout "
+  with_items: "{{app_configs}}"
+
+# ***** CONFIGURE user_saml *****
+- name: read user_saml configs
+  shell: "podman exec mysql sh -c \"mysql -u root -h 127.0.0.1 nextcloud -e \\\"SELECT configuration FROM oc_user_saml_configurations WHERE id = 1;\\\"\""
+  changed_when: no
+  register: user_saml_config_result
+
+- name: set user_saml configs
+  set_fact:
+    user_saml_configs:
+      - { id: "1", name: "general-uid_mapping", value: "REMOTE_USERNAME" }
+      - { id: "1", name: "saml-attribute-mapping-displayName_mapping", value: "REMOTE_USERFULLNAME" }
+
+- name: set user_saml config
+  shell: "podman exec php sh -c \"php {{htdocs_path}}nextcloud/occ saml:config:set --{{item.name}}='{{item.value}}' {{item.id}}\""
+  register: change_user_saml_config_result
+  failed_when: change_user_saml_config_result.rc != 0
+  when: "'\"' + item.name + '\":\"' + item.value + '\"' not in user_saml_config_result.stdout "
+  with_items: "{{user_saml_configs}}"
 
 # ***** PREVIEW GENERATOR CRON JOB *****
 - name: create previewgenerator incremental cron job
   vars:
     name: "Nextcloud Previewupdates"
-    cmd: "docker exec php sh -c \"php -f {{htdocs_path}}nextcloud/occ preview:pre-generate > /dev/null\""
+    cmd: "podman exec php sh -c \"php -f {{htdocs_path}}nextcloud/occ preview:pre-generate > /dev/null\""
     group: "nextcloud"
     log: "preview_generator"
     minute: "*/15"
@@ -182,13 +170,13 @@
 #  register: keeweb_result
 #  changed_when: "keeweb_result.rc == 0"
 #  failed_when: False
-  
+
 #- name: uninstall outdated keeweb version => old version was detected
 #  file:
 #    state: absent
 #    path: "{{htdocs_path}}nextcloud/apps/keeweb/"
 #  when: "keeweb_result.rc == 0"
-  
+
 #- name: install keeweb app => app does not exists
 #  unarchive:
 #    src: "https://github.com/jhass/nextcloud-keeweb/releases/download/v{{nextcloud_keeweb_version}}/keeweb-{{nextcloud_keeweb_version}}.tar.gz"
@@ -198,7 +186,7 @@
 #    owner: "{{system_users['www'].name}}"
 #    group: "{{system_groups['www'].name}}"
 #  register: keeweb_installation
-  
+
 #- name: check keeweb max version
 #  lineinfile:
 #    path: "{{htdocs_path}}nextcloud/apps/keeweb/appinfo/info.xml"
@@ -206,22 +194,22 @@
 #    line: '\1="21"\2'
 #    backrefs: yes
 #  when: keeweb_installation.changed
-    
+
 #- name: upgrade existing database => keeweb version changed
-#  shell: "docker exec php sh -c \"php {{htdocs_path}}nextcloud/occ upgrade\""
+#  shell: "podman exec php sh -c \"php {{htdocs_path}}nextcloud/occ upgrade\""
 #  when: "keeweb_installation.changed"
-  
+
 # maybe cleanup
 # UPDATE `oc_jobs` SET `reserved_at` = 0 WHERE `class` = 'OCA\\News\\Cron\\Updater'
 
 # ***** CHECK FOR DISABLED APPS *****
 - name: get final app status
-  shell: "docker exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:list\""
+  shell: "podman exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:list\""
   register: app_status
   changed_when: no
 
 - name: enable disabled core apps
-  shell: "docker exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:enable {{item}} --force\""
+  shell: "podman exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:enable {{item}} --force\""
   register: app_enable_result
   failed_when: "'enabled' not in app_enable_result.stdout"
   when: "item not in app_status.stdout.split('Disabled')[0]"
@@ -237,7 +225,7 @@
     - keeweb
 
 - name: enable disabled additional_apps apps
-  shell: "docker exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:enable {{item.app}} --force\""
+  shell: "podman exec php sh -c \"php {{htdocs_path}}nextcloud/occ app:enable {{item.app}} --force\""
   register: app_enable_result
   failed_when: "'enabled' not in app_enable_result.stdout"
   when: "item.app not in app_status.stdout.split('Disabled')[0]"

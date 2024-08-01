@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    prometheus_version: '2.53.0'
+    prometheus_version: '2.53.1'
   tags: [ 'update_notifier_config' ]    
 
 - name: prepare needed directories
@@ -11,15 +11,15 @@
 
 - name: copy config
   copy:
-    src: "templates/etc/prometheus/{{item.path}}"
-    dest: "{{ global_etc }}prometheus/{{item.path}}"
+    src: "templates/{{item.src}}"
+    dest: "{{item.dest}}"
     owner: "{{item.user}}"
     group: "{{item.group}}"
     mode: "{{item.mode}}"
   with_items:
-    - { user: "{{system_users['nobody'].name}}", group: "{{system_groups['nobody'].name}}", mode: "u=rw,g=r,o=", path: "prometheus.yml.tpl" }
-    - { user: "{{system_users['nobody'].name}}", group: "{{system_groups['nobody'].name}}", mode: "u=rw,g=r,o=", path: "rules/prometheus.yml" }
-    - { user: "{{system_users['nobody'].name}}", group: "{{system_groups['nobody'].name}}", mode: "u=rwx,g=rx,o=", path: "generator" }
+    - { user: "{{system_users['nobody'].name}}", group: "{{system_groups['nobody'].name}}", mode: "u=rw,g=r,o=", src: "/etc/prometheus/prometheus.yml.tpl", dest: "{{ global_etc }}prometheus/prometheus.yml.tpl" }
+    - { user: "{{system_users['nobody'].name}}", group: "{{system_groups['nobody'].name}}", mode: "u=rw,g=r,o=", src: "/etc/prometheus/rules/prometheus.yml", dest: "{{ global_etc }}prometheus/rules/prometheus.yml" }
+    - { user: "root", group: "root", mode: "u=rwx,g=rx,o=", src: "/opt/scripts/prometheus_generator", dest: "/opt/scripts/prometheus_generator" }
   notify: "restart prometheus"
 
 - name: check custom rules
@@ -37,28 +37,13 @@
   tags: ['prometheus_config']
   when: "monitoring_enabled and custom_rules_result.rc == 0"
 
-- name: set docker selinux configuration => is_rhel or is_fedora
-  sefcontext:
-    target: "{{ global_etc }}prometheus/generator"
-    setype: "bin_t"
-  register: sefcontext_result
-  when: is_rhel or is_fedora
-
-- name: reload selinux configuration => (is_rhel or is_fedora) and sefcontext changed
-  shell: "restorecon -irv {{ global_etc }}prometheus"
-  when: (is_fedora or is_rhel) and sefcontext_result.changed
-
-- name: check started docker
-  systemd:
-    name: docker
-    state: started
-  
-- name: create docker container
-  docker_container:
+- name: create podman container
+  containers.podman.podman_container:
     name: prometheus
     image: "prom/prometheus:v{{prometheus_version}}"
     state: present
-#    recreate: true
+    security_opt:
+      - label=disable
     env:
       TZ: "{{timezone}}"
     command:
@@ -70,35 +55,55 @@
     log_driver: journald
     log_options:
       tag: prometheus
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks:
-      - name: "isolated"
-        ipv4_address: "{{docker_prometheus_ip}}"
-    networks_cli_compatible: yes
+    network: "isolated"
+    ip: "{{podman_prometheus_ip}}"
     volumes:
-      - '{{ global_etc }}prometheus:/etc/prometheus:z'
-      - '{{ global_lib }}prometheus:/prometheus:z'
+      - '{{ global_etc }}prometheus:/etc/prometheus'
+      - '{{ global_lib }}prometheus:/prometheus'
     exposed_ports:
      - "9090"
+  register: "podman_container_state"
   notify: "restart prometheus"
-  
-- name: allow prometheus service
+
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
   vars:
-    name: "prometheus"
-    rules:
-      - "saddr {{docker_prometheus_ip}} daddr {{docker_alertmanager_ip}}"
-      - "saddr {{docker_prometheus_ip}} daddr {{default_server_ip}} proto tcp dport 443" # needed to pull from openhab, netdata or system_service endpoint, because they are bound to 127.0.0.1:xxxx
+    container_name: "prometheus"
+    container_changed: "{{podman_container_state.changed}}"
+    container_pre_exec: "/opt/scripts/prometheus_generator {{ global_etc }}prometheus/"
+    container_reload_exec: "/usr/bin/podman kill --signal=HUP prometheus"
+    container_after: [ "alertmanager" ]
+  include_tasks: roles/container/shared/handle_podman_service.yml
+  tags: ['systemd_watcher_config']
+
+- name: allow service
+  vars:
+    service_name: "prometheus"
+    container_to_container_rules:
+      - { saddr: "{{podman_prometheus_ip}}", daddr: "{{podman_alertmanager_ip}}", protocol: "tcp", dport: "9093", comment: "prometheus => alertmanager" }
+    container_to_host_rules:
+      - { saddr: "{{podman_prometheus_ip}}", protocol: "tcp", dport: "443", comment: "=> apache (openhab, netdata ...)" } # needed to pull from openhab, netdata or system_service endpoint, because they are bound to 127.0.0.1:xxxx
+  include_tasks: roles/firewall/shared/allow_service_nftables.yml
+  tags: ['firewall_config']
+  when: "nftables_enabled"
+
+- name: allow service
+  vars:
+    firewall_name: "prometheus"
+    firewall_rules:
+      - "saddr {{podman_prometheus_ip}} daddr {{podman_alertmanager_ip}}"
+      - "saddr {{podman_prometheus_ip}} daddr {{default_server_ip}} proto tcp dport 443" # needed to pull from openhab, netdata or system_service endpoint, because they are bound to 127.0.0.1:xxxx
   include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
+  when: "not nftables_enabled"
 
 - name: add container name
   vars:
     host_name: "prometheus"
-    host_ip_address: "{{docker_prometheus_ip}}"
+    host_ip_address: "{{podman_prometheus_ip}}"
   include_tasks: roles/_shared/add_to_hosts.yml
 
-# ***** FINALIZE *****
+# ***** DEPENDENCY CONFIGS *****
 - name: register grafana configs
   vars:
     name: "loki"
@@ -131,15 +136,7 @@
   include_tasks: roles/fluentd/shared/add_config.yml
   tags: ['fluentd_config']
   when: "monitoring_enabled"
-    
-- name: create systemd service
-  vars:
-    container_name: "prometheus"
-    container_pre_exec: "{{ global_etc }}prometheus/generator"
-    container_after: [ "alertmanager" ]
-  include_tasks: roles/container/shared/add_docker_service.yml
-  tags: ['systemd_watcher_config']
-  
+
 - name: register update notifier
   vars:
     name: "prometheus"
@@ -153,8 +150,3 @@
   tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"
 
-- name: trigger prometheus handler
-  vars:
-    notify: "restart prometheus"
-    service: "prometheus.service"
-  include_tasks: roles/_shared/service_check.yml

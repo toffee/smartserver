@@ -34,6 +34,8 @@ default_variables: {
 
     ipv6_enabled:                             { default: no },
 
+    nftables_enabled:                         { default: yes },
+
     intern_networks:                          { default: [] },                                                      # e.g. intern (trusted) ipv4 & ipv6 address ranges. Networks, based on production/staging ip and ansible server ip, be added additionally.
     public_networks:                          { default: [] },                                                      # e.g. public ipv6 address ranges
 
@@ -715,7 +717,7 @@ default_variables: {
 project_name:                     "smartserver"
 
 # version of alpine linux used in several container based roles
-alpine_version:                   "3.20.1"
+alpine_version:                   "3.20.2"
 
 flask_version:                    "3.0.0"
 flask_socketio_version:           "5.3.6"
@@ -743,43 +745,44 @@ samba_master:                     "{%if is_production%}yes{%else%}no{%endif%}"
 # used for e.g. openwrt's md5 password crypt
 default_password_salt:            "{{((server_domain+':'+default_server_ip) | b64encode | replace(';','0') )[:-1]}}"
 
-docker_base_network:              "172.16.0.0"
-docker_base_gateway:              "172.16.0.1"
-docker_dns_ip:                    "172.16.0.100"
-docker_postfix_ip:                "172.16.0.101"
-docker_influxdb_ip:               "172.16.0.103"
-docker_redis_ip:                  "172.16.0.104"
-docker_mysql_ip:                  "172.16.0.105"
-docker_mosquitto_ip:              "172.16.0.106"
-docker_speedtest_ip:              "172.16.0.107"
-docker_libreoffice_ip:            "172.16.0.108"
-docker_alertmanager_ip:           "172.16.0.109"
-docker_loki_ip:                   "172.16.0.110"
-docker_fluentd_ip:                "172.16.0.111"
-docker_php_ip:                    "172.16.0.112"
-docker_librenms_ip:               "172.16.0.113"
-docker_prometheus_ip:             "172.16.0.114"
-docker_grafana_ip:                "172.16.0.115"
-docker_postgres_ip:               "172.16.0.116"
-docker_pgadmin_ip:                "172.16.0.117"
+podman_base_network:              "172.16.0.0/24"
+podman_base_gateway:              "172.16.0.1"
+podman_dns_ip:                    "172.16.0.100"
+podman_postfix_ip:                "172.16.0.101"
+podman_influxdb_ip:               "172.16.0.103"
+podman_redis_ip:                  "172.16.0.104"
+podman_mysql_ip:                  "172.16.0.105"
+podman_mosquitto_ip:              "172.16.0.106"
+podman_speedtest_ip:              "172.16.0.107"
+podman_libreoffice_ip:            "172.16.0.108"
+podman_alertmanager_ip:           "172.16.0.109"
+podman_loki_ip:                   "172.16.0.110"
+podman_fluentd_ip:                "172.16.0.111"
+podman_php_ip:                    "172.16.0.112"
+podman_librenms_ip:               "172.16.0.113"
+podman_prometheus_ip:             "172.16.0.114"
+podman_grafana_ip:                "172.16.0.115"
+podman_samba_ip:                  "172.16.0.116"
+podman_postgres_ip:               "172.16.0.120"
+podman_pgadmin_ip:                "172.16.0.121"
 
-docker_cloud_mosquitto_ip:        "172.16.0.200"
-docker_weather_service_ip:        "172.16.0.201"
-docker_cloud_check_ip:            "172.16.0.202"
-docker_camera_ftp_ip:             "172.16.0.203"
-docker_camera_service_ip:         "172.16.0.204"
+podman_weather_service_ip:        "172.16.0.201"
+podman_cloud_check_ip:            "172.16.0.202"
+podman_camera_ftp_ip:             "172.16.0.203"
+podman_camera_service_ip:         "172.16.0.204"
+podman_ci_service_ip:             "172.16.0.205"
 
-docker_zigbee2mqtt_ip:            "172.16.0.210"
-docker_recorder_ip:               "172.16.0.211"
-docker_mytracker_ip:              "172.16.0.212"
-docker_unifi_ip:                  "172.16.0.213"
-docker_mimic3_ip:                 "172.16.0.214"
-docker_fireflyiii_core_ip:        "172.16.0.215"
-docker_fireflyiii_importer_ip:    "172.16.0.216"
-docker_ghostfolio_ip:             "172.16.0.217"
+podman_zigbee2mqtt_ip:            "172.16.0.210"
+podman_recorder_ip:               "172.16.0.211"
+podman_mytracker_ip:              "172.16.0.212"
+podman_unifi_ip:                  "172.16.0.213"
+podman_mimic3_ip:                 "172.16.0.214"
+podman_fireflyiii_core_ip:        "172.16.0.215"
+podman_fireflyiii_importer_ip:    "172.16.0.216"
+podman_ghostfolio_ip:             "172.16.0.217"
 docker_jekyll_ip:                 "172.16.0.218"
 
-docker_vcontrold_ip:              "172.16.0.230"
+podman_vcontrold_ip:              "172.16.0.230"
 
 netgroup:                         "{{default_server_ip.split('.')[2]}}"
 
@@ -840,5 +843,6 @@ user_key_maps: {
 }
 
 group_key_maps: {
-  "nogroup": "nobody"
+  "nogroup": "nobody",
+  "apache": "www"
 }

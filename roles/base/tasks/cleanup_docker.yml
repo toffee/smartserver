@@ -1,0 +1,71 @@
+- name: check for obsolete docker
+  shell:
+    cmd: "docker ps -a --format '{{ '{{' }}.Names {{ '}}' }}'"
+  changed_when: "docker_container_check.rc == 0"
+  failed_when: no
+  register: docker_container_check
+
+- name: process obsolete docker container
+  vars:
+    container_name: "{{item}}"
+  include_tasks: cleanup_docker_container.yml
+  with_items: "{{container_names.stdout_lines}}"
+  when: "docker_container_check.rc == 0"
+
+- name: remove obsolete docker networks
+  shell:
+    cmd: "docker network rm {{item}}"
+  changed_when: "docker_network_check.rc == 0"
+  failed_when: no
+  register: docker_network_check
+  with_items:
+    - "isolated"
+    - "macvlan"
+    - "cloud_vpn"
+
+- name: clean old docker related files
+  file:
+    path: "{{item}}"
+    state: absent
+  with_items:
+    - "/etc/ferm/ferm.d/00-docker.ferm"
+    - "/etc/ferm/ferm.d/99-docker.ferm"
+    - "/usr/lib/systemd/system/ferm.service"
+    - "{{global_etc}}fluentd/_.ansible.d/docker.conf"
+    - "/opt/docker/"
+    - "/opt/containerd/"
+    - "/etc/docker/"
+    - "{{global_lib}}docker/"
+    - "{{global_etc}}prometheus/generator"
+    - "{{global_etc}}cloud_check"
+
+- name: uninstall docker => is_rhel or is_fedora
+  yum:
+    name: [
+        docker-ce
+        , docker-ce-cli
+        , containerd.io
+        , python3-docker
+    ]
+    state: absent
+  when: is_rhel or is_fedora
+
+- name: uninstall docker => is_ubuntu
+  apt:
+    name: [
+        docker-ce
+        , docker-ce-cli
+        , containerd.io
+        , python3-docker
+    ]
+    state: absent
+  when: is_ubuntu
+
+- name: uninstall docker => is_suse
+  zypper:
+    name: [
+        docker
+        , python3-docker
+    ]
+    state: absent
+  when: is_suse

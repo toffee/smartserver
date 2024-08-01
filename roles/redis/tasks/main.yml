@@ -3,52 +3,52 @@
     redis_version: '7.2.5'
   tags: [ 'update_notifier_config' ]
   
-- name: check started docker
-  systemd:
-    name: docker
-    state: started
-
-- name: create docker container
-  docker_container:
+- name: create podman container
+  containers.podman.podman_container:
     name: redis
     image: "redis:{{redis_version}}-alpine"
     state: present
-#    network_mode: "none"
-#    recreate: true
+    security_opt:
+      - label=disable
     env:
       TZ: "{{timezone}}"
     log_driver: journald
     log_options:
       tag: redis
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks:
-      - name: "isolated"
-        ipv4_address: "{{docker_redis_ip}}"
-    networks_cli_compatible: yes
+    network: "isolated"
+    ip: "{{podman_redis_ip}}"
     exposed_ports:
      - "6379"
+  register: "podman_container_state"
   notify: "restart redis"
 
-#- name: clean old docker images => image does not exists
-#  shell: "docker rmi -f $(docker images --filter \"dangling=true\" -q)"
-#  when: "'custom_redis' not in image_exists.stdout"
-  
-# ***** FINALIZE *****
-- name: allow redis service
-  vars:
-    name: "redis"
-    rules:
-      - "saddr {{docker_redis_ip}} daddr {{docker_php_ip}}"
-  include_tasks: roles/firewall/shared/allow_service.yml
-  tags: ['firewall_config']
-
-- name: create systemd service
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
   vars:
     container_name: "redis"
-  include_tasks: roles/container/shared/add_docker_service.yml
+    container_changed: "{{podman_container_state.changed}}"
+  include_tasks: roles/container/shared/handle_podman_service.yml
   tags: ['systemd_watcher_config']
 
+#- name: allow service
+#  vars:
+#    service_name: "redis"
+#    container_to_container_rules:
+#      - { saddr: podman_redis_ip, daddr: podman_php_ip }
+#  include_tasks: roles/firewall/shared/allow_service_nftables.yml
+#  tags: ['firewall_config']
+#  when: "nftables_enabled"
+
+- name: allow service
+  vars:
+    firewall_name: "redis"
+    firewall_rules:
+      - "saddr {{podman_redis_ip}} daddr {{podman_php_ip}}"
+  include_tasks: roles/firewall/shared/allow_service.yml
+  tags: ['firewall_config']
+  when: "not nftables_enabled"
+
+# ***** DEPENDENCY CONFIGS *****
 - name: register update notifier
   vars:
     name: "redis"
@@ -61,9 +61,3 @@
   include_tasks: roles/update_service/shared/add_software.yml
   tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"
-
-- name: trigger redis handler
-  vars:
-    notify: "restart redis"
-    service: "redis.service"
-  include_tasks: roles/_shared/service_check.yml

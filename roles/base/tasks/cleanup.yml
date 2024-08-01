@@ -1,0 +1,34 @@
+# check if docker exists
+
+# unmount cloud remotes if available
+
+- name: check for docker
+  shell:
+    cmd: "docker 2> /dev/null"
+  changed_when: "cleanup_docker_check.rc == 0"
+  failed_when: no
+  register: cleanup_docker_check
+
+- name: cleanup docker
+  include_tasks: cleanup_docker.yml
+  when: "cleanup_docker_check.rc == 0"
+
+- name: check for iptables
+  stat:
+    path: "/etc/ferm/"
+  register: cleanup_iptables_check
+  when: "nftables_enabled"
+
+- name: cleanup iptables
+  include_tasks: cleanup_iptables.yml
+  when: "nftables_enabled and cleanup_iptables_check.stat.exists"
+
+- name: clean old build folder
+  file:
+    path: "{{item}}"
+    state: absent
+  with_items:
+    - "{{global_build}}loki"
+    - "{{global_build}}influxdb"
+    - "{{global_build}}mysql"
+

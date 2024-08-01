@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    libreoffice_version: "24.04.4.2.1"
+    libreoffice_version: "24.04.5.2.1"
     libreoffice_changelog_version: "23-05"
   tags: [ 'update_notifier_config' ]
   
@@ -12,63 +12,73 @@
 #      - { mode: "u=rwx,g=rx,o=", owner: "109", group: "112", path: "{{global_etc}}libreoffice" }
 #  include_tasks: roles/_shared/create_directories.yml
 
-#- name: build docker image
-#  vars:
-#    name: "libreoffice"
-#    image_name: "custom_libreoffice"
-#    image_version: "{{libreoffice_version}}"
-#    files:
-#      - roles/nextcloud_libreoffice/templates/container/Dockerfile
-#  include_tasks: roles/container/shared/build_docker_image.yml
 
-- name: create docker container
-  docker_container:
+# https://github.com/CollaboraOnline/online/issues/9534
+# FIX --o=mount_namespaces=false
+- name: create podman container
+  containers.podman.podman_container:
     name: libreoffice
     image: "collabora/code:{{libreoffice_version}}"
-#    image: "custom_libreoffice:{{libreoffice_version}}"
     state: present
-#    network_mode: "host"
-#    recreate: true
+    security_opt:
+      - label=disable
     env:
       TZ: "{{timezone}}"
-      extra_params: "--o:ssl.enable=false --o:ssl.termination=true --o:welcome.enable=false" # --o:user_interface.mode=tabbed --o:user_interface.use_integration_theme=false"
+      extra_params: "--o:ssl.enable=false --o:ssl.termination=true --o:welcome.enable=false --o=mount_namespaces=false" # --o:user_interface.mode=tabbed --o:user_interface.use_integration_theme=false"
       server_name: "libreoffice.{{server_domain}}"
     #capabilities:
+    #  - SYS_PTRACE
+    #  - SYS_ADMIN
     #  - MKNOD
+    #  - CAP_CHOWN
     privileged: yes
     log_driver: journald
     log_options:
       tag: libreoffice
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks:
-      - name: "isolated"
-        ipv4_address: "{{docker_libreoffice_ip}}"
-    networks_cli_compatible: yes
+    network: "isolated"
+    ip: "{{podman_libreoffice_ip}}"
 #    volumes:
-#      - '{{global_etc}}libreoffice/fonts:/usr/share/fonts/truetype/custom:z'
-#      - '{{global_log}}libreoffice:/var/log/libreoffice:z'
-#      - '{{global_lib}}libreoffice:/var/www/libreoffice/Data:z'
+#      - '{{global_etc}}libreoffice/fonts:/usr/share/fonts/truetype/custom'
+#      - '{{global_log}}libreoffice:/var/log/libreoffice'
+#      - '{{global_lib}}libreoffice:/var/www/libreoffice/Data'
     exposed_ports:
-     - "9980:9980"
+      - "9980"
+  register: "podman_container_state"
   notify: "restart libreoffice"
-    
-- name: allow libreoffice service
+
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
   vars:
-    name: "libreoffice"
-    rules:
-      - "saddr {{docker_libreoffice_ip}} daddr {{default_server_ip}} proto tcp dport 443"
-      - "saddr {{docker_libreoffice_ip}} proto tcp dport 443"
+    container_name: "libreoffice"
+    container_changed: "{{podman_container_state.changed}}"
+  include_tasks: roles/container/shared/handle_podman_service.yml
+  tags: ['systemd_watcher_config']
+
+- name: allow service
+  vars:
+    service_name: "libreoffice"
+    container_to_host_rules:
+      - { saddr: "{{podman_libreoffice_ip}}", protocol: "tcp", dport: "443", comment: "=> apache (nextcloud)" }
+  include_tasks: roles/firewall/shared/allow_service_nftables.yml
+  tags: ['firewall_config']
+  when: "nftables_enabled"
+
+- name: allow service
+  vars:
+    firewall_name: "libreoffice"
+    firewall_rules:
+      - "saddr {{podman_libreoffice_ip}} daddr {{default_server_ip}} proto tcp dport 443"
   include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
+  when: "not nftables_enabled"
 
 - name: add container name
   vars:
     host_name: "libreoffice"
-    host_ip_address: "{{docker_libreoffice_ip}}"
+    host_ip_address: "{{podman_libreoffice_ip}}"
   include_tasks: roles/_shared/add_to_hosts.yml
 
-# ***** FINALIZE *****
+# ***** DEPENDENCY CONFIGS *****
 #- name: register style
 #  vars:
 #    name: "libreoffice"
@@ -91,13 +101,6 @@
   tags: ['fluentd_config']
   when: "monitoring_enabled"
 
-- name: create systemd service
-  vars:
-    container_name: "libreoffice"
-#    container_after: [ "mysql", "redis" ]
-  include_tasks: roles/container/shared/add_docker_service.yml
-  tags: ['systemd_watcher_config']
-
 - name: register update notifier
   vars:
     name: "libreoffice"
@@ -110,9 +113,3 @@
   include_tasks: roles/update_service/shared/add_software.yml
   tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"
-
-- name: trigger libreoffice handler
-  vars:
-    notify: "restart libreoffice"
-    service: "libreoffice.service"
-  include_tasks: roles/_shared/service_check.yml

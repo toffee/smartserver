@@ -68,17 +68,23 @@ class Application(App):
         else:
             if Application.repositories is None:
                 Application.repositories = {}
-                result = command.exec([ "/usr/bin/docker", "image", "list" ] )
+
+                result = command.exec(["podman", "image", "list", "--format", "'{{json .}}'"])
                 lines = result.stdout.decode("utf-8").split("\n")
                 for line in lines:
-                    columns = line.split()
-                    if len(columns) == 0:
+                    if line == "":
                         continue
 
-                    if columns[0] not in Application.repositories:
-                        Application.repositories[columns[0]] = []
+                    obj = json.loads(line[1:-1])
+                    if obj["repository"] is None or obj["repository"] == '<none>':
+                        continue
 
-                    Application.repositories[columns[0]].append({'tag': columns[1],'image': columns[2]})
+                    name = obj["repository"].split("/", 1)[1]
+
+                    if name not in Application.repositories:
+                        Application.repositories[name] = []
+
+                    Application.repositories[name].append({'tag': obj["tag"],'image': obj["Id"]})
 
             data_r = Application.repositories[self.plugin_config['repository']]
             for data in data_r:
