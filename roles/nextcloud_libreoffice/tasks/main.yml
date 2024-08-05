@@ -43,15 +43,14 @@
 #      - '{{global_lib}}libreoffice:/var/www/libreoffice/Data'
     exposed_ports:
       - "9980"
-  register: "podman_container_state"
   notify: "restart libreoffice"
 
 # ***** SERVICE CONFIGS *****
 - name: handle systemd service
   vars:
     container_name: "libreoffice"
-    container_changed: "{{podman_container_state.changed}}"
-    container_readyness: { "ip": "{{podman_libreoffice_ip}}", "port": "9980" }
+    container_ip: "{{podman_libreoffice_ip}}"
+    container_readyness: { "type": "port_check", "ip": "{{podman_libreoffice_ip}}", "port": "9980" }
   include_tasks: roles/container/shared/handle_podman_service.yml
   tags: ['systemd_watcher_config','systemd_service_config']
 
@@ -60,18 +59,8 @@
     service_name: "libreoffice"
     container_to_host_rules:
       - { saddr: "{{podman_libreoffice_ip}}", protocol: "tcp", dport: "443", comment: "=> apache (nextcloud)" }
-  include_tasks: roles/firewall/shared/allow_service_nftables.yml
-  tags: ['firewall_config']
-  when: "nftables_enabled"
-
-- name: allow service
-  vars:
-    firewall_name: "libreoffice"
-    firewall_rules:
-      - "saddr {{podman_libreoffice_ip}} daddr {{default_server_ip}} proto tcp dport 443"
   include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
-  when: "not nftables_enabled"
 
 - name: add container name
   vars:

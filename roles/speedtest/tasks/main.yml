@@ -10,10 +10,13 @@
     image_version: "v{{speedtest_version}}"
     image_files:
       - roles/speedtest/templates/container/Dockerfile
-      - roles/speedtest/templates/container/entrypoint.sh
       - roles/speedtest/templates/container/patches/ipInfo.js
       - roles/speedtest/templates/container/patches/gzip.js
+    entrypoint_services:
+      - "iperf3 --server --forceflush &"
+      - "node server.js &"
   include_tasks: roles/container/shared/build_podman_image.yml
+  tags: ['container_entrypoint_config']
 
 - name: prepare published_ports
   set_fact:
@@ -39,17 +42,14 @@
     exposed_ports:
      - "80"
     published_ports: "{{speedtest_published_ports}}"
-#    volumes:
-#      - "{{global_build}}speedtest/entrypoint.sh:/entrypoint.sh"
-  register: "podman_container_state"
   notify: "restart speedtest"
 
 # ***** SERVICE CONFIGS *****
 - name: handle systemd service
   vars:
     container_name: "speedtest"
-    container_changed: "{{podman_container_state.changed}}"
-    container_readyness: { "ip": "{{podman_speedtest_ip}}", "port": "80" }
+    container_ip: "{{podman_speedtest_ip}}"
+    container_readyness: { "type": "port_check", "ip": "{{podman_speedtest_ip}}", "port": "80" }
   include_tasks: roles/container/shared/handle_podman_service.yml
   tags: ['systemd_watcher_config','systemd_service_config']
 
@@ -63,9 +63,8 @@
   vars:
     service_name: "speedtest"
     nat_rules: { ip: "{{podman_speedtest_ip}}", ports: "{{speedtest_published_ports}}" }
-  include_tasks: roles/firewall/shared/allow_service_nftables.yml
+  include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
-  when: "nftables_enabled"
 
 # ***** DEPENDENCY CONFIGS *****
 - name: register webui

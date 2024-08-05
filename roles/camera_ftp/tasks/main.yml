@@ -73,15 +73,14 @@
     network: "isolated"
     ip: "{{podman_camera_ftp_ip}}"
     published_ports: "{{camera_ftp_published_ports}}"
-  register: "podman_container_state"
   notify: "restart vsftpd"
 
 # ***** SERVICE CONFIGS *****
 - name: handle systemd service
   vars:
     container_name: "vsftpd"
-    container_changed: "{{podman_container_state.changed}}"
-    container_readyness: { "ip": "{{podman_camera_ftp_ip}}", "port": "21" }
+    container_ip: "{{podman_camera_ftp_ip}}"
+    container_readyness: { "type": "port_check", "ip": "{{podman_camera_ftp_ip}}", "port": "21" }
   include_tasks: roles/container/shared/handle_podman_service.yml
   tags: ['systemd_watcher_config','systemd_service_config']
 
@@ -91,23 +90,14 @@
     container_to_outside_rules:
       - { saddr: "{{podman_camera_ftp_ip}}", sport: "20", daddr: "{{intern_networks}}", protocol: "tcp", comment: "camera_ftp => internal networks" }
     nat_rules: { ip: "{{podman_camera_ftp_ip}}", ports: "{{camera_ftp_published_ports}}" }
-  include_tasks: roles/firewall/shared/allow_service_nftables.yml
+  include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
-  when: "nftables_enabled"
 
 - name: prepare firewall rules
   set_fact:
     ftp_rules: "{{ (ftp_rules | default([])) + [ 'saddr ' + podman_camera_ftp_ip + ' proto tcp sport 20 daddr ' + item ] }}"
   with_items: "{{ intern_networks }}"
   tags: ['firewall_config']
-
-- name: allow service
-  vars:
-    firewall_name: "ftp"
-    firewall_rules: "{{ftp_rules}}"
-  include_tasks: roles/firewall/shared/allow_service.yml
-  tags: ['firewall_config']
-  when: "not nftables_enabled"
 
 # ***** DEPENDENCY CONFIGS *****
 - name: create cron job

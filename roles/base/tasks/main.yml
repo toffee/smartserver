@@ -50,6 +50,9 @@
       
       , wireguard-tools
       
+      , netcat
+      , wget
+
       , curl
       , bzip2
       , lsof
@@ -60,7 +63,7 @@
       , git
 
 #      , gcc
-      , make
+#      , make
 
       , sshpass
       
@@ -98,6 +101,9 @@
 
       , wireguard-tools
       
+      , netcat
+      , wget
+
       , curl
       , bzip2
       , lsof
@@ -108,7 +114,7 @@
       , git
 
 #      , gcc
-      , make
+#      , make
 
       , sshpass
 
@@ -143,6 +149,9 @@
 
       , wireguard-tools
 
+      , netcat             # used for readyness checks
+      , wget               # used for readyness checks
+
       , curl               # used to fetch e.g. picture of the day
       , bzip2              # used to import databases with bzcat
       , lsof               # used by container visualizer cli & shared_libs (processlist??)
@@ -154,7 +163,7 @@
       , git                # used for ansible git module
 
 #      , gcc                # used for ansible gem module => to build native extension
-      , make               # used for installing ferm
+#      , make               # used for installing ferm
       
       , sshpass            # used for ssh accessibility checks (e.g. openhab => wait until ready)
 

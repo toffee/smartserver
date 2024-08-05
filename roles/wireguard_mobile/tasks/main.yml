@@ -165,17 +165,15 @@
       - '{{global_etc}}wireguard_mobile:/etc/wireguard'
 #    exposed_ports:
 #      - "{{mobile_vpn_internal_port}}/udp"
-  register: "podman_container_state"
   notify: "restart wireguard_mobile"
 
 # ***** SERVICE CONFIGS *****
 - name: handle systemd service
   vars:
     container_name: "wireguard_mobile"
-    container_changed: "{{podman_container_state.changed}}"
     container_pre_exec: "modprobe wireguard"
-    container_readyness: { "cmd": "echo -n ''", "type": "container" }
-#    container_readyness: { "ip": "127.0.0.1", "port": "{{mobile_vpn_internal_port}}", "protocol": "udp" }
+    container_readyness: { "type": "state_check" }
+#    container_readyness: { "type": "port_check", "ip": "127.0.0.1", "port": "{{mobile_vpn_internal_port}}", "protocol": "udp" }
   include_tasks: roles/container/shared/handle_podman_service.yml
   tags: ['systemd_watcher_config','systemd_service_config']
   
@@ -193,26 +191,5 @@
               , { "saddr": "{{vpn_mobile_network}}/24", "oifname": "mac0" }
             {% endif %}
         ]
-  include_tasks: roles/firewall/shared/allow_service_nftables.yml
-  tags: ['firewall_config']
-  when: "nftables_enabled"
-
-- name: prepare mobile vpn admin ip rules
-  set_fact:
-    vpn_admin_ip_rules: |
-      [
-      {% for vpn_admin_ip in vpn_admin_ips %}
-        "saddr {{vpn_admin_ip}}",
-      {% endfor %}
-      "daddr {{default_server_ip}} proto udp dport {{mobile_vpn_internal_port}}"
-      ]
-  tags: ['firewall_config']
-  when: "not nftables_enabled"
-
-- name: allow mobile vpn service
-  vars:
-    firewall_name: "wireguard_mobile"
-    firewall_rules: "{{vpn_admin_ip_rules}}"
   include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
-  when: "not nftables_enabled"

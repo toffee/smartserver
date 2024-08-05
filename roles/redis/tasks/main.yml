@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    redis_version: '7.2.5'
+    redis_version: '7.4.0'
   tags: [ 'update_notifier_config' ]
   
 - name: create podman container
@@ -19,15 +19,14 @@
     ip: "{{podman_redis_ip}}"
     exposed_ports:
      - "6379"
-  register: "podman_container_state"
   notify: "restart redis"
 
 # ***** SERVICE CONFIGS *****
 - name: handle systemd service
   vars:
     container_name: "redis"
-    container_changed: "{{podman_container_state.changed}}"
-    container_readyness: { "ip": "{{podman_redis_ip}}", "port": "6379" }
+    container_ip: "{{podman_redis_ip}}"
+    container_readyness: { "type": "port_check", "ip": "{{podman_redis_ip}}", "port": "6379" }
   include_tasks: roles/container/shared/handle_podman_service.yml
   tags: ['systemd_watcher_config','systemd_service_config']
 
@@ -36,25 +35,15 @@
 #    service_name: "redis"
 #    container_to_container_rules:
 #      - { saddr: podman_redis_ip, daddr: podman_php_ip }
-#  include_tasks: roles/firewall/shared/allow_service_nftables.yml
+#  include_tasks: roles/firewall/shared/allow_service.yml
 #  tags: ['firewall_config']
-#  when: "nftables_enabled"
-
-- name: allow service
-  vars:
-    firewall_name: "redis"
-    firewall_rules:
-      - "saddr {{podman_redis_ip}} daddr {{podman_php_ip}}"
-  include_tasks: roles/firewall/shared/allow_service.yml
-  tags: ['firewall_config']
-  when: "not nftables_enabled"
 
 # ***** DEPENDENCY CONFIGS *****
 - name: register update notifier
   vars:
     name: "redis"
     type: "docker"
-    url: "https://raw.githubusercontent.com/antirez/redis/7.0/00-RELEASENOTES"
+    url: "https://raw.githubusercontent.com/antirez/redis/{{redis_version | regex_replace('\\.[0-9]+$', '') }}/00-RELEASENOTES"
     config: {
       repository: "redis",
       pattern: "^([0-9\\.]+)-alpine$"

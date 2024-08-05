@@ -30,8 +30,10 @@
     image_version: "{{alpine_version}}"
     image_files:
       - roles/minidlna/templates/container/Dockerfile
-      - roles/minidlna/templates/container/entrypoint.sh
+    entrypoint_services:
+      - "/usr/sbin/minidlnad -f /etc/minidlna/minidlna.conf -S &"
   include_tasks: roles/container/shared/build_podman_image.yml
+  tags: ['container_entrypoint_config']
 
 - name: prepare volumes
   set_fact:
@@ -53,8 +55,7 @@
       - label=disable
     env:
       TZ: "{{timezone}}"
-      PGID: "{{system_groups['www'].id}}"
-      PUID: "{{system_users['www'].id}}"
+    user: "{{system_users['www'].id}}:{{system_groups['www'].id}}"
     log_driver: journald
     log_options:
       tag: minidlna
@@ -65,14 +66,13 @@
     exposed_ports:
      - "8200/tcp"  
      - "1900/udp"  
-  register: "podman_container_state"
   notify: "restart minidlna"
 
 # ***** SERVICE CONFIGS *****
 - name: handle systemd service
   vars:
     container_name: "minidlna"
-    container_changed: "{{podman_container_state.changed}}"
-    container_readyness: { "ip": "{{dlna_ip}}", "port": "8200" }
+    container_ip: "{{dlna_ip}}"
+    container_readyness: { "type": "port_check", "ip": "{{dlna_ip}}", "port": "8200" }
   include_tasks: roles/container/shared/handle_podman_service.yml
   tags: ['systemd_watcher_config','systemd_service_config']

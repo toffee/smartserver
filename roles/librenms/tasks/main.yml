@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    librenms_version: '24.5.0'
+    librenms_version: '24.6.0'
   tags: [ 'update_notifier_config' ]    
 
 - name: "create user and group => user or group does not exists"
@@ -80,15 +80,14 @@
      - "8000/tcp"
      - "162"
      - "514"
-  register: "podman_container_state"
   notify: "restart librenms"
 
 # ***** SERVICE CONFIGS *****
 - name: handle systemd service
   vars:
     container_name: "librenms"
-    container_changed: "{{podman_container_state.changed}}"
-    container_readyness: { "ip": "{{podman_librenms_ip}}", "port": "8000" }
+    container_ip: "{{podman_librenms_ip}}"
+    container_readyness: { "type": "port_check", "ip": "{{podman_librenms_ip}}", "port": "8000" }
     container_after: [ "redis", "mysql" ]
   include_tasks: roles/container/shared/handle_podman_service.yml
   tags: ['systemd_watcher_config','systemd_service_config']
@@ -101,30 +100,8 @@
       - { saddr: "{{podman_librenms_ip}}", daddr: "{{podman_redis_ip}}", protocol: "tcp", dport: "6379", comment: "librenms => redis" }
     container_to_outside_rules:
       - { saddr: "{{podman_librenms_ip}}", daddr: "{{intern_networks}}", comment: "librenms => internal networks (snmp scanner)" }
-  include_tasks: roles/firewall/shared/allow_service_nftables.yml
-  tags: ['firewall_config']
-  when: "nftables_enabled"
-
-- name: prepare ferm rules
-  set_fact:
-    librenms_ferm_rules: |
-      [
-      "saddr {{podman_librenms_ip}} daddr {{podman_mysql_ip}}",
-      "saddr {{podman_librenms_ip}} daddr {{podman_redis_ip}}",
-      {% for network in intern_networks %}
-        "saddr {{podman_librenms_ip}} daddr {{network}}",
-      {% endfor %}
-      ]
-  tags: ['firewall_config']
-  when: "not nftables_enabled"
-
-- name: allow service
-  vars:
-    firewall_name: "librenms"
-    firewall_rules: "{{librenms_ferm_rules}}"
   include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
-  when: "not nftables_enabled"
 
 - name: add service name
   vars:

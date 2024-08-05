@@ -49,8 +49,11 @@
     image_version: "{{alpine_version}}"
     image_files:
       - roles/weather_service/templates/container/Dockerfile
-      - roles/weather_service/templates/container/entrypoint.sh
+    entrypoint_services:
+      - "/opt/shared/python/install.py"
+      - "/opt/weather_service/weather_service &"
   include_tasks: roles/container/shared/build_podman_image.yml
+  tags: ['container_entrypoint_config']
 
 - name: create podman container
   containers.podman.podman_container:
@@ -70,15 +73,14 @@
       - '{{global_opt}}shared/python:/opt/shared/python:ro'
       - '{{global_opt}}weather_service/:/opt/weather_service:ro'
       - "{{global_lib}}weather_service/:/var/lib/weather_service:rw"
-  register: "podman_container_state"
   notify: "restart weather_service"
 
 # ***** SERVICE CONFIGS *****
 - name: handle systemd service
   vars:
     container_name: "weather_service"
-    container_changed: "{{podman_container_state.changed}}"
-    container_readyness: { "ip": "{{podman_weather_service_ip}}", "port": "80" }
+    container_ip: "{{podman_weather_service_ip}}"
+    container_readyness: { "type": "port_check", "ip": "{{podman_weather_service_ip}}", "port": "80" }
     container_after: [ "cloud_mosquitto", "mysql" ]
   include_tasks: roles/container/shared/handle_podman_service.yml
   tags: ['systemd_watcher_config','systemd_service_config']
@@ -86,32 +88,23 @@
 - name: allow service
   vars:
     service_name: "weather_service"
-    container_to_container_rules:
-      - { saddr: "{{podman_prometheus_ip}}", daddr: "{{podman_weather_service_ip}}", protocol: "tcp", dport: "80", comment: "prometheus => weather_service" }
-      - { saddr: "{{podman_weather_service_ip}}", daddr: "{{podman_mysql_ip}}", protocol: "tcp", dport: "3306", comment: "weather_service => mysql" }
-      - { saddr: "{{podman_weather_service_ip}}", daddr: "{{vpn_cloud_services.local.mosquitto if weather_mqtt_server == 'cloud_mosquitto' else podman_mosquitto_ip}}", protocol: "tcp", dport: [ "1883", "9001" ], comment: "weather_service => {{ weather_mqtt_server if weather_mqtt_server != 'dummy' else 'mosquitto' }}" }
-    container_to_outside_rules: |
+    container_to_container_rules: |
       [
-        { "saddr": "{{podman_weather_service_ip}}", "protocol": "tcp", "dport": "443", "oif": "{{default_network_interface}}", "comment": "weather_service => external weather provider" }
-        {% if cloud_vpn is defined %}
-            , { "saddr": "{{podman_weather_service_ip}}", "daddr": "{{vpn_cloud_services['local']['mosquitto']}}", "protocol": "tcp", "dport": "1883", "comment": "weather_service => cloud mosquitto" }
+        { "saddr": "{{podman_prometheus_ip}}", "daddr": "{{podman_weather_service_ip}}", "protocol": "tcp", "dport": "80", "comment": "prometheus => weather_service" },
+        { "saddr": "{{podman_weather_service_ip}}", "daddr": "{{podman_mysql_ip}}", "protocol": "tcp", "dport": "3306", "comment": "weather_service => mysql" },
+        {% if weather_mqtt_server == 'mosquitto' %}
+          { "saddr": "{{podman_weather_service_ip}}", "daddr": "{{podman_mosquitto_ip}}", "protocol": "tcp", "dport": [ "1883", "9001" ], "comment": "weather_service => mosquitto }}" }
         {% endif %}
       ]
-  include_tasks: roles/firewall/shared/allow_service_nftables.yml
-  tags: ['firewall_config']
-  when: "nftables_enabled"
-
-- name: allow service
-  vars:
-    firewall_name: "weather_service"
-    firewall_rules:
-      - "saddr {{podman_prometheus_ip}} daddr {{podman_weather_service_ip}}"
-      - "saddr {{podman_weather_service_ip}} daddr {{podman_mysql_ip}}"
-      - "saddr {{podman_weather_service_ip}} daddr {{vpn_cloud_services.local.mosquitto if weather_mqtt_server == 'cloud_mosquitto' else podman_mosquitto_ip}}"
-      - "saddr {{podman_weather_service_ip}} proto tcp dport 443 outerface {{default_network_interface}}"
+    container_to_outside_rules: |
+      [
+        { "saddr": "{{podman_weather_service_ip}}", "protocol": "tcp", "dport": "443", "oif": "{{default_network_interface}}", "comment": "weather_service => external weather provider" }, 
+        {% if weather_mqtt_server == 'cloud_mosquitto' %}
+            { "saddr": "{{podman_weather_service_ip}}", "daddr": "{{vpn_cloud_services['local']['mosquitto']}}", "protocol": "tcp", "dport": [ "1883", "9001" ], "comment": "weather_service => cloud mosquitto" }
+        {% endif %}
+      ]
   include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
-  when: "not nftables_enabled"
 
 # ***** DEPENDENCY CONFIGS *****
 - name: check mysql service

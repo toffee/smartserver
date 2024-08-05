@@ -34,8 +34,11 @@
     image_version: "{{alpine_version}}"
     image_files:
       - roles/cloud_check/templates/container/Dockerfile
-      - roles/cloud_check/templates/container/entrypoint.sh
+    entrypoint_services:
+#      - "/opt/shared/python/install.py"
+      - "/opt/cloud_check/cloud_check &"
   include_tasks: roles/container/shared/build_podman_image.yml
+  tags: ['container_entrypoint_config']
 
 - name: create podman container
   containers.podman.podman_container:
@@ -54,15 +57,14 @@
     volumes:
       - '{{global_opt}}cloud_check/:/opt/cloud_check'
       - '{{cloud_path}}/remote:/cloud/remote:rshared'
-  register: "podman_container_state"
   notify: "restart cloud_check"
 
 # ***** SERVICE CONFIGS *****
 - name: handle systemd service
   vars:
     container_name: "cloud_check"
-    container_changed: "{{podman_container_state.changed}}"
-    container_readyness: { "ip": "{{podman_cloud_check_ip}}", "port": "80" }
+    container_ip: "{{podman_cloud_check_ip}}"
+    container_readyness: { "type": "port_check", "ip": "{{podman_cloud_check_ip}}", "port": "80" }
     container_after: [ "cloud_mosquitto" ]
   include_tasks: roles/container/shared/handle_podman_service.yml
   tags: ['systemd_watcher_config','systemd_service_config']
@@ -77,22 +79,9 @@
       - { saddr: "{{podman_cloud_check_ip}}", protocol: "tcp", dport: "80", oif: "{{default_network_interface}}", comment: "cloud_check => http endpoint of other clouds" }
       - { saddr: "{{podman_cloud_check_ip}}", protocol: "icmp", oif: "{{default_network_interface}}", comment: "cloud_check => icmp endpoint of other clouds" }
       - { saddr: "{{podman_cloud_check_ip}}", daddr: "{{vpn_cloud_services['local']['mosquitto']}}", protocol: "tcp", dport: "1883", comment: "cloud_check => cloud mosquitto" }
-  include_tasks: roles/firewall/shared/allow_service_nftables.yml
-  tags: ['firewall_config']
-  when: "nftables_enabled"
-  
-- name: allow service
-  vars:
-    firewall_name: "cloud_check"
-    firewall_rules:
-      - "saddr {{podman_prometheus_ip}} daddr {{podman_cloud_check_ip}}"
-      - "saddr {{podman_cloud_check_ip}} daddr {{vpn_cloud_services.local.mosquitto}}"
-      - "saddr {{podman_cloud_check_ip}} proto tcp dport 80 outerface {{default_network_interface}}"
-      - "saddr {{podman_cloud_check_ip}} proto icmp outerface {{default_network_interface}}"
   include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
-  when: "not nftables_enabled"
-
+  
 # ***** DEPENDENCY CONFIGS *****
 - name: register prometheus rules & metrics
   vars:
