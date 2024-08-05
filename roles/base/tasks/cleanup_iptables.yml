@@ -1,10 +1,10 @@
-- name: stop ferm
-  systemd:
-    name: ferm
-    state: stopped
-    daemon_reload: yes
-    enabled: no
-    masked: no
+#- name: stop ferm
+#  systemd:
+#    name: ferm
+#    state: stopped
+#    daemon_reload: yes
+#    enabled: no
+#    masked: no
 
 - name: clean old iptables related files
   file:

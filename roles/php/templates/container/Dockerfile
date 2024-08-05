@@ -25,7 +25,6 @@ RUN apt-get update && \
   apt-get install -y libpq-dev && \
   docker-php-ext-install -j$(nproc) pdo_pgsql && \
   docker-php-ext-install -j$(nproc) sysvsem && \
->>>>>>> master
 
 # GMP => needed by nextcloud bookmarks
   docker-php-ext-install -j$(nproc) gmp && \

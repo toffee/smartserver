@@ -25,16 +25,24 @@
     - "servers.json"
   notify: "restart pgadmin"
 
-- name: check started docker
-  systemd:
-    name: docker
-    state: started
+- name: prepare published_ports
+  set_fact:
+    pgadmin_published_ports:  |
+      [
+        "5050:5050",
+        {% if default_server_ipv6 is defined %}
+          "[::]:5050:5050",
+        {% endif %}
+      ]
+  tags: ['firewall_config']
 
-- name: create docker container
-  docker_container:
+- name: create podman container
+  containers.podman.podman_container:
     name: pgadmin
     image: "dpage/pgadmin4:{{pgadmin_version}}"
     state: present
+    security_opt:
+      - label=disable
     env:
       PGADMIN_DEFAULT_EMAIL: "{{pgadmin_username}}"
       PGADMIN_DEFAULT_PASSWORD: "{{pgadmin_password}}"
@@ -43,45 +51,46 @@
     log_driver: journald
     log_options:
       tag: pgadmin
+    network: "isolated"
+    ip: "{{podman_pgadmin_ip}}"
     volumes:
       - '{{ global_etc }}pgadmin/servers.json:/pgadmin4/servers.json:z'
       - '{{ global_lib }}pgadmin:/var/lib/pgadmin:z'
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks:
-      - name: "isolated"
-        ipv4_address: "{{docker_pgadmin_ip}}"
-    networks_cli_compatible: yes
-    published_ports: |
-      [
-        "5050:5050",
-        {% if default_server_ipv6 is defined %}
-          "[::]:5050:5050"
-        {% endif %}
-      ]
-  register: pgadmin_container
+    published_ports: "{{pgadmin_published_ports}}"
+  register: "podman_container_state"
   notify: "restart pgadmin"
+
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
+  vars:
+    container_name: "pgadmin"
+    container_changed: "{{podman_container_state.changed}}"
+    container_after: ["postgres"]
+  include_tasks: roles/container/shared/handle_podman_service.yml
+  tags: ['systemd_watcher_config']
 
 - name: add container name
   vars:
     host_name: "pgadmin"
-    host_ip_address: "{{docker_pgadmin_ip}}"
+    host_ip_address: "{{podman_pgadmin_ip}}"
   import_tasks: roles/_shared/add_to_hosts.yml
 
-- name: prepare ferm rules
-  set_fact:
-    pgadmin_ferm_rules: |
-      [
-      "saddr {{docker_pgadmin_ip}} daddr {{docker_postgres_ip}}"
-      ]
-  tags: [ 'firewall_config' ]
-
-- name: allow pgadmin service
+- name: allow service
   vars:
-    name: "pgadmin"
-    rules: "{{pgadmin_ferm_rules}}"
-  import_tasks: roles/firewall/shared/allow_service.yml
-  tags: [ 'firewall_config' ]
+    service_name: "pgadmin"
+    container_to_container_rules:
+      - { saddr: "{{podman_pgadmin_ip}}", daddr: "{{podman_postgres_ip}}", protocol: "tcp", dport: "5432", comment: "pgadmin => pastgres" }
+  include_tasks: roles/firewall/shared/allow_service_nftables.yml
+  tags: ['firewall_config']
+  when: "nftables_enabled"
+
+- name: allow service
+  vars:
+    firewall_name: "pgadmin"
+    firewall_rules:
+      - "saddr {{podman_pgadmin_ip}} daddr {{podman_postgres_ip}}"
+  include_tasks: roles/firewall/shared/allow_service.yml
+  when: "not nftables_enabled"
 
 # ***** FINALIZE *****
 - name: register webui
@@ -100,12 +109,9 @@
   vars:
     config_file: "templates/etc/fluent/_.ansible.d/pgadmin.conf"
   import_tasks: roles/fluentd/shared/add_config.yml
+  tags: ['fluentd_config']
+  when: "monitoring_enabled"
 
-- name: create systemd service
-  vars:
-    container_name: "pgadmin"
-  import_tasks: roles/container/shared/add_docker_service.yml
-    
 - name: register update notifier
   vars:
     name: "pgadmin"

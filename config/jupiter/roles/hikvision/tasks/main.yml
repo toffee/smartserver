@@ -55,7 +55,7 @@
 # ***** FINALIZE *****
 - name: register systemd service watcher
   vars:
-    name: "hikvision"
+    watcher_name: "hikvision"
   import_tasks: roles/systemd_watcher/shared/add_watcher.yml
   when: "is_production|bool" # restart handler is also disabled if no production
 

@@ -106,6 +106,7 @@
     env: "{{pihole_env}}"
     capabilities:
       - net_admin
+      - net_raw
     shm_size: 256m
     log_driver: journald
     log_options:

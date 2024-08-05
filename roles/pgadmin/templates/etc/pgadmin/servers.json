@@ -3,7 +3,7 @@
         "1": {
             "Name": "{{ server_name }}",
             "Group": "Servers",
-            "Host": "{{ docker_postgres_ip }}",
+            "Host": "{{ podman_postgres_ip }}",
             "Port": 5432,
             "MaintenanceDB": "postgres",
             "Username": "postgres",

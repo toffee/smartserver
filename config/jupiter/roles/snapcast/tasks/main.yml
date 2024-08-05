@@ -1,4 +1,4 @@
-- name: set snapcats version
+- name: set snapcast version
   set_fact:
     snapcast_version: "0.28.0"
   tags: [ 'update_notifier_config' ]
@@ -70,7 +70,7 @@
 # ***** FINALIZE *****
 - name: register systemd service watcher
   vars:
-    name: "snapclient"
+    watcher_name: "snapclient"
   import_tasks: roles/systemd_watcher/shared/add_watcher.yml
 
 - name: register update notifier

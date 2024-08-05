@@ -33,20 +33,33 @@
       - "--chmod=D750,F640"
   notify: "restart postgres"
 
-- name: build docker image
+- name: prepare published_ports
+  set_fact:
+    postgres_published_ports:  |
+      [
+        "5432:5432",
+        {% if default_server_ipv6 is defined %}
+          "[::]:5432:5432",
+        {% endif %}
+      ]
+  tags: ['firewall_config']
+
+- name: build podman image
   vars:
-    name: "postgres"
+    container_name: "postgres"
     image_name: "custom_postgres"
     image_version: "{{postgres_version}}"
-    files:
+    image_files:
       - roles/postgres/templates/container/Dockerfile
-  include_tasks: roles/container/shared/build_docker_image.yml
+  include_tasks: roles/container/shared/build_podman_image.yml
 
-- name: create docker container
-  docker_container:
+- name: create podman container
+  containers.podman.podman_container:
     name: postgres
     image: "custom_postgres:{{postgres_version}}"
     state: present
+    security_opt:
+      - label=disable
     user: "{{system_users['postgres'].name}}:{{system_groups['postgres'].name}}"
     env:
       POSTGRES_PASSWORD: "{{postgres_password}}"
@@ -54,29 +67,27 @@
     log_driver: journald
     log_options:
       tag: postgres
+    network: "isolated"
+    ip: "{{podman_postgres_ip}}"
     volumes:
       - '{{ global_etc }}postgres:/etc/postgresql:z'
       - '{{ global_lib }}postgres:/var/lib/postgresql/data:z'
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks:
-      - name: "isolated"
-        ipv4_address: "{{docker_postgres_ip}}"
-    networks_cli_compatible: yes
-    published_ports: |
-      [
-        "5432:5432",
-        {% if default_server_ipv6 is defined %}
-          "[::]:5432:5432"
-        {% endif %}
-      ]
-  register: postgres_container
+    published_ports: "{{postgres_published_ports}}"
+  register: "podman_container_state"
   notify: "restart postgres"
+
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
+  vars:
+    container_name: "postgres"
+    container_changed: "{{podman_container_state.changed}}"
+  include_tasks: roles/container/shared/handle_podman_service.yml
+  tags: ['systemd_watcher_config']
 
 - name: add container name
   vars:
     host_name: "postgres"
-    host_ip_address: "{{docker_postgres_ip}}"
+    host_ip_address: "{{podman_postgres_ip}}"
   import_tasks: roles/_shared/add_to_hosts.yml
 
 # ***** FINALIZE *****
@@ -94,7 +105,7 @@
 - name: create cron job
   vars:
     name: "Postgres Core Backup"
-    cmd: "set -o pipefail && docker exec postgres sh -c \"pg_dump postgres\" | bzip2 -c > {{database_backup_path}}postgres/postgres_$(date +\\%Y-\\%m-\\%d).sql.bz2"
+    cmd: "set -o pipefail && podman exec postgres sh -c \"pg_dump postgres\" | bzip2 -c > {{database_backup_path}}postgres/postgres_$(date +\\%Y-\\%m-\\%d).sql.bz2"
     group: "postgres"
     log: "dump_postgres"
     hour: "2"
@@ -109,12 +120,6 @@
   tags: ['fluentd_config']
   when: "monitoring_enabled"
   
-- name: create systemd service
-  vars:
-    container_name: "postgres"
-  import_tasks: roles/container/shared/add_docker_service.yml
-  tags: ['systemd_watcher_config']
-   
 - name: register update notifier
   vars:
     name: "postgres"
@@ -136,4 +141,4 @@
 
 - name: check postgres service
   include_tasks: roles/postgres/shared/wait_until_ready.yml
-  when: postgres_container.changed
+  when: podman_container_state.changed

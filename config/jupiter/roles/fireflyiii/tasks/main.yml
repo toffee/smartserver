@@ -39,16 +39,35 @@
     - restart fireflyiii-core
     - restart fireflyiii-importer
 
-- name: check started docker
-  systemd:
-    name: docker
-    state: started
+- name: prepare published_ports
+  set_fact:
+    fireflyiii_core_published_ports:  |
+      [
+        "21580:8080",
+        {% if default_server_ipv6 is defined %}
+          "[::]:21580:8080",
+        {% endif %}
+      ]
+  tags: ['firewall_config']
 
-- name: create docker fireflyiii-core container
-  docker_container:
+- name: prepare published_ports
+  set_fact:
+    fireflyiii_importer_published_ports:  |
+      [
+        "21680:8080",
+        {% if default_server_ipv6 is defined %}
+          "[::]:21680:8080",
+        {% endif %}
+      ]
+  tags: ['firewall_config']
+
+- name: create podman fireflyiii-core container
+  containers.podman.podman_container:
     name: fireflyiii-core
     image: "fireflyiii/core:{{fireflyiii_core_version}}"
     state: present
+    security_opt:
+      - label=disable
     env:
       TZ: "{{timezone}}"
       APP_KEY: "{{fireflyiii_api_key}}"
@@ -69,33 +88,26 @@
     log_driver: journald
     log_options:
       tag: fireflyiii
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks: 
-      - name: "isolated"
-        ipv4_address: "{{docker_fireflyiii_core_ip}}"
-    networks_cli_compatible: yes
+    network: "isolated"
+    ip: "{{podman_fireflyiii_core_ip}}"
     volumes:
-      - '{{global_lib}}fireflyiii/upload:/var/www/html/storage/upload:z'
-      - '{{global_log}}fireflyiii:/var/www/html/storage/logs:z'
-    published_ports: |
-      [
-        "21580:8080",
-        {% if default_server_ipv6 is defined %}
-          "[::]:21580:8080"
-        {% endif %}
-      ]
+      - '{{global_lib}}fireflyiii/upload:/var/www/html/storage/upload'
+      - '{{global_log}}fireflyiii:/var/www/html/storage/logs'
+    published_ports: "{{fireflyiii_core_published_ports}}"
+  register: "podman_container_core_state"
   notify: "restart fireflyiii-core"
   
-- name: create docker fireflyiii-importer container
-  docker_container:
+- name: create podman fireflyiii-importer container
+  containers.podman.podman_container:
     name: fireflyiii-importer
     image: "fireflyiii/data-importer:{{fireflyiii_importer_version}}"
     state: present
+    security_opt:
+      - label=disable
     env: 
       TZ: "{{timezone}}"
       IMPORT_DIR_ALLOWLIST: "/var/www/html/storage/configurations"
-      FIREFLY_III_URL: "http://{{docker_fireflyiii_core_ip}}:8080"
+      FIREFLY_III_URL: "http://{{podman_fireflyiii_core_ip}}:8080"
       VANITY_URL: "https://fireflyiii.{{server_domain}}"
 #      FIREFLY_III_CLIENT_ID: "{{vault_fireflyiii_client_id}}"
       FIREFLY_III_ACCESS_TOKEN: "{{fireflyiii_pat}}"
@@ -115,51 +127,64 @@
     log_driver: journald
     log_options:
       tag: fireflyiii
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks: 
-      - name: "isolated"
-        ipv4_address: "{{docker_fireflyiii_importer_ip}}"
-    networks_cli_compatible: yes
+    network: "isolated"
+    ip: "{{podman_fireflyiii_importer_ip}}"
     volumes:
-      - '{{global_lib}}fireflyiii/configurations:/var/www/html/storage/configurations:z'
-      - '{{global_log}}fireflyiii:/var/www/html/storage/logs:z'
-    published_ports: |
-      [
-        "21680:8080",
-        {% if default_server_ipv6 is defined %}
-          "[::]:21680:8080"
-        {% endif %}
-      ]
+      - '{{global_lib}}fireflyiii/configurations:/var/www/html/storage/configurations'
+      - '{{global_log}}fireflyiii:/var/www/html/storage/logs'
+    published_ports: "{{fireflyiii_importer_published_ports}}"
+  register: "podman_container_importer_state"
   notify: "restart fireflyiii-importer"
 
-- name: prepare ferm rules
-  set_fact:
-    fireflyiii_ferm_rules: |
-      [
-      "saddr {{docker_fireflyiii_core_ip}} daddr {{docker_mysql_ip}}",
-      "saddr {{docker_fireflyiii_importer_ip}} daddr {{docker_mysql_ip}}",
-      "saddr {{docker_fireflyiii_importer_ip}} daddr {{docker_fireflyiii_core_ip}}"
-      ]
-  tags: [ 'firewall_config' ]
-
-- name: allow fireflyiii service
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
   vars:
-    name: "fireflyiii"
-    rules: "{{fireflyiii_ferm_rules}}"
+    container_name: "fireflyiii-core"
+    container_changed: "{{podman_container_core_state.changed}}"
+    container_after: [ "mysql" ]
+  include_tasks: roles/container/shared/handle_podman_service.yml
+  tags: ['systemd_watcher_config']
+
+- name: handle systemd service
+  vars:
+    container_name: "fireflyiii-importer"
+    container_changed: "{{podman_container_importer_state.changed}}"
+    container_after: [ "mysql", "fireflyiii-core" ]
+  include_tasks: roles/container/shared/handle_podman_service.yml
+  tags: ['systemd_watcher_config']
+
+- name: allow service
+  vars:
+    service_name: "fireflyiii"
+    container_to_container_rules:
+      - { saddr: "{{podman_fireflyiii_core_ip}}", daddr: "{{podman_mysql_ip}}", protocol: "tcp", dport: "3306", comment: "fireflyiii-core => mysql" }
+      - { saddr: "{{podman_fireflyiii_importer_ip}}", daddr: "{{podman_mysql_ip}}", protocol: "tcp", dport: "3306", comment: "fireflyiii-importer => mysql" }
+      - { saddr: "{{podman_fireflyiii_importer_ip}}", daddr: "{{podman_fireflyiii_core_ip}}", protocol: "tcp", dport: "8080", comment: "fireflyiii-importer => fireflyiii-core" }
+  include_tasks: roles/firewall/shared/allow_service_nftables.yml
+  tags: ['firewall_config']
+  when: "nftables_enabled"
+
+- name: allow service
+  vars:
+    firewall_name: "fireflyiii"
+    firewall_rules:
+      - "saddr {{podman_fireflyiii_core_ip}} daddr {{podman_mysql_ip}}"
+-     - "saddr {{podman_fireflyiii_importer_ip}} daddr {{podman_mysql_ip}}"
+-     - "saddr {{podman_fireflyiii_importer_ip}} daddr {{podman_fireflyiii_core_ip}}"
   import_tasks: roles/firewall/shared/allow_service.yml
   tags: [ 'firewall_config' ]
-  
+  when: "not nftables_enabled"
+
 - name: add container fireflyiii-core name
   vars:
     host_name: "fireflyiii"
-    host_ip_address: "{{docker_fireflyiii_core_ip}}"
+    host_ip_address: "{{podman_fireflyiii_core_ip}}"
   import_tasks: roles/_shared/add_to_hosts.yml
 
 - name: add container fireflyiii-importer name
   vars:
     host_name: "fireflyiii-importer"
-    host_ip_address: "{{docker_fireflyiii_importer_ip}}"
+    host_ip_address: "{{podman_fireflyiii_importer_ip}}"
   import_tasks: roles/_shared/add_to_hosts.yml
 
 
@@ -176,7 +201,7 @@
 - name: create cron job
   vars:
     name: "Firefly III Importer cron job"
-    cmd: "docker exec --user www-data fireflyiii-importer sh -c \"php artisan importer:auto-import /var/www/html/storage/configurations/; exit 0\""
+    cmd: "podman exec --user www-data fireflyiii-importer sh -c \"php artisan importer:auto-import /var/www/html/storage/configurations/; exit 0\""
     group: "fireflyiii"
     hour: "8"
     minute: "30"
@@ -189,7 +214,8 @@
     name: "fireflyiii"
     js_file: "templates/webui/fireflyiii.js"
     icons: [ 'templates/webui/icons/fireflyiii_logo.svg', 'templates/webui/icons/financial_logo.svg' ]
-  import_tasks: roles/apache_webui/shared/add_webui.yml
+  include_tasks: roles/apache_webui/shared/add_webui.yml
+  tags: ['apache_webui_config']
 
 - name: copy apache config
   vars:
@@ -208,18 +234,6 @@
     config_file: "templates/etc/fluent/_.ansible.d/fireflyiii.conf"
   import_tasks: roles/fluentd/shared/add_config.yml
 
-- name: create systemd fireflyiii-core service
-  vars:
-    container_name: "fireflyiii-core"
-    container_after: [ "mysql" ]
-  import_tasks: roles/container/shared/add_docker_service.yml
-  
-- name: create systemd fireflyiii-importer service
-  vars:
-    container_name: "fireflyiii-importer"
-    container_after: [ "mysql", "fireflyiii-core" ]
-  import_tasks: roles/container/shared/add_docker_service.yml
-
 - name: register update notifier
   vars:
     name: "fireflyiii-core"
@@ -230,6 +244,8 @@
       pattern: "^version-([0-9\\.]+)$"
     }
   import_tasks: roles/update_service/shared/add_software.yml
+  tags: ['update_notifier_config']
+  when: "update_service_software_check_enabled"
   
 - name: register update notifier
   vars:
@@ -241,4 +257,6 @@
       pattern: "^version-([0-9\\.]+)$"
     }
   import_tasks: roles/update_service/shared/add_software.yml
+  tags: ['update_notifier_config']
+  when: "update_service_software_check_enabled"
 
