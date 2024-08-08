@@ -1,4 +1,4 @@
-FROM openhab/openhab:{{image_version}}-debian
+FROM openhab/openhab:{{openhab_version}}-debian
 
 RUN apt-get update && \
   apt-get install -y ffmpeg

@@ -36,6 +36,9 @@ class State():
                 ConfigHelper.saveConfig(self.dump_path, self.version, { "data": self.data } )
                 logging.info("Saved state")
 
+    def save(self):
+        self._dump()
+
     def setState(self, status):
         with self.lock:
             self.data["status"] = status
