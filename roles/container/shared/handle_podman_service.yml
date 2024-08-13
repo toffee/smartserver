@@ -1,3 +1,10 @@
+- name: "container : build_podman_image : stop service"
+  systemd:
+    name: "{{container_name}}"
+    state: stopped
+  failed_when: no
+  when: "container_changed"
+
 - name: "container : add_podman_service : create systemd service"
   copy:
     content: "{{ lookup('template', 'roles/container/templates/podman.service') }}"
