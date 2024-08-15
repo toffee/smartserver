@@ -1,4 +1,4 @@
-- name: set mimic3 version
+- name: set version
   set_fact:
     mimic3_version: "0.2.4"
   tags: [ 'update_notifier_configs' ]
@@ -11,46 +11,44 @@
   with_items:
     - "{{global_etc}}mimic3"
 
-- name: check started docker
-  systemd:
-    name: docker
-    state: started
 
-- name: create docker container
-  docker_container:
+
+- name: create podman container
+  containers.podman.podman_container:
     name: mimic3
     image: "mycroftai/mimic3:{{mimic3_version}}"
     state: present
+    security_opt:
+      - label=disable
     env:
       TZ: "{{timezone}}"
     log_driver: journald
     log_options:
       tag: mimic3
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks:
-      - name: "isolated"
-        ipv4_address: "{{docker_mimic3_ip}}"
-    networks_cli_compatible: yes
+    network: "isolated"
+    ip: "{{podman_mimic3_ip}}"
     volumes:
       - '{{global_etc}}mimic3/:/home/mimic3/.local/share/mycroft/mimic3:z'
     published_ports:  
       - "59125:59125"
+  register: "podman_container_state"
   notify: "restart mimic3"
 
-#- name: allow unifi service
-#  vars:
-#    name: "unifi"
-#    rules:      
-#      - "saddr {{docker_unifi_ip}} proto tcp dport 443"
-#  import_tasks: roles/firewall/shared/allow_service.yml
-#  tags: [ 'firewall_config' ]
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
+  vars:
+    container_name: "mimic3"
+    container_ip: "{{podman_mimic3_ip}}"
+    container_readyness: { "type": "port_check", "ip": "{{podman_mimic3_ip}}", "port": "59125" }
+    container_changed: "{{podman_container_state.changed}}"
+  include_tasks: roles/container/shared/handle_podman_service.yml
+  tags: ['systemd_watcher_config','systemd_service_config']
 
 - name: add container name
   vars:
     host_name: "mimic3"
-    host_ip_address: "{{docker_mimic3_ip}}"
-  import_tasks: roles/_shared/add_to_hosts.yml
+    host_ip_address: "{{podman_mimic3_ip}}"
+  include_tasks: roles/_shared/add_to_hosts.yml
   
 # ***** FINALIZE *****    
 - name: register webui
@@ -59,44 +57,13 @@
     js_file: "templates/webui/mimic3.js"
     listener: { "prefix": "mimic3", "js_file": "templates/webui/mimic3.listener.js" }
     icons: [ 'templates/webui/icons/mimic3_logo.svg' ]
-  import_tasks: roles/apache_webui/shared/add_webui.yml
-
-#- name: copy apache vhost
-#  vars:
-#    sub_domain: "mimic3"
-#    usergroup: "admin"
-#    include: "templates/etc/apache2/_.ansible.vhost.d/mimic3.inc"
-#  import_tasks: roles/apache/shared/add_vhost.yml
+  include_tasks: roles/apache_webui/shared/add_webui.yml
 
 - name: copy fluentd config
   vars:
     config_file: "templates/etc/fluent/_.ansible.d/mimic3.conf"
-  import_tasks: roles/fluentd/shared/add_config.yml
-    
-- name: create systemd service
-  vars:
-    container_name: "mimic3"
-  import_tasks: roles/container/shared/add_docker_service.yml
-  
-- name: register service watcher
-  vars:
-    name: "mimic3"
-  import_tasks: roles/systemd_watcher/shared/add_watcher.yml
+  include_tasks: roles/fluentd/shared/add_config.yml
+  tags: ['fluentd_config']
+  when: "monitoring_enabled"
 
-#- name: register unifi update notifier
-#  vars:
-#    name: "mimic3"
-#    type: "docker"
-#    url: "https://github.com/linuxserver/docker-unifi-controller/releases"
-#    config: {
-#      repository: "mycroftai/mimic3",
-#      pattern: "^([0-9\\.]+)-ls([0-9]+)$"
-#    }
-#  import_tasks: roles/update_service/shared/add_software.yml
-
-- name: trigger mimic3 handler
-  vars:
-    notify: "restart mimic3"
-    service: "mimic3.service"
-  import_tasks: roles/_shared/service_check.yml
 

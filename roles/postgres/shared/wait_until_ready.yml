@@ -13,7 +13,7 @@
   
 # retries needs to increased from 120 to 240 to give postgres on travisci more time to start
 - name: "postgres : wait_until_ready : wait for to become ready"
-  command: "docker exec postgres pg_isready"
+  command: "podman exec postgres pg_isready"
   register: check_result
   until: not check_result.rc  # or check_result.rc == 0 if you prefer
   retries: 300

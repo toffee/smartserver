@@ -3,7 +3,7 @@
 # You can also add your own custom role as shown in the example "apache_proxy"
 
 # *** OPTIONAL CLOUD ***
-#- { import_role: { name: wireguard_cloud }, tags: [ 'wireguard', 'wireguard_cloud', 'alpine' ] } 
+#- { import_role: { name: wireguard_cloud }, tags: [ 'wireguard', 'wireguard_cloud', 'alpine' ] }
 #- { import_role: { name: cloud_nfs }, tags: [ 'cloud_nfs', 'alpine' ] }
 #- { import_role: { name: cloud_mosquitto }, tags: [ 'cloud_mosquitto', 'alpine' ] }     # [docker,user:1883]
 #- { import_role: { name: cloud_check }, tags: [ 'cloud_check', 'alpine' ] }
@@ -16,21 +16,16 @@
 
 - { import_role: { name: "config/jupiter/roles/menuentries" }, tags: [ 'menuentries' ] } # additional menuentries for external devices
 
-#- { import_role: { name: update_notifier }, tags: [ 'update_notifier' ] }               # update check for installed software
 #TODO- { import_role: { name: "config/jupiter/roles/hosts" }, tags: [ 'hosts' ] }             # add local host names/IPs to DNS 
-#- { import_role: { name: "config/jupiter/roles/asterisk" }, tags: [ 'asterisk' ] }      # asterisk SIP server
-- { import_role: { name: "config/jupiter/roles/zigbee2mqtt" }, tags: [ 'zigbee2mqtt' ] } # configuration of zigbee2mqtt
-#- { import_role: { name: "config/jupiter/roles/recorder" }, tags: [ 'recorder' ] }      # configuration of OwnTracks Recorder
-#- { import_role: { name: "config/jupiter/roles/flexisip" }, tags: [ 'flexisip' ] }          
+- { import_role: { name: "config/jupiter/roles/zigbee2mqtt" }, tags: [ 'zigbee2mqtt' ] } # configuration of zigbee2mqtt        
 #NICETOHAVE- { import_role: { name: "config/jupiter/roles/unifi" }, tags: [ 'unifi' ] }
-#NICETOHAVE- { import_role: { name: "config/jupiter/roles/mytracker" }, tags: [ 'mytracker' ] }
+- { import_role: { name: "config/jupiter/roles/mytracker" }, tags: [ 'mytracker' ] }
 - { import_role: { name: "config/jupiter/roles/hikvision" }, tags: [ 'hikvision' ] }
 - { import_role: { name: "config/jupiter/roles/snapcast" }, tags: [ 'snapcast' ] }
-#- { import_role: { name: "config/jupiter/roles/homeassistant" }, tags: [ 'homeassistant' ] }
-#NICETOHAVE- { import_role: { name: "config/jupiter/roles/mimic3" }, tags: [ 'mimic3' ] }
+- { import_role: { name: "config/jupiter/roles/mimic3" }, tags: [ 'mimic3' ] }
 - { import_role: { name: "config/jupiter/roles/rsyncd" }, tags: [ 'rsyncd' ] }
 - { import_role: { name: "config/jupiter/roles/fireflyiii" }, tags: [ 'fireflyiii' ] }
-#NEED- { import_role: { name: "config/jupiter/roles/ghostfolio" }, tags: [ 'ghostfolio' ] }
-#NEED- { import_role: { name: "config/jupiter/roles/vdirsyncer" }, tags: [ 'vdirsyncer' ] }
+- { import_role: { name: "config/jupiter/roles/ghostfolio" }, tags: [ 'ghostfolio' ] }
+- { import_role: { name: "config/jupiter/roles/vdirsyncer" }, tags: [ 'vdirsyncer' ] }
 #NICETOHAVE- { import_role: { name: "config/jupiter/roles/jekyll" }, tags: [ 'jekyll' ] }
-#- { import_role: { name: "config/jupiter/roles/hugo" }, tags: [ 'hugo' ] }
+#NICETOHAVE- { import_role: { name: "config/jupiter/roles/hugo" }, tags: [ 'hugo' ] }

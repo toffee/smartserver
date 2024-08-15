@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    postgres_version: "16.3-alpine3.19"
+    postgres_version: "16.4-alpine3.19"
   tags: [ 'update_notifier_config' ]
 
 - name: "create user and group => user or group does not exists"
@@ -33,6 +33,14 @@
       - "--chmod=D750,F640"
   notify: "restart postgres"
 
+- name: build podman image
+  vars:
+    container_name: "postgres"
+    image_name: "custom_postgres:{{postgres_version}}"
+    image_files:
+      - roles/postgres/templates/container/Dockerfile
+  include_tasks: roles/container/shared/build_podman_image.yml
+
 - name: prepare published_ports
   set_fact:
     postgres_published_ports:  |
@@ -44,14 +52,6 @@
       ]
   tags: ['firewall_config']
 
-- name: build podman image
-  vars:
-    container_name: "postgres"
-    image_name: "custom_postgres"
-    image_version: "{{postgres_version}}"
-    image_files:
-      - roles/postgres/templates/container/Dockerfile
-  include_tasks: roles/container/shared/build_podman_image.yml
 
 - name: create podman container
   containers.podman.podman_container:
@@ -80,9 +80,11 @@
 - name: handle systemd service
   vars:
     container_name: "postgres"
+    container_ip: "{{podman_postgres_ip}}"
+    container_readyness: { "type": "port_check", "ip": "{{podman_postgres_ip}}", "port": "5432" }
     container_changed: "{{podman_container_state.changed}}"
   include_tasks: roles/container/shared/handle_podman_service.yml
-  tags: ['systemd_watcher_config']
+  tags: ['systemd_watcher_config','systemd_service_config']
 
 - name: add container name
   vars:
@@ -139,6 +141,3 @@
     service: "postgres.service"
   import_tasks: roles/_shared/service_check.yml
 
-- name: check postgres service
-  include_tasks: roles/postgres/shared/wait_until_ready.yml
-  when: podman_container_state.changed

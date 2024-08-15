@@ -3,16 +3,24 @@
     ghostfolio_version: '2.97.0'
   tags: [ 'update_notifier_config' ]
 
-- name: check started docker
-  systemd:
-    name: docker
-    state: started
+- name: prepare published_ports
+  set_fact:
+    ghostfolio_published_ports:  |
+      [
+        "3333:3333",
+        {% if default_server_ipv6 is defined %}
+          "[::]:3333:3333",
+        {% endif %}
+      ]
+  tags: ['firewall_config']
 
-- name: create docker ghostfolio container
-  docker_container:
+- name: create podman container
+  containers.podman.podman_container:
     name: ghostfolio
     image: "ghostfolio/ghostfolio:{{ghostfolio_version}}"
     state: present
+    security_opt:
+      - label=disable
     env:
       TZ: "UTC"
       ACCESS_TOKEN_SALT: "{{ghostfolio_token_salt}}"
@@ -26,42 +34,37 @@
     log_driver: journald
     log_options:
       tag: ghostfolio
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks: 
-      - name: "isolated"
-        ipv4_address: "{{docker_ghostfolio_ip}}"
-    networks_cli_compatible: yes
-    published_ports: |
-      [
-        "3333:3333",
-        {% if default_server_ipv6 is defined %}
-          "[::]:3333:3333"
-        {% endif %}
-      ]
+    network: "isolated"
+    ip: "{{podman_ghostfolio_ip}}"
+    published_ports: "{{ghostfolio_published_ports}}"
+  register: "podman_container_state"
   notify: "restart ghostfolio"
-  
-- name: prepare ferm rules
-  set_fact:
-    ghostfolio_ferm_rules: |
-      [
-      "saddr {{docker_ghostfolio_ip}} daddr {{docker_postgres_ip}}",
-      "saddr {{docker_ghostfolio_ip}} daddr {{docker_redis_ip}}",
-      ]
-  tags: [ 'firewall_config' ]
 
-- name: allow ghostfolio service
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
   vars:
-    name: "ghostfolio"
-    rules: "{{ghostfolio_ferm_rules}}"
-  import_tasks: roles/firewall/shared/allow_service.yml
-  tags: [ 'firewall_config' ]
-  
-- name: add container ghostfolio name
+    container_name: "ghostfolio"
+    container_ip: "{{podman_ghostfolio_ip}}"
+    container_readyness: { "type": "port_check", "ip": "{{podman_ghostfolio_ip}}", "port": "3333" }
+    container_after: [ "postgres" ]
+    container_changed: "{{podman_container_state.changed}}"
+  include_tasks: roles/container/shared/handle_podman_service.yml
+  tags: ['systemd_watcher_config','systemd_service_config']
+
+- name: allow service
+  vars:
+    service_name: "ghostfolio"
+    container_to_container_rules:
+      - { saddr: "{{podman_ghostfolio_ip}}", daddr: "{{podman_postgres_ip}}", protocol: "tcp", dport: "5432", comment: "ghostfolio => postgres" }
+      - { saddr: "{{podman_ghostfolio_ip}}", daddr: "{{podman_redis_ip}}", protocol: "tcp", dport: "6379", comment: "ghostfolio => redis" }
+  include_tasks: roles/firewall/shared/allow_service.yml
+  tags: ['firewall_config']
+
+- name: add service name
   vars:
     host_name: "ghostfolio"
-    host_ip_address: "{{docker_ghostfolio_ip}}"
-  import_tasks: roles/_shared/add_to_hosts.yml
+    host_ip_address: "{{podman_ghostfolio_ip}}"
+  include_tasks: roles/_shared/add_to_hosts.yml
 
 - name: create database
   vars:
@@ -69,7 +72,7 @@
     username: "{{ghostfolio_postgres_username}}"
     password: "{{ghostfolio_postgres_password}}"
     backup: yes
-  import_tasks: roles/postgres/shared/add_database.yml
+  include_tasks: roles/postgres/shared/add_database.yml
   tags: ['cron_job','backup_restore']
   when: "postgres_enabled"
   
@@ -79,25 +82,23 @@
     name: "ghostfolio"
     js_file: "templates/webui/ghostfolio.js"
     icons: [ 'templates/webui/icons/ghostfolio_logo.svg' ]
-  import_tasks: roles/apache_webui/shared/add_webui.yml
+  include_tasks: roles/apache_webui/shared/add_webui.yml
+  tags: ['apache_webui_config']
 
 - name: copy apache vhost
   vars:
     sub_domain: "ghostfolio"
     usergroup: "user"
     include: "templates/etc/apache2/_.ansible.vhost.d/ghostfolio.inc"
-  import_tasks: roles/apache/shared/add_vhost.yml
+  include_tasks: roles/apache/shared/add_vhost.yml
+  tags: ['apache_config']
 
 - name: copy fluentd config
   vars:
     config_file: "templates/etc/fluent/_.ansible.d/ghostfolio.conf"
-  import_tasks: roles/fluentd/shared/add_config.yml
-
-- name: create systemd ghostfolio service
-  vars:
-    container_name: "ghostfolio"
-    container_after: [ "postgres", "redis" ]
-  import_tasks: roles/container/shared/add_docker_service.yml
+  include_tasks: roles/fluentd/shared/add_config.yml
+  tags: ['fluentd_config']
+  when: "monitoring_enabled"
   
 - name: register update notifier
   vars:
@@ -108,4 +109,6 @@
       repository: "ghostfolio/ghostfolio",
       pattern: "^([0-9\\.]+)$"
     }
-  import_tasks: roles/update_service/shared/add_software.yml
+  include_tasks: roles/update_service/shared/add_software.yml
+  tags: ['update_notifier_config']
+  when: "update_service_software_check_enabled"

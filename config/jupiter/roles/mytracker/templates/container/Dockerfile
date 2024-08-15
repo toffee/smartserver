@@ -10,4 +10,3 @@ RUN mkdir /mytracker && \
     
 #ENTRYPOINT ["/bin/sleep","3000000"]
 ENTRYPOINT ["/usr/bin/python3","/mytracker/app.py"]
-

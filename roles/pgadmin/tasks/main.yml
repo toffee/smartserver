@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    pgadmin_version: "8.9"
+    pgadmin_version: "8.10"
   tags: [ 'update_notifier_config' ]
   
 - name: prepare needed folder
@@ -64,8 +64,10 @@
 - name: handle systemd service
   vars:
     container_name: "pgadmin"
-    container_changed: "{{podman_container_state.changed}}"
+    container_ip: "{{podman_pgadmin_ip}}"
+    container_readyness: { "type": "port_check", "ip": "{{podman_pgadmin_ip}}", "port": "5050" }
     container_after: ["postgres"]
+    container_changed: "{{podman_container_state.changed}}"
   include_tasks: roles/container/shared/handle_podman_service.yml
   tags: ['systemd_watcher_config']
 
@@ -80,17 +82,8 @@
     service_name: "pgadmin"
     container_to_container_rules:
       - { saddr: "{{podman_pgadmin_ip}}", daddr: "{{podman_postgres_ip}}", protocol: "tcp", dport: "5432", comment: "pgadmin => pastgres" }
-  include_tasks: roles/firewall/shared/allow_service_nftables.yml
-  tags: ['firewall_config']
-  when: "nftables_enabled"
-
-- name: allow service
-  vars:
-    firewall_name: "pgadmin"
-    firewall_rules:
-      - "saddr {{podman_pgadmin_ip}} daddr {{podman_postgres_ip}}"
   include_tasks: roles/firewall/shared/allow_service.yml
-  when: "not nftables_enabled"
+  tags: ['firewall_config']
 
 # ***** FINALIZE *****
 - name: register webui

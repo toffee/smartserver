@@ -2,7 +2,7 @@
   vars:
     user: { name: "unifi", system: true, home: "{{global_etc}}unifi" }
     group: { name: "unifi", system: true }
-  import_tasks: roles/user/shared/add_system_user.yml
+  include_tasks: roles/user/shared/add_system_user.yml
 
 - name: set unifi version
   set_fact:
@@ -61,14 +61,14 @@
     name: "unifi"
     rules:      
       - "saddr {{docker_unifi_ip}} proto tcp dport 443"
-  import_tasks: roles/firewall/shared/allow_service.yml
+  include_tasks: roles/firewall/shared/allow_service.yml
   tags: [ 'firewall_config' ]
 
 - name: add container name
   vars:
     host_name: "unifi"
     host_ip_address: "{{docker_unifi_ip}}"
-  import_tasks: roles/_shared/add_to_hosts.yml
+  include_tasks: roles/_shared/add_to_hosts.yml
   
 # ***** FINALIZE *****    
 - name: register webui
@@ -77,29 +77,31 @@
     js_file: "templates/webui/unifi.js"
     i18n_files: [ { language: "de", file: "templates/webui/unifi.de.json" } ]
     icons: [ 'templates/webui/icons/unifi_logo.svg' ]
-  import_tasks: roles/apache_webui/shared/add_webui.yml
+  include_tasks: roles/apache_webui/shared/add_webui.yml
 
 - name: copy apache vhost
   vars:
     sub_domain: "unifi"
     usergroup: "admin"
     include: "templates/etc/apache2/_.ansible.vhost.d/unifi.inc"
-  import_tasks: roles/apache/shared/add_vhost.yml
+  include_tasks: roles/apache/shared/add_vhost.yml
 
 - name: copy fluentd config
   vars:
     config_file: "templates/etc/fluent/_.ansible.d/unifi.conf"
-  import_tasks: roles/fluentd/shared/add_config.yml
+  include_tasks: roles/fluentd/shared/add_config.yml
+  tags: ['fluentd_config']
+  when: "monitoring_enabled"
     
 - name: create systemd service
   vars:
     container_name: "unifi"
-  import_tasks: roles/container/shared/add_docker_service.yml
+  include_tasks: roles/container/shared/add_docker_service.yml
   
 - name: register service watcher
   vars:
     name: "unifi"
-  import_tasks: roles/systemd_watcher/shared/add_watcher.yml
+  include_tasks: roles/systemd_watcher/shared/add_watcher.yml
 
 - name: register unifi update notifier
   vars:
@@ -110,11 +112,11 @@
       repository: "linuxserver/unifi-controller",
       pattern: "^([0-9\\.]+)-ls([0-9]+)$"
     }
-  import_tasks: roles/update_service/shared/add_software.yml
+  include_tasks: roles/update_service/shared/add_software.yml
 
 - name: trigger unifi handler
   vars:
     notify: "restart unifi"
     service: "unifi.service"
-  import_tasks: roles/_shared/service_check.yml
+  include_tasks: roles/_shared/service_check.yml
 

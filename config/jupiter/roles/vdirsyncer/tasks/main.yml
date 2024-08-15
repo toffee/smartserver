@@ -22,16 +22,13 @@
     - "config"    
   notify: "restart vdirsyncer"
 
-- name: check started docker
-  systemd:
-    name: docker
-    state: started
-
-- name: create docker vdirsyncer container
-  docker_container:
+- name: create podman container
+  containers.podman.podman_container:
     name: vdirsyncer
     image: "bleala/vdirsyncer:{{vdirsyncer_version}}"
     state: present
+    security_opt:
+      - label=disable
     env:
       TZ: "{{timezone}}"
       AUTODISCOVER: "false"
@@ -40,25 +37,31 @@
     log_driver: journald
     log_options:
       tag: vdirsyncer
-    container_default_behavior: "compatibility"
-    network_mode: "host"
     volumes:
       - '{{global_etc}}vdirsyncer/config:/vdirsyncer/config:z'
       - '{{global_lib}}vdirsyncer:/vdirsyncer:z'
       - '{{global_log}}vdirsyncer:/vdirsyncer/log:z'
+    network: "host"
+  register: "podman_container_state"
   notify: "restart vdirsyncer"
+  
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
+  vars:
+    container_name: "vdirsyncer"
+    container_readyness: { "type": "state_check" }
+    container_changed: "{{podman_container_state.changed}}"
+  include_tasks: roles/container/shared/handle_podman_service.yml
+  tags: ['systemd_watcher_config','systemd_service_config']
   
 # ***** FINALIZE *****
 - name: copy fluentd config
   vars:
     config_file: "templates/etc/fluent/_.ansible.d/vdirsyncer.conf"
-  import_tasks: roles/fluentd/shared/add_config.yml
+  include_tasks: roles/fluentd/shared/add_config.yml
+  tags: ['fluentd_config']
+  when: "monitoring_enabled"
 
-- name: create systemd vdirsyncer service
-  vars:
-    container_name: "vdirsyncer"    
-  import_tasks: roles/container/shared/add_docker_service.yml
-  
 - name: register update notifier
   vars:
     name: "vdirsyncer"
@@ -69,4 +72,6 @@
       pattern: "^([0-9\\.]+)$",
       version: "{{vdirsyncer_version}}"
     }
-  import_tasks: roles/update_service/shared/add_software.yml
+  include_tasks: roles/update_service/shared/add_software.yml
+  tags: ['update_notifier_config']
+  when: "update_service_software_check_enabled"

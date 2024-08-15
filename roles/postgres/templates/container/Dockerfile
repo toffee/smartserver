@@ -1,4 +1,4 @@
-FROM postgres:{{image_version}}
+FROM postgres:{{postgres_version}}
 
 USER root
 

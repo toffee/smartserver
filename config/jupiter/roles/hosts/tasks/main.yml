@@ -26,7 +26,7 @@
     name: "jupiter"
     rules: "{{jupiter_ferm_rules}}"
     instant_activation: True
-  import_tasks: roles/firewall/shared/allow_service.yml
+  include_tasks: roles/firewall/shared/allow_service.yml
   tags: [ 'firewall_config' ]
 
 - name: collect vpn other ip
@@ -47,5 +47,5 @@
     name: "wireguard.mobile_vpn_other"
     rules: "{{vpn_other_ip_rules}}"
     is_docker: True
-  import_tasks: roles/firewall/shared/allow_service.yml
+  include_tasks: roles/firewall/shared/allow_service.yml
   tags: [ 'firewall_config' ] 

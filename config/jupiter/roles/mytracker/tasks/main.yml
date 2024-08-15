@@ -1,33 +1,40 @@
-- name: set mytracker version
+- name: set version
   set_fact:
     mytracker_version: 'unknown'
-  tags: [ 'update_notifier_configs' ]
+  tags: [ 'update_notifier_config' ]
   
-- name: prepare needed folder
-  file:
-    path: "{{item}}"
-    state: directory
-    owner: root
-    group: root
-    mode: 0750
-  with_items:
-    - "{{global_etc}}mytracker/"
-
-- name: build docker image
+- name: prepare needed directories
   vars:
-    name: "mytracker"
-    image_name: "custom_mytracker"
-    image_version: "{{alpine_version}}-{{mytracker_version}}"
-    files:
-      - "{{config_path}}/roles/mytracker/templates/container/Dockerfile"
-  import_tasks: roles/container/shared/build_docker_image.yml
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_etc }}mytracker" }
+  include_tasks: roles/_shared/create_directories.yml
 
-- name: create docker container
-  docker_container:
+- name: build podman image
+  vars:
+    container_name: "mytracker"
+    image_name: "custom_mytracker:{{alpine_version}}-{{mytracker_version}}"
+    image_files:
+      - "{{config_path}}/roles/mytracker/templates/container/Dockerfile"
+  include_tasks: roles/container/shared/build_podman_image.yml
+
+- name: prepare published_ports
+  set_fact:
+    mytracker_published_ports:  |
+      [
+        "5000:5000",
+        {% if default_server_ipv6 is defined %}
+          "[::]:5000:5000",
+        {% endif %}
+      ]
+  tags: ['firewall_config']
+
+- name: create podman container
+  containers.podman.podman_container:
     name: mytracker
     image: "custom_mytracker:{{alpine_version}}-{{mytracker_version}}"
     state: present
-#    recreate: true
+    security_opt:
+      - label=disable
     env:
       TZ: "{{timezone}}"
       FLASK_ENV: "development"
@@ -35,31 +42,38 @@
     log_driver: journald
     log_options:
       tag: mytracker
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks:
-      - name: "isolated"
-        ipv4_address: "{{docker_mytracker_ip}}"
-    networks_cli_compatible: yes
     volumes:
-      - '{{global_lib}}mytracker/:/var/lib/mytracker:z'
-    published_ports:
-      - "5000:5000"
+      - '{{global_lib}}mytracker/:/var/lib/mytracker'
+    network: "isolated"
+    ip: "{{podman_mytracker_ip}}"
+    published_ports: "{{mytracker_published_ports}}"
+  register: "podman_container_state"
   notify: "restart mytracker"
-
-- name: allow mytracker service
+  
+# ***** SERVICE CONFIGS *****
+- name: handle systemd service
   vars:
-    name: "mytracker"
-    rules:
-      - "saddr {{docker_mytracker_ip}} daddr {{docker_mosquitto_ip}}"
-  import_tasks: roles/firewall/shared/allow_service.yml
-  tags: [ 'firewall_config' ]
+    container_name: "mytracker"
+    container_ip: "{{podman_mytracker_ip}}"
+    container_readyness: { "type": "port_check", "ip": "{{podman_mytracker_ip}}", "port": "5000" }
+    container_after: [ "mosquitto" ]
+    container_changed: "{{podman_container_state.changed}}"
+  include_tasks: roles/container/shared/handle_podman_service.yml
+  tags: ['systemd_watcher_config','systemd_service_config']
+
+- name: allow service
+  vars:
+    service_name: "mytracker"
+    container_to_container_rules:
+      - { saddr: "{{podman_mytracker_ip}}", daddr: "{{podman_mosquitto_ip}}", protocol: "tcp", dport: "1883", comment: "mytracker => mosquitto" }
+  include_tasks: roles/firewall/shared/allow_service.yml
+  tags: ['firewall_config']
 
 - name: add container name
   vars:
     host_name: "mytracker"
-    host_ip_address: "{{docker_mytracker_ip}}"
-  import_tasks: roles/_shared/add_to_hosts.yml
+    host_ip_address: "{{podman_mytracker_ip}}"
+  include_tasks: roles/_shared/add_to_hosts.yml
 
 # ***** FINALIZE *****
 - name: register webui
@@ -67,26 +81,10 @@
     name: "mytracker"
     js_file: "templates/webui/mytracker.js"
     icons: [ 'templates/webui/icons/mytracker_logo.svg' ]
-  import_tasks: roles/apache_webui/shared/add_webui.yml
+  include_tasks: roles/apache_webui/shared/add_webui.yml
+  tags: ['apache_webui_config']
 
 - name: copy apache config
   vars:
     config_file: "templates/etc/apache2/_.ansible.conf.d/mytracker.conf"
   import_tasks: roles/apache/shared/add_config.yml
- 
-#- name: copy fluentd config
-#  vars:
-#    config_file: "templates/etc/fluent/_.ansible.d/mytracker.conf"
-#  import_tasks: roles/fluentd/shared/add_config.yml
-      
-- name: create systemd service
-  vars:
-    container_name: "mytracker"
-    container_after: [ "mosquitto" ]
-  import_tasks: roles/container/shared/add_docker_service.yml
-
-- name: trigger mytracker handler
-  vars:
-    notify: "restart mytracker"
-    service: "mytracker.service"
-  import_tasks: roles/_shared/service_check.yml

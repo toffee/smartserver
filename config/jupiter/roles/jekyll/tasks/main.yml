@@ -89,7 +89,7 @@
   vars:
     host_name: "jekyll-serve"
     host_ip_address: "{{docker_jekyll_ip}}"
-  import_tasks: roles/_shared/add_to_hosts.yml
+  include_tasks: roles/_shared/add_to_hosts.yml
 
 # ***** FINALIZE *****
 - name: register webui
@@ -97,7 +97,7 @@
     name: "jekyll"
     js_file: "templates/webui/jekyll.js"
     icons: [ 'templates/webui/icons/jekyll_logo.svg' ]
-  import_tasks: roles/apache_webui/shared/add_webui.yml
+  include_tasks: roles/apache_webui/shared/add_webui.yml
 
 - name: copy apache vhost
   vars:
@@ -109,12 +109,14 @@
 - name: copy fluentd config
   vars:
     config_file: "templates/etc/fluent/_.ansible.d/jekyll.conf"
-  import_tasks: roles/fluentd/shared/add_config.yml
+  include_tasks: roles/fluentd/shared/add_config.yml
+  tags: ['fluentd_config']
+  when: "monitoring_enabled"
 
 - name: create systemd jekyll-serve service
   vars:
     container_name: "jekyll-serve"
-  import_tasks: roles/container/shared/add_docker_service.yml
+  include_tasks: roles/container/shared/add_docker_service.yml
 
 - name: register update notifier
   vars:
@@ -126,4 +128,4 @@
       pattern: "^stable-([0-9]+)-([0-9a-z]+)$",
       version: "{{jekyll_version}}"
     }
-  import_tasks: roles/update_service/shared/add_software.yml
+  include_tasks: roles/update_service/shared/add_software.yml

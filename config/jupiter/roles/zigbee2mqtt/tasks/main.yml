@@ -1,7 +1,8 @@
 - name: set version
   set_fact:
-    zigbee2mqtt_version: "1.39.0"
+    zigbee2mqtt_version: "1.39.1"
   tags: [ 'update_notifier_config' ]
+
 - name: prepare needed directories
   vars:
     directories:
@@ -22,6 +23,14 @@
     - "groups.yaml"
   notify: "restart zigbee2mqtt"
 
+- name: build podman image
+  vars:
+    container_name: "zigbee2mqtt"
+    image_name: "custom_zigbee2mqtt:{{zigbee2mqtt_version}}"
+    image_files:
+      - '{{config_path}}roles/zigbee2mqtt/templates/container/Dockerfile'
+  include_tasks: roles/container/shared/build_podman_image.yml
+
 - name: prepare published_ports
   set_fact:
     zigbee2mqtt_published_ports:  |
@@ -32,15 +41,6 @@
         {% endif %}
       ]
   tags: ['firewall_config']
-
-- name: build podman image
-  vars:
-    container_name: "zigbee2mqtt"
-    image_name: "custom_zigbee2mqtt"
-    image_version: "{{zigbee2mqtt_version}}"
-    image_files:
-      - '{{config_path}}roles/zigbee2mqtt/templates/container/Dockerfile'
-  include_tasks: roles/container/shared/build_podman_image.yml
 
 - name: create podman container
   containers.podman.podman_container:
@@ -54,11 +54,11 @@
     log_driver: journald
     log_options:
       tag: zigbee2mqtt
-    network: "isolated"
-    ip: "{{podman_zigbee2mqtt_ip}}"
     volumes:
       - '{{global_etc}}zigbee2mqtt:/app/data'
       - '{{global_log}}zigbee2mqtt:/app/data/log'
+    network: "isolated"
+    ip: "{{podman_zigbee2mqtt_ip}}"
     published_ports: "{{zigbee2mqtt_published_ports}}"
   register: "podman_container_state"
   notify: "restart zigbee2mqtt"
@@ -67,10 +67,12 @@
 - name: handle systemd service
   vars:
     container_name: "zigbee2mqtt"
-    container_changed: "{{podman_container_state.changed}}"
+    container_ip: "{{podman_zigbee2mqtt_ip}}"
+    container_readyness: { "type": "port_check", "ip": "{{podman_zigbee2mqtt_ip}}", "port": "8084" }
     container_after: [ "mosquitto" ]
+    container_changed: "{{podman_container_state.changed}}"
   include_tasks: roles/container/shared/handle_podman_service.yml
-  tags: ['systemd_watcher_config']
+  tags: ['systemd_watcher_config','systemd_service_config']
 
 - name: allow service
   vars:
@@ -80,20 +82,8 @@
       - { saddr: "{{podman_zigbee2mqtt_ip}}", daddr: "{{podman_mosquitto_ip}}", protocol: "tcp", dport: "1883", comment: "zigbee2mqtt => mosquitto" }
     container_to_outside_rules:
       - { saddr: "{{podman_zigbee2mqtt_ip}}", daddr: "{{zigbee_adapter_ip}}", protocol: "tcp", dport: "6638", comment: "zigbee2mqtt => zigbee-adapter" }
-  include_tasks: roles/firewall/shared/allow_service_nftables.yml
+  include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
-  when: "nftables_enabled"
-
-- name: allow service
-  vars:
-    firewall_name: "zigbee2mqtt"
-    firewall_rules:
-      - "saddr {{podman_zigbee2mqtt_ip}} daddr {{docker_mosquitto_ip}}"
-      - "saddr {{podman_zigbee2mqtt_ip}} daddr {{zigbee_adapter_ip}}"
-      - "saddr {{podman_zigbee2mqtt_ip}} proto tcp dport 443" # is this really needed?
-  import_tasks: roles/firewall/shared/allow_service.yml
-  tags: [ 'firewall_config' ]
-  when: "not nftables_enabled"
 
 - name: add service name
   vars:
@@ -115,7 +105,7 @@
     sub_domain: "zigbee2mqtt"
     usergroup: "user"
     include: "templates/etc/apache2/_.ansible.vhost.d/zigbee2mqtt.inc"
-  import_tasks: roles/apache/shared/add_vhost.yml
+  include_tasks: roles/apache/shared/add_vhost.yml
   tags: ['apache_config']
 
 - name: register update notifier
@@ -131,10 +121,3 @@
   include_tasks: roles/update_service/shared/add_software.yml
   tags: ['update_notifier_config']
   when: "update_service_software_check_enabled"
-
-- name: trigger zigbee2mqtt handler
-  vars:
-    notify: "restart zigbee2mqtt"
-    service: "zigbee2mqtt.service"
-  import_tasks: roles/_shared/service_check.yml
-
