@@ -28,14 +28,6 @@
         group: "{{system_groups['pihole'].name}}"
         mode: 0640
       register: dhcp_changed
-      
-    - name: write pxeboot file
-      template:
-        src: templates/etc/pihole/dnsmasq.d/09-pxeboot.conf
-        dest: "{{global_etc}}pihole/dnsmasq.d/09-pxeboot.conf"
-        owner: "999"
-        group: "1000"
-      register: dhcp_changed
 
     - name: revoke existing leases if dhcpd file changed
       file:
@@ -78,6 +70,7 @@
     container_image: "pihole/pihole:{{pihole_version}}"
     container_capabilities:
       - net_admin
+      - net_raw
     container_network: "macvlan"
     container_ip: "{{pihole_ip}}"
     container_ip6: "{{pihole_ipv6 if pihole_ipv6 is defined else ''}}"
@@ -120,7 +113,6 @@
     container_volumes:
       - '{{ global_etc }}pihole/:/etc/pihole/'
       - '{{ global_etc }}pihole/dnsmasq.d/:/etc/dnsmasq.d/'
-      - '{{ global_lib }}pihole/tftpboot/:/tftpboot/'
       - '{{ global_lib }}pihole/:/var/lib/pihole/'
     container_readyness: { "type": "port_check", "ip": "{{pihole_ip}}", "port": "80" }
   include_tasks: roles/container/shared/create_podman_service.yml

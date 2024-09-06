@@ -124,6 +124,24 @@
       - "--chmod=F640"
   when: "habpanel_result.rc == 0"
 
+- stat:
+    path: "{{projects_path}}openhab_config/userdata/jsondb"
+  register: jsondb_dir
+
+- name: set symbolic link to jsondb files
+  file:
+    src: "{{projects_path}}openhab_config/userdata/{{item}}"
+    dest: "{{global_lib}}/openhab/{{item}}"
+    state: link
+    follow: no
+    owner: "{{openhab_user}}"
+    group: "{{openhab_group}}"
+  with_items:
+    - "jsondb/automation_rules.json"
+    - "jsondb/uicomponents_ui_page.json"
+    - "jsondb/uicomponents_ui_widget.json"
+  when: jsondb_dir.stat.stat.isdir is defined and jsondb_dir.stat.stat.isdir
+
 # addons folder
 - name: copy addons folder
   synchronize:
@@ -263,7 +281,7 @@
       EXTRA_SHELL_OPTS: "+x" # disable debug logs in entrypoint bash script
       #EXTRA_SHELL_OPTS: "-x"
       #EXTRA_SHELL_OPTS: "-v"
-      OPENHAB_HTTP_ADDRESS: "127.0.0.1"
+      OPENHAB_HTTP_ADDRESS: "0.0.0.0"
       CRYPTO_POLICY: "unlimited"
     container_volumes: |
       [
