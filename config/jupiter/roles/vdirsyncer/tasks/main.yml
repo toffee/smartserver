@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    vdirsyncer_version: '2.5.2'
+    vdirsyncer_version: '2.5.3'
   tags: [ 'update_notifier_config' ]
 
 - name: prepare needed directories

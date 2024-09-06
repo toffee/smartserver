@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    ghostfolio_version: '2.97.0'
+    ghostfolio_version: '2.105.0'
   tags: [ 'update_notifier_config' ]
 
 - name: prepare published_ports

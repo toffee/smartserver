@@ -383,7 +383,7 @@
       EXTRA_SHELL_OPTS: "+x" # disable debug logs in entrypoint bash script
       #EXTRA_SHELL_OPTS: "-x"
       #EXTRA_SHELL_OPTS: "-v"
-      OPENHAB_HTTP_ADDRESS: "127.0.0.1"
+      OPENHAB_HTTP_ADDRESS: "0.0.0.0"
       CRYPTO_POLICY: "unlimited"
     log_driver: journald
     log_options:
