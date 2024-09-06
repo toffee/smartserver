@@ -39,36 +39,15 @@
     - restart fireflyiii-core
     - restart fireflyiii-importer
 
-- name: prepare published_ports
-  set_fact:
-    fireflyiii_core_published_ports:  |
-      [
-        "21580:8080",
-        {% if default_server_ipv6 is defined %}
-          "[::]:21580:8080",
-        {% endif %}
-      ]
-  tags: ['firewall_config']
-
-- name: prepare published_ports
-  set_fact:
-    fireflyiii_importer_published_ports:  |
-      [
-        "21680:8080",
-        {% if default_server_ipv6 is defined %}
-          "[::]:21680:8080",
-        {% endif %}
-      ]
-  tags: ['firewall_config']
-
-- name: create podman fireflyiii-core container
-  containers.podman.podman_container:
-    name: fireflyiii-core
-    image: "fireflyiii/core:{{fireflyiii_core_version}}"
-    state: present
-    security_opt:
-      - label=disable
-    env:
+- name: create container service
+  vars:
+    container_name: "fireflyiii-core"
+    container_image: "fireflyiii/core:{{fireflyiii_core_version}}"
+    container_network: "isolated"
+    container_ip: "{{podman_fireflyiii_core_ip}}"
+    container_exposed_ports:
+      - "8080"
+    container_env:
       TZ: "{{timezone}}"
       APP_KEY: "{{fireflyiii_api_key}}"
       DB_HOST: "mysql"
@@ -85,26 +64,23 @@
       MAIL_USERNAME: "{{mailserver_username}}"
       MAIL_PASSWORD: "{{mailserver_password}}"
       MAIL_FROM: "{{root_email}}"
-    log_driver: journald
-    log_options:
-      tag: fireflyiii
-    network: "isolated"
-    ip: "{{podman_fireflyiii_core_ip}}"
-    volumes:
+    container_volumes: 
       - '{{global_lib}}fireflyiii/upload:/var/www/html/storage/upload'
       - '{{global_log}}fireflyiii:/var/www/html/storage/logs'
-    published_ports: "{{fireflyiii_core_published_ports}}"
-  register: "podman_container_core_state"
-  notify: "restart fireflyiii-core"
-  
-- name: create podman fireflyiii-importer container
-  containers.podman.podman_container:
-    name: fireflyiii-importer
-    image: "fireflyiii/data-importer:{{fireflyiii_importer_version}}"
-    state: present
-    security_opt:
-      - label=disable
-    env: 
+    container_after: [ "mysql" ]
+    container_readyness: { "type": "port_check", "ip": "{{podman_fireflyiii_core_ip}}", "port": "8080" }
+  include_tasks: roles/container/shared/create_podman_service.yml
+  tags: ['podman_container','systemd_watcher_config','systemd_service_config']
+
+- name: create container service
+  vars:
+    container_name: "fireflyiii-importer"
+    container_image: "fireflyiii/data-importer:{{fireflyiii_importer_version}}"
+    container_network: "isolated"
+    container_ip: "{{podman_fireflyiii_importer_ip}}"
+    container_exposed_ports:
+      - "8080"
+    container_env:
       TZ: "{{timezone}}"
       IMPORT_DIR_ALLOWLIST: "/var/www/html/storage/configurations"
       FIREFLY_III_URL: "http://{{podman_fireflyiii_core_ip}}:8080"
@@ -124,38 +100,13 @@
       MAIL_USERNAME: "{{mailserver_username}}"
       MAIL_PASSWORD: "{{mailserver_password}}"
       MAIL_FROM_ADDRESS: "{{root_email}}"
-    log_driver: journald
-    log_options:
-      tag: fireflyiii
-    network: "isolated"
-    ip: "{{podman_fireflyiii_importer_ip}}"
-    volumes:
+    container_volumes: 
       - '{{global_lib}}fireflyiii/configurations:/var/www/html/storage/configurations'
       - '{{global_log}}fireflyiii:/var/www/html/storage/logs'
-    published_ports: "{{fireflyiii_importer_published_ports}}"
-  register: "podman_container_importer_state"
-  notify: "restart fireflyiii-importer"
-
-# ***** SERVICE CONFIGS *****
-- name: handle systemd service
-  vars:
-    container_name: "fireflyiii-core"
-    container_ip: "{{podman_fireflyiii_core_ip}}"
-    container_readyness: { "type": "port_check", "ip": "{{podman_fireflyiii_core_ip}}", "port": "8080" }
-    container_after: [ "mysql" ]
-    container_changed: "{{podman_container_core_state.changed}}"
-  include_tasks: roles/container/shared/handle_podman_service.yml
-  tags: ['systemd_watcher_config']
-
-- name: handle systemd service
-  vars:
-    container_name: "fireflyiii-importer"
-    container_ip: "{{podman_fireflyiii_importer_ip}}"
-    container_readyness: { "type": "port_check", "ip": "{{podman_fireflyiii_importer_ip}}", "port": "8080" }
     container_after: [ "mysql", "fireflyiii-core" ]
-    container_changed: "{{podman_container_importer_state.changed}}"
-  include_tasks: roles/container/shared/handle_podman_service.yml
-  tags: ['systemd_watcher_config']
+    container_readyness: { "type": "port_check", "ip": "{{podman_fireflyiii_importer_ip}}", "port": "8080" }
+  include_tasks: roles/container/shared/create_podman_service.yml
+  tags: ['podman_container','systemd_watcher_config','systemd_service_config']
 
 - name: allow service
   vars:
@@ -180,7 +131,6 @@
     host_name: "fireflyiii-importer"
     host_ip_address: "{{podman_fireflyiii_importer_ip}}"
   include_tasks: roles/_shared/add_to_hosts.yml
-
 
 # ***** MYSQL DATABASE ****
 - name: create database

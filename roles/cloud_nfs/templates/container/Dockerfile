@@ -2,11 +2,9 @@ FROM alpine:{{alpine_version}}
 
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
 
-RUN apk add --no-cache --update nfs-utils tzdata
-
-#RUN echo 'hosts: files dns' >> /etc/nsswitch.conf
-
-RUN mkdir /var/lib/nfs/v4recovery
+RUN {{alpine_build_cache}} && \
+    apk --update add nfs-utils tzdata && \
+    mkdir /var/lib/nfs/v4recovery
 
 #openrc musl-nscd
 #openrc
@@ -16,7 +14,7 @@ RUN mkdir /var/lib/nfs/v4recovery
 #    echo "rpc_pipefs  /var/lib/nfs/rpc_pipefs  rpc_pipefs  defaults  0  0" >> /etc/fstab && \
 #    echo "nfsd        /proc/fs/nfsd            nfsd        defaults  0  0" >> /etc/fstab
 
-#RUN apk add --no-cache --update git cmake make g++ bison flex krb5-dev userspace-rcu-dev nfs-utils-dev libnsl-dev
+#RUN apk add --update git cmake make g++ bison flex krb5-dev userspace-rcu-dev nfs-utils-dev libnsl-dev
 #RUN git clone --recursive https://github.com/nfs-ganesha/nfs-ganesha.git
 #RUN git checkout tags/V3.2
 #RUN git submodule update --init
@@ -28,6 +26,3 @@ RUN mkdir /var/lib/nfs/v4recovery
 # -DUSE_RADOS_RECOV=OFF -DRADOS_URLS=OFF 
  
 ENTRYPOINT ["/entrypoint.sh"]
-
-EXPOSE 2049/tcp
-EXPOSE 2049/udp

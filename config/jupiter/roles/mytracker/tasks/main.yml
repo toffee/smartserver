@@ -17,49 +17,24 @@
       - "{{config_path}}/roles/mytracker/templates/container/Dockerfile"
   include_tasks: roles/container/shared/build_podman_image.yml
 
-- name: prepare published_ports
-  set_fact:
-    mytracker_published_ports:  |
-      [
-        "5000:5000",
-        {% if default_server_ipv6 is defined %}
-          "[::]:5000:5000",
-        {% endif %}
-      ]
-  tags: ['firewall_config']
-
-- name: create podman container
-  containers.podman.podman_container:
-    name: mytracker
-    image: "custom_mytracker:{{alpine_version}}-{{mytracker_version}}"
-    state: present
-    security_opt:
-      - label=disable
-    env:
+- name: create container service
+  vars:
+    container_name: "mytracker"
+    container_image: "custom_mytracker:{{alpine_version}}-{{mytracker_version}}"
+    container_network: "isolated"
+    container_ip: "{{podman_mytracker_ip}}"
+    container_exposed_ports:
+      - "5000"
+    container_env:
       TZ: "{{timezone}}"
       FLASK_ENV: "development"
       FLASK_DEBUG : "False"
-    log_driver: journald
-    log_options:
-      tag: mytracker
-    volumes:
+    container_volumes: 
       - '{{global_lib}}mytracker/:/var/lib/mytracker'
-    network: "isolated"
-    ip: "{{podman_mytracker_ip}}"
-    published_ports: "{{mytracker_published_ports}}"
-  register: "podman_container_state"
-  notify: "restart mytracker"
-  
-# ***** SERVICE CONFIGS *****
-- name: handle systemd service
-  vars:
-    container_name: "mytracker"
-    container_ip: "{{podman_mytracker_ip}}"
-    container_readyness: { "type": "port_check", "ip": "{{podman_mytracker_ip}}", "port": "5000" }
     container_after: [ "mosquitto" ]
-    container_changed: "{{podman_container_state.changed}}"
-  include_tasks: roles/container/shared/handle_podman_service.yml
-  tags: ['systemd_watcher_config','systemd_service_config']
+    container_readyness: { "type": "port_check", "ip": "{{podman_mytracker_ip}}", "port": "5000" }
+  include_tasks: roles/container/shared/create_podman_service.yml
+  tags: ['podman_container','systemd_watcher_config','systemd_service_config']
 
 - name: allow service
   vars:
@@ -69,7 +44,7 @@
   include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
 
-- name: add container name
+- name: add service name
   vars:
     host_name: "mytracker"
     host_ip_address: "{{podman_mytracker_ip}}"

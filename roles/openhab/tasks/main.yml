@@ -18,6 +18,8 @@
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_etc}}openhab/conf" }
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_etc}}openhab/conf/html" }
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_etc}}openhab/conf/icons" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_etc}}openhab/conf/services" }
+      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_etc}}openhab/conf/things" }
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_etc}}openhab/python" }
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_lib}}openhab" }
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_lib}}openhab/jsondb" }
@@ -37,20 +39,6 @@
     git_mode:  "u=rwX,g=rX,o="
   include_tasks: roles/_shared/git_clone.yml
 
-- name: set symbolic link to shared python scripts
-  file:
-    src: "{{projects_path}}openhab_shared/{{item}}"
-    dest: "{{global_etc}}/openhab/{{item}}"
-    state: link
-    follow: no
-    owner: "{{system_users['openhab'].name}}"
-    group: "{{system_groups['openhab'].name}}"
-  with_items:
-    - "python/shared"
-    - "conf/html/shared"
-    - "conf/icons/classic"
-#    - "conf/icons"
-
 # ****** GITHUB CONFIG PROJECT ******
 - name: clone config git
   vars:
@@ -62,47 +50,14 @@
     git_mode:  "u=rwX,g=rX,o="
   include_tasks: roles/_shared/git_clone.yml
 
-# => custom python
-- name: link custom python
-  file:
-    src: "{{projects_path}}openhab_config/python/custom"
-    dest: "{{global_etc}}openhab/python/custom"
-    state: link
-    follow: no
-    owner: "{{system_users['openhab'].name}}"
-    group: "{{system_groups['openhab'].name}}"
-  notify: "restart openhab"
-
 # conf folder
 - name: check conf folder
   shell: "ls -1 {{projects_path}}openhab_config/conf/"
   register: config_result
   changed_when: no
   
-- name: link conf folder
-  file:
-    src: "{{projects_path}}openhab_config/conf/{{item}}"
-    dest: "{{global_etc}}openhab/conf/{{item}}"
-    state: link
-    follow: no
-    owner: "{{system_users['openhab'].name}}"
-    group: "{{system_groups['openhab'].name}}"
-  with_items: "{{config_result.stdout_lines | difference(['html','icons'])}}"
-  notify: "restart openhab"
-
-- name: copy conf folder
-  file:
-    src: "{{projects_path}}openhab_config/conf/{{item}}"
-    dest: "{{global_etc}}openhab/conf/{{item}}"
-    state: link
-    follow: no
-    owner: "{{system_users['openhab'].name}}"
-    group: "{{system_groups['openhab'].name}}"
-  with_items: "{{config_result.stdout_lines | difference(['html','icons'])}}"
-  notify: "restart openhab"
-
 # custom conf sub folder (html & icons)
-- name: check custom html & icons conf folder
+- name: check html & icons folder
   shell: "ls -1 {{projects_path}}openhab_config/conf/{{item}}/"
   register: config_sub_folder_result
   changed_when: no
@@ -111,50 +66,38 @@
     - html
     - icons
     
-- name: collect custom html & icons conf folder
+- name: collect conf folder
   set_fact:
-    config_sub_folders: |
+    config_link_folders: |
       [
-      {% for result in config_sub_folder_result.results %}
-      {% if result.stdout_lines is defined %}
-      {% for line in result.stdout_lines %}
-      "{{result.item}}/{{line}}",
-      {% endfor %}
-      {% endif %}
-      {% endfor %}
+        { "src": "{{projects_path}}openhab_shared/python/shared"        , "dest": "{{global_etc}}/openhab/python/shared" },
+        { "src": "{{projects_path}}openhab_shared/conf/html/shared"     , "dest": "{{global_etc}}/openhab/conf/html/shared" },
+        { "src": "{{projects_path}}openhab_shared/conf/icons/classic"   , "dest": "{{global_etc}}/openhab/conf/icons/classic" },
+
+        { "src": "{{projects_path}}openhab_config/python/custom"        , "dest": "{{global_etc}}openhab/python/custom" },
+
+        {% for line in config_result.stdout_lines | difference(['html','icons','services','things']) %}
+          { "src": "{{projects_path}}openhab_config/conf/{{line}}"    , "dest": "{{global_etc}}openhab/conf/{{line}}" },
+        {% endfor %}
+
+        {% for result in config_sub_folder_result.results %}
+        {% if result.stdout_lines is defined %}
+        {% for line in result.stdout_lines %}
+          { "src": "{{projects_path}}openhab_config/conf/{{result.item}}/{{line}}", "dest": "{{global_etc}}openhab/conf/{{result.item}}/{{line}}" },
+        {% endfor %}
+        {% endif %}
+        {% endfor %}
       ]
-    
-- name: link custom html & icons conf folder
+
+- name: link conf folder
   file:
-    src: "{{projects_path}}openhab_config/conf/{{item}}"
-    dest: "{{global_etc}}openhab/conf/{{item}}"
+    src: "{{item.src}}"
+    dest: "{{item.dest}}"
     state: link
     follow: no
     owner: "{{system_users['openhab'].name}}"
     group: "{{system_groups['openhab'].name}}"
-  with_items: "{{config_sub_folders}}"
-  notify: "restart openhab"
-
-# create missing folder
-- name: prepare missing config folder
-  file:
-    path:  "{{global_etc}}openhab{{item}}"
-    state: directory
-    owner: "{{system_users['openhab'].name}}"
-    group: "{{system_groups['openhab'].name}}"
-    mode: 0750
-  with_items:
-    - /conf/automation
-#    - /conf/html
-#    - /conf/icons
-    - /conf/items
-    - /conf/persistence
-    - /conf/rules
-    - /conf/scripts
-    - /conf/services
-    - /conf/sitemaps
-    - /conf/transform
-    - /conf/things
+  with_items: "{{config_link_folders}}"
   notify: "restart openhab"
     
 # habpanel if exists
@@ -169,6 +112,7 @@
   synchronize:
     src: "{{projects_path}}openhab_config/jsondb/uicomponents_habpanel_panelconfig.json"
     dest: "{{global_lib}}openhab/jsondb/uicomponents_habpanel_panelconfig.json"
+    mode: "pull"
     archive: no
     checksum: yes
     group: yes
@@ -181,49 +125,26 @@
   when: "habpanel_result.rc == 0"
 
 # addons folder
-- name: check addons folder
-  shell: "ls -1 {{projects_path}}openhab_config/addons/"
-  register: addons_result
-  changed_when: no
-
 - name: copy addons folder
-  copy:
-    src: "{{projects_path}}openhab_config/addons/{{item}}"
-    dest: "{{global_etc}}openhab/addons/{{item}}"
-    remote_src: yes
-    owner: "{{system_users['openhab'].name}}"
-    group: "{{system_groups['openhab'].name}}"
-    mode: 0640
-  with_items: "{{addons_result.stdout_lines}}"
+  synchronize:
+    src: "{{projects_path}}openhab_config/addons/"
+    dest: "{{global_etc}}openhab/addons/"
+    mode: "pull"
+    archive: no
+    checksum: yes
+    rsync_opts:
+      - "--chown={{system_users['openhab'].name}}:{{system_groups['openhab'].name}}"
+      - "--chmod=D750,F640"
+#    group: yes
+#    owner: yes
+#    perms: yes
+    recursive: yes
 
-- stat:
-    path: "{{projects_path}}openhab_config/userdata/jsondb"
-  register: jsondb_dir
-
-- name: set symbolic link to jsondb files
-  file:
-    src: "{{projects_path}}openhab_config/userdata/{{item}}"
-    dest: "{{global_lib}}/openhab/{{item}}"
-    state: link
-    follow: no
-    owner: "{{openhab_user}}"
-    group: "{{openhab_group}}"  
-  with_items:
-    - "jsondb/automation_rules.json"
-    - "jsondb/uicomponents_ui_page.json"
-    - "jsondb/uicomponents_ui_widget.json"
-  when: jsondb_dir.stat.stat.isdir is defined and jsondb_dir.stat.stat.isdir
-  
 # SERVICES
-- name: check service folder
-  shell: "ls -1 {{projects_path}}openhab_config/templates/services/"
-  register: services_result
-  changed_when: no
-
 # have to fetch files before, because ansible template module works only with local files
 - name: prepare service configs
   synchronize:
-    src: "{{projects_path}}openhab_config/templates/services"
+    src: "{{projects_path}}openhab_config/templates/"
     dest: "/tmp/ansible/openhab/"
     mode: "pull"
     archive: no
@@ -236,56 +157,32 @@
 #    perms: yes
     recursive: yes
   changed_when: no
-  when: "services_result.rc == 0"
 
 - name: copy service configs
   template:
-    src: "/tmp/ansible/openhab/services/{{item}}"
-    dest: "{{ global_etc }}openhab/conf/services/{{item}}"
+    src: "{{item}}"
+    dest: "{{ global_etc }}openhab/conf/services/{{item | basename}}"
     owner: "{{system_users['openhab'].name}}"
     group: "{{system_groups['openhab'].name}}"
     mode: 0640
-  with_items: "{{services_result.stdout_lines}}"
+  with_fileglob: "/tmp/ansible/openhab/services/*"
   notify: "restart openhab"
 
 # THINGS
-- name: check things folder
-  shell: "ls -1 {{projects_path}}openhab_config/templates/things/"
-  register: things_result
-  changed_when: no
-
-# have to fetch files before, because ansible template module works only with local files
-- name: prepare things configs
-  synchronize:
-    src: "{{projects_path}}openhab_config/templates/things"
-    dest: "/tmp/ansible/openhab/"
-    mode: "pull"
-    archive: no
-    checksum: yes
-    rsync_opts:
-      - "--chown=root:root"
-      - "--chmod=D755,F644"
-#    group: yes
-#    owner: yes
-#    perms: yes
-    recursive: yes
-  changed_when: no
-  when: "things_result.rc == 0"
-
 - name: copy things configs
   template:
-    src: "/tmp/ansible/openhab/things/{{item}}"
-    dest: "{{ global_etc }}openhab/conf/things/{{item}}"
+    src: "{{item}}"
+    dest: "{{ global_etc }}openhab/conf/things/{{item | basename}}"
     owner: "{{system_users['openhab'].name}}"
     group: "{{system_groups['openhab'].name}}"
     mode: 0640
-  with_items: "{{things_result.stdout_lines}}"
+  with_fileglob: "/tmp/ansible/openhab/things/*"
   notify: "restart openhab"
   
 # UDEV
 - name: copy udev rules
   vars:
-    udev_rules_path: "{{projects_path}}openhab_config/templates/udev/rules.d/"
+    udev_rules_path: "/tmp/ansible/openhab/udev/rules.d/"
     udev_rules_trigger: "restart openhab"
   include_tasks: roles/_shared/synchronize_udev_rules.yml
 
@@ -334,7 +231,7 @@
   with_indexed_items: "{{device_result.stdout_lines}}"
   when: "device_result.rc == 0 and symlink_result.results[item.0].rc == 0"
   
-- name: build podman image
+- name: build container image
   vars:
     container_name: "openhab"
     image_name: "custom_openhab:{{openhab_version}}"
@@ -348,9 +245,27 @@
   register: conf_folder_result
   changed_when: no
 
-- name: prepare volumes
-  set_fact:
-    openhab_volumes: |
+- name: create container service
+  vars:
+    container_name: "openhab"
+    container_image: "custom_openhab:{{openhab_version}}"
+    container_network: "host"
+    container_exposed_ports:
+      - "8080"
+      - "8443"
+      - "5007"
+      - "8101"
+    container_device: "{{openhab_device_mounts | default([])}}"
+    container_env:
+      USER_ID: "{{system_users['openhab'].id}}"
+      GROUP_ID: "{{system_groups['openhab'].id}}"
+      EXTRA_JAVA_OPTS: "-Duser.timezone={{timezone}} {{openhab_device_java_opts | default('')}} -Dpython.path=/openhab/python/"
+      EXTRA_SHELL_OPTS: "+x" # disable debug logs in entrypoint bash script
+      #EXTRA_SHELL_OPTS: "-x"
+      #EXTRA_SHELL_OPTS: "-v"
+      OPENHAB_HTTP_ADDRESS: "127.0.0.1"
+      CRYPTO_POLICY: "unlimited"
+    container_volumes: |
       [
         '{{projects_path}}openhab_config:{{projects_path}}openhab_config',
         '{{projects_path}}openhab_shared:{{projects_path}}openhab_shared',
@@ -363,51 +278,11 @@
             '{{global_etc}}openhab/conf/{{name}}:/openhab/conf/{{name}}',
         {% endfor %}
       ]
-
-- name: create podman container
-  containers.podman.podman_container:
-    name: openhab
-    image: "custom_openhab:{{openhab_version}}"
-    state: present
-#    capabilities:
-#      - NET_ADMIN
-#      - NET_RAW
-#    recreate: true
-    security_opt:
-      - label=disable
-    env:
-      TZ: "{{timezone}}"
-      USER_ID: "{{system_users['openhab'].id}}"
-      GROUP_ID: "{{system_groups['openhab'].id}}"
-      EXTRA_JAVA_OPTS: "-Duser.timezone={{timezone}} {{openhab_device_java_opts | default('')}} -Dpython.path=/openhab/python/"
-      EXTRA_SHELL_OPTS: "+x" # disable debug logs in entrypoint bash script
-      #EXTRA_SHELL_OPTS: "-x"
-      #EXTRA_SHELL_OPTS: "-v"
-      OPENHAB_HTTP_ADDRESS: "0.0.0.0"
-      CRYPTO_POLICY: "unlimited"
-    log_driver: journald
-    log_options:
-      tag: openhab
-    device: "{{openhab_device_mounts | default([])}}"
-    network: "host"
-    volumes: "{{openhab_volumes}}"
-    exposed_ports:
-      - "8080"  
-      - "8443"  
-      - "5007"  
-      - "8101" 
-  register: "podman_container_state"
-  notify: "restart openhab"
-
-# ***** SERVICE CONFIGS *****
-- name: handle systemd service
-  vars:
-    container_name: "openhab"
-    container_readyness: { "type": "port_check", "ip": "127.0.0.1", "port": "8080" }
+    container_timeout_stop_sec: 60
     container_after: [ "mysql", "influxdb", "mosquitto" ]
-    container_changed: "{{podman_container_state.changed}}"
-  include_tasks: roles/container/shared/handle_podman_service.yml
-  tags: ['systemd_watcher_config','systemd_service_config']
+    container_readyness: { "type": "port_check", "ip": "127.0.0.1", "port": "8080" }
+  include_tasks: roles/container/shared/create_podman_service.yml
+  tags: ['podman_container','systemd_watcher_config','systemd_service_config']
 
 - name: add service name
   vars:
@@ -421,11 +296,11 @@
   register: ssh_key_result
   changed_when: no
   failed_when: no
-  when: podman_container_state.changed
+  when: "podman_service_container_changed"
    
 - name: clean ssh key
   command: "ssh-keygen -R [openhab]:8101 -f /root/.ssh/known_hosts"
-  when: "podman_container_state.changed and ssh_key_result.rc == 0"
+  when: "podman_service_container_changed and ssh_key_result.rc == 0"
 
 # ***** MYSQL DATABASE ****
 - name: create database
@@ -497,15 +372,6 @@
   when: "habpanel_result.rc == 0"
   tags: ['apache_webui_config']
 
-#- name: add admin web user
-#  vars:
-#    username: "{{openhab_tablet_username}}"
-#    password: "{{openhab_tablet_password}}"
-#    fullname: "Openhab Tablet User"
-#    usergroups: []
-#  include_tasks: roles/user/shared/add_web_user.yml
-#  tags: [ 'user' ]
-
 - name: copy apache vhost
   vars:
     sub_domain: "openhab"
@@ -515,16 +381,6 @@
     include: "templates/etc/apache2/_.ansible.vhost.d/openhab.inc"
   include_tasks: roles/apache/shared/add_vhost.yml
   tags: ['apache_config']
-
-#- name: copy special vhosts
-#  template:
-#    src: "templates/etc/apache2/_.ansible.vhost.d/default-127.0.0.0-80-openhab.conf"
-#    dest: "{{global_etc}}apache2/_.ansible.vhost.d/default-127.0.0.0-80-openhab.conf"
-#    owner: root
-#    group: root
-#    mode: 0644
-#  notify: "restart apache2"
-#  tags: ['apache_config']
 
 - name: create cleanup cron job
   vars:

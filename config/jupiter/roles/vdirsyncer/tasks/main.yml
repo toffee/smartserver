@@ -22,37 +22,23 @@
     - "config"    
   notify: "restart vdirsyncer"
 
-- name: create podman container
-  containers.podman.podman_container:
-    name: vdirsyncer
-    image: "bleala/vdirsyncer:{{vdirsyncer_version}}"
-    state: present
-    security_opt:
-      - label=disable
-    env:
+- name: create container service
+  vars:
+    container_name: "vdirsyncer"
+    container_image: "bleala/vdirsyncer:{{vdirsyncer_version}}"
+    container_network: "host"
+    container_env:
       TZ: "{{timezone}}"
       AUTODISCOVER: "false"
       AUTOSYNC: "true"
       LOG: "/vdirsyncer/log/vdirsyncer.log"
-    log_driver: journald
-    log_options:
-      tag: vdirsyncer
-    volumes:
-      - '{{global_etc}}vdirsyncer/config:/vdirsyncer/config:z'
-      - '{{global_lib}}vdirsyncer:/vdirsyncer:z'
-      - '{{global_log}}vdirsyncer:/vdirsyncer/log:z'
-    network: "host"
-  register: "podman_container_state"
-  notify: "restart vdirsyncer"
-  
-# ***** SERVICE CONFIGS *****
-- name: handle systemd service
-  vars:
-    container_name: "vdirsyncer"
+    container_volumes: 
+      - '{{global_etc}}vdirsyncer/config:/vdirsyncer/config'
+      - '{{global_lib}}vdirsyncer:/vdirsyncer'
+      - '{{global_log}}vdirsyncer:/vdirsyncer/log'
     container_readyness: { "type": "state_check" }
-    container_changed: "{{podman_container_state.changed}}"
-  include_tasks: roles/container/shared/handle_podman_service.yml
-  tags: ['systemd_watcher_config','systemd_service_config']
+  include_tasks: roles/container/shared/create_podman_service.yml
+  tags: ['podman_container','systemd_watcher_config','systemd_service_config']
   
 # ***** FINALIZE *****
 - name: copy fluentd config

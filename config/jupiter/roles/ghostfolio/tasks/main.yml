@@ -3,25 +3,15 @@
     ghostfolio_version: '2.105.0'
   tags: [ 'update_notifier_config' ]
 
-- name: prepare published_ports
-  set_fact:
-    ghostfolio_published_ports:  |
-      [
-        "3333:3333",
-        {% if default_server_ipv6 is defined %}
-          "[::]:3333:3333",
-        {% endif %}
-      ]
-  tags: ['firewall_config']
-
-- name: create podman container
-  containers.podman.podman_container:
-    name: ghostfolio
-    image: "ghostfolio/ghostfolio:{{ghostfolio_version}}"
-    state: present
-    security_opt:
-      - label=disable
-    env:
+- name: create container service
+  vars:
+    container_name: "ghostfolio"
+    container_image: "ghostfolio/ghostfolio:{{ghostfolio_version}}"
+    container_network: "isolated"
+    container_ip: "{{podman_ghostfolio_ip}}"
+    container_exposed_ports:
+      - "3333"
+    container_env:
       TZ: "UTC"
       ACCESS_TOKEN_SALT: "{{ghostfolio_token_salt}}"
       POSTGRES_DB: "ghostfolio"
@@ -31,25 +21,10 @@
       JWT_SECRET_KEY: "{{ghostfolio_jwt_key}}"
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
-    log_driver: journald
-    log_options:
-      tag: ghostfolio
-    network: "isolated"
-    ip: "{{podman_ghostfolio_ip}}"
-    published_ports: "{{ghostfolio_published_ports}}"
-  register: "podman_container_state"
-  notify: "restart ghostfolio"
-
-# ***** SERVICE CONFIGS *****
-- name: handle systemd service
-  vars:
-    container_name: "ghostfolio"
-    container_ip: "{{podman_ghostfolio_ip}}"
-    container_readyness: { "type": "port_check", "ip": "{{podman_ghostfolio_ip}}", "port": "3333" }
     container_after: [ "postgres" ]
-    container_changed: "{{podman_container_state.changed}}"
-  include_tasks: roles/container/shared/handle_podman_service.yml
-  tags: ['systemd_watcher_config','systemd_service_config']
+    container_readyness: { "type": "port_check", "ip": "{{podman_ghostfolio_ip}}", "port": "3333" }
+  include_tasks: roles/container/shared/create_podman_service.yml
+  tags: ['podman_container','systemd_watcher_config','systemd_service_config']
 
 - name: allow service
   vars:

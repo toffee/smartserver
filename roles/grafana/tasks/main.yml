@@ -1,6 +1,7 @@
 - name: set version
   set_fact:
-    grafana_version: '11.1.4'
+    grafana_version: '11.2.0'
+#    grafana_mqtt_plugin_version: '1.1.0-beta.2'
   tags: [ 'update_notifier_config' ]    
 
 - name: prepare needed directories
@@ -39,16 +40,26 @@
 
 - name: copy grafana provisioning
   template:
-    src: "templates/{{item}}"
-    dest: "{{ global_etc }}grafana/{{item}}"
+    src: "templates/provisioning/dashboards/provider.yaml"
+    dest: "{{ global_etc }}grafana/provisioning/dashboards/provider.yaml"
     owner: "root"
     group: "root"
     mode: 0640
   notify: "restart grafana"
-  with_items:
-    - "provisioning/dashboards/provider.yaml"
+
+#- name: install plugins
+#  unarchive:
+#    src: "{{item.src}}"
+#    dest: "{{ global_lib }}grafana/plugins/"
+#    creates: "{{ global_lib }}grafana/plugins/{{item.creates}}/"
+#    remote_src: yes
+#    owner: "root"
+#    group: "root"
+#  with_items:
+#    - { src: "https://grafana.com/api/plugins/grafana-mqtt-datasource/versions/{{grafana_mqtt_plugin_version}}/download?os=linux&arch=amd64", creates: "grafana-mqtt-datasource" }
+#  notify: "restart grafana"
     
-- name: build podman image
+- name: build container image
   vars:
     container_name: "grafana"
     image_name: "custom_grafana:{{grafana_version}}"
@@ -56,47 +67,32 @@
       - roles/grafana/templates/container/Dockerfile
   include_tasks: roles/container/shared/build_podman_image.yml
     
-- name: create podman container
-  containers.podman.podman_container:
-    name: grafana
-    image: "custom_grafana:{{grafana_version}}"
-    state: present
-    security_opt:
-      - label=disable
-    user: "root:root"
-    env:
-      GF_SERVER_DOMAIN: "grafana.{{server_domain}}"
+- name: create container service
+  vars:
+    container_name: "grafana"
+    container_image: "custom_grafana:{{grafana_version}}"
+    container_user: "root:root"
+    container_env:
+      GF_SERVER_DOMAIN: "https://%(domain)s/"
 #      GF_SERVER_HTTP_ADDR: "127.0.0.1"
-      GF_SERVER_ROOT_URL: "https://%(domain)s/"
+      GF_SERVER_ROOT_URL: "https://grafana.{{server_domain}}/"
 #      GF_LOG_MODE: "syslog"
 #      GF_LOG_SYSLOG_TAG: "grafana"
       GF_SECURITY_ALLOW_EMBEDDING: "true"
-      TZ: "{{timezone}}"
-    log_driver: journald
-    log_options:
-      tag: grafana
-    network: "isolated"
-    ip: "{{podman_grafana_ip}}"
-    volumes:
+#      GF_INSTALL_PLUGINS: "grafana-mqtt-datasource"
+    container_network: "isolated"
+    container_ip: "{{podman_grafana_ip}}"
+    container_exposed_ports:
+      - "3000/tcp"
+    container_volumes:
       - '{{global_lib}}grafana:/var/lib/grafana'
       - '{{global_etc}}grafana/provisioning:/etc/grafana/provisioning'
-    exposed_ports:
-     - "3000"
-  register: "podman_container_state"
-  notify: "restart grafana"
-
-# ***** SERVICE CONFIGS *****
-- name: handle systemd service
-  vars:
-    container_name: "grafana"
-    container_ip: "{{podman_grafana_ip}}"
-    container_readyness: { "type": "port_check", "ip": "{{podman_grafana_ip}}", "port": "3000" }
     container_after: [ "mysql", "influxdb", "loki", "prometheus", "alertmanager" ]
-    container_changed: "{{podman_container_state.changed}}"
-  include_tasks: roles/container/shared/handle_podman_service.yml
-  tags: ['systemd_watcher_config','systemd_service_config']
-      
-- name: allow service
+    container_readyness: { "type": "port_check", "ip": "{{podman_grafana_ip}}", "port": "3000" }
+  include_tasks: roles/container/shared/create_podman_service.yml
+  tags: ['podman_container','systemd_watcher_config','systemd_service_config']
+
+- name: allow container service
   vars:
     service_name: "grafana"
     container_to_container_rules:
@@ -127,7 +123,8 @@
 - name: copy apache vhost
   vars:
     sub_domain: "grafana"
-    usergroup: "admin"
+    usergroup: "user"
+    additional_env: yes
     include: "templates/etc/apache2/_.ansible.vhost.d/grafana.inc"
   include_tasks: roles/apache/shared/add_vhost.yml
   tags: ['apache_config']

@@ -1,7 +1,7 @@
 # double check for new versions if "copy patch" is still needed
 - name: set version
   set_fact:
-    nextcloud_version: '29.0.4' # patches in "enable_apps" beim nächsten Update überprüfen
+    nextcloud_version: '29.0.5' # patches in "enable_apps" beim nächsten Update überprüfen
 
     # 1. check for news update (blocker)
     # 2. upgrade keeweb at the same time
@@ -52,19 +52,6 @@
   tags: ['cron_job','backup_restore']
   when: "mysql_enabled"
 
-# ***** REDIS ****
-- name: check redis service => database does not exists
-  include_tasks: roles/redis/shared/wait_until_ready.yml
-  when: "redis_enabled and database_added"
-
-# ***** APACHE *****  
-- name: check apache service
-  include_tasks: roles/apache/shared/wait_until_ready.yml
-  when: "database_added or not nextcloud_version_exists.stat.exists"
-
-  
-  
-  
 # ***** INITIALIZE NEW *****
 - name: clean unused config.php => database does not exists
   file:

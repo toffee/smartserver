@@ -41,14 +41,19 @@
       when: dhcp_changed.changed
   when: "dhcp_enabled and dhcp_type == 'dnsmasq'"
 
-- name: build podman image
+- name: build container image
   vars:
     container_name: "dnsmasq"
     image_name: "custom_dnsmasq:{{alpine_version}}"
     image_files:
       - roles/dnsmasq/templates/container/Dockerfile
+    container_shutdown_hook: "roles/dnsmasq/tasks/disable.yml"
   include_tasks: roles/container/shared/build_podman_image.yml
   
+# must be called before container is activated. Otherwise the container can't start because of the systemd_resolver on ubuntu which uses the same port
+- name: enable dnsmasq
+  include_tasks: roles/dnsmasq/tasks/enable.yml
+
 - name: prepare published_ports
   set_fact:
     dnsmasq_published_ports:  |
@@ -60,42 +65,21 @@
       ]
   tags: ['firewall_config']
 
-- name: create podman container
-  containers.podman.podman_container:
-    name: dnsmasq
-    image: "custom_dnsmasq:{{alpine_version}}"
-    state: present
-    security_opt:
-      - label=disable
-    env:
-      TZ: "{{timezone}}"
-    log_driver: journald
-    log_options:
-      tag: dnsmasq
-    network: "isolated"
-    ip: "{{podman_dns_ip}}"
-    volumes:
-      - '{{ global_etc }}dnsmasq/dnsmasq.conf:/etc/dnsmasq.conf'
-      - '{{ global_etc }}dnsmasq/:/etc/dnsmasq/'
-    published_ports: "{{dnsmasq_published_ports}}"
-  register: "podman_container_state"
-  notify: "restart dnsmasq"
-
-# ***** SERVICE CONFIGS *****
-# must be called before container is activated. Otherwise the container can't start because of the systemd_resolver on ubuntu which uses the same port
-- name: enable dnsmasq
-  include_tasks: roles/dnsmasq/tasks/enable.yml
-
-- name: handle systemd service
+- name: create container service
   vars:
     container_name: "dnsmasq"
+    container_image: "custom_dnsmasq:{{alpine_version}}"
+    container_network: "isolated"
     container_ip: "{{podman_dns_ip}}"
+    container_published_ports: "{{dnsmasq_published_ports}}"
+    container_volumes:
+      - '{{ global_etc }}dnsmasq/dnsmasq.conf:/etc/dnsmasq.conf'
+      - '{{ global_etc }}dnsmasq/:/etc/dnsmasq/'
     container_readyness: { "type": "port_check", "ip": "{{podman_dns_ip}}", "port": "53" }
-    container_changed: "{{podman_container_state.changed}}"
-  include_tasks: roles/container/shared/handle_podman_service.yml
-  tags: ['systemd_watcher_config','systemd_service_config']
+  include_tasks: roles/container/shared/create_podman_service.yml
+  tags: ['podman_container','systemd_watcher_config','systemd_service_config']
 
-- name: allow service
+- name: allow container service
   vars:
     service_name: "dnsmasq"
     container_to_outside_rules:
@@ -110,4 +94,4 @@
     state: restarted
     daemon_reload: yes
     name: dnsmasq
-  when: "podman_container_state.changed"
+  when: "podman_service_container_changed"

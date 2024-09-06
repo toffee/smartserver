@@ -42,37 +42,22 @@
       ]
   tags: ['firewall_config']
 
-- name: create podman container
-  containers.podman.podman_container:
-    name: zigbee2mqtt
-    image: "custom_zigbee2mqtt:{{zigbee2mqtt_version}}"
-    state: present
-    security_opt:
-      - label=disable
-    env:
-      TZ: "{{timezone}}"
-    log_driver: journald
-    log_options:
-      tag: zigbee2mqtt
-    volumes:
-      - '{{global_etc}}zigbee2mqtt:/app/data'
-      - '{{global_log}}zigbee2mqtt:/app/data/log'
-    network: "isolated"
-    ip: "{{podman_zigbee2mqtt_ip}}"
-    published_ports: "{{zigbee2mqtt_published_ports}}"
-  register: "podman_container_state"
-  notify: "restart zigbee2mqtt"
-
-# ***** SERVICE CONFIGS *****
-- name: handle systemd service
+- name: create container service
   vars:
     container_name: "zigbee2mqtt"
+    container_image: "custom_zigbee2mqtt:{{zigbee2mqtt_version}}"
+    container_network: "isolated"
     container_ip: "{{podman_zigbee2mqtt_ip}}"
-    container_readyness: { "type": "port_check", "ip": "{{podman_zigbee2mqtt_ip}}", "port": "8084" }
+    container_published_ports: "{{zigbee2mqtt_published_ports}}"
+    container_env:
+      TZ: "{{timezone}}"
+    container_volumes: 
+      - '{{global_etc}}zigbee2mqtt:/app/data'
+      - '{{global_log}}zigbee2mqtt:/app/data/log'
     container_after: [ "mosquitto" ]
-    container_changed: "{{podman_container_state.changed}}"
-  include_tasks: roles/container/shared/handle_podman_service.yml
-  tags: ['systemd_watcher_config','systemd_service_config']
+    container_readyness: { "type": "port_check", "ip": "{{podman_zigbee2mqtt_ip}}", "port": "8084" }
+  include_tasks: roles/container/shared/create_podman_service.yml
+  tags: ['podman_container','systemd_watcher_config','systemd_service_config']
 
 - name: allow service
   vars:
