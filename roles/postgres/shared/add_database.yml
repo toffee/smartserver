@@ -1,6 +1,3 @@
-- name: "postgres : add_database : check service"
-  include_tasks: roles/postgres/shared/wait_until_ready.yml
-  
 - name: "postgres : add_database : check databases"
   shell: "podman exec postgres sh -c \"psql -c \\\"SELECT datname FROM pg_database;\\\"\""
   register: postgres_database_exists
