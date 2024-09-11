@@ -652,11 +652,11 @@ default_variables: {
     # Roles:
     # - 'fireflyiii'
     fireflyiii_enabled:                       { default: no,                                                       # disabled by default
-                                                requirement: "mysql_enabled" },
+                                                requirement: "mariadb_enabled" },
     fireflyiii_api_key:                       { dependency: "{{fireflyiii_enabled}}" },
-    fireflyiii_mysql_username:                { "default": "fireflyiii",
+    fireflyiii_mariadb_username:              { "default": "fireflyiii",
                                                 dependency: "{{fireflyiii_enabled}}" },
-    fireflyiii_mysql_password:                { dependency: "{{fireflyiii_enabled}}" },
+    fireflyiii_mariadb_password:              { dependency: "{{fireflyiii_enabled}}" },
     fireflyiii_pat:                           { dependency: "{{fireflyiii_enabled}}" },
     fireflyiii_nordigen_id:                   { dependency: "{{fireflyiii_enabled}}" },
     fireflyiii_nordigen_key:                  { dependency: "{{fireflyiii_enabled}}" },

@@ -50,12 +50,12 @@
     container_env:
       TZ: "{{timezone}}"
       APP_KEY: "{{fireflyiii_api_key}}"
-      DB_HOST: "mysql"
+      DB_HOST: "mariadb"
       DB_PORT: "3306"
       DB_CONNECTION: "mysql"
       DB_DATABASE: "fireflyiii"
-      DB_USERNAME: "{{fireflyiii_mysql_username}}"
-      DB_PASSWORD: "{{fireflyiii_mysql_password}}"
+      DB_USERNAME: "{{fireflyiii_mariadb_username}}"
+      DB_PASSWORD: "{{fireflyiii_mariadb_password}}"
       TRUSTED_PROXIES: "**"
       MAIL_MAILER: "smtp"
       MAIL_HOST: "{{mailserver_host}}"
@@ -67,7 +67,7 @@
     container_volumes: 
       - '{{global_lib}}fireflyiii/upload:/var/www/html/storage/upload'
       - '{{global_log}}fireflyiii:/var/www/html/storage/logs'
-    container_after: [ "mysql" ]
+    container_after: [ "mariadb" ]
     container_readyness: { "type": "port_check", "ip": "{{podman_fireflyiii_core_ip}}", "port": "8080" }
   include_tasks: roles/container/shared/create_podman_service.yml
   tags: ['podman_container','systemd_watcher_config','systemd_service_config']
@@ -103,7 +103,7 @@
     container_volumes: 
       - '{{global_lib}}fireflyiii/configurations:/var/www/html/storage/configurations'
       - '{{global_log}}fireflyiii:/var/www/html/storage/logs'
-    container_after: [ "mysql", "fireflyiii-core" ]
+    container_after: [ "mariadb", "fireflyiii-core" ]
     container_readyness: { "type": "port_check", "ip": "{{podman_fireflyiii_importer_ip}}", "port": "8080" }
   include_tasks: roles/container/shared/create_podman_service.yml
   tags: ['podman_container','systemd_watcher_config','systemd_service_config']
@@ -112,8 +112,8 @@
   vars:
     service_name: "fireflyiii"
     container_to_container_rules:
-      - { saddr: "{{podman_fireflyiii_core_ip}}", daddr: "{{podman_mysql_ip}}", protocol: "tcp", dport: "3306", comment: "fireflyiii-core => mysql" }
-      - { saddr: "{{podman_fireflyiii_importer_ip}}", daddr: "{{podman_mysql_ip}}", protocol: "tcp", dport: "3306", comment: "fireflyiii-importer => mysql" }
+      - { saddr: "{{podman_fireflyiii_core_ip}}", daddr: "{{podman_mariadb_ip}}", protocol: "tcp", dport: "3306", comment: "fireflyiii-core => mariadb" }
+      - { saddr: "{{podman_fireflyiii_importer_ip}}", daddr: "{{podman_mariadb_ip}}", protocol: "tcp", dport: "3306", comment: "fireflyiii-importer => mariadb" }
       - { saddr: "{{podman_fireflyiii_importer_ip}}", daddr: "{{podman_fireflyiii_core_ip}}", protocol: "tcp", dport: "8080", comment: "fireflyiii-importer => fireflyiii-core" }
     container_to_outside_rules:
       - { saddr: "{{podman_fireflyiii_importer_ip}}", protocol: "tcp", dport: "443", oif: "{{default_network_interface}}", comment: "fireflyiii-importer => external bankaccountdata.gocardless.com provider" }
@@ -136,10 +136,10 @@
 - name: create database
   vars:
     database: "fireflyiii"
-    username: "{{fireflyiii_mysql_username}}"
-    password: "{{fireflyiii_mysql_password}}"
+    username: "{{fireflyiii_mariadb_username}}"
+    password: "{{fireflyiii_mariadb_password}}"
     backup: yes
-  include_tasks: roles/mysql/shared/add_database.yml
+  include_tasks: roles/mariadb/shared/add_database.yml
   
 # ***** CRONJOB FOR IMPORT ****
 - name: create cron job
