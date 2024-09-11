@@ -31,11 +31,9 @@
       TZ: "{{timezone}}"
       AUTODISCOVER: "false"
       AUTOSYNC: "true"
-      LOG: "/vdirsyncer/log/vdirsyncer.log"
     container_volumes: 
       - '{{global_etc}}vdirsyncer/config:/vdirsyncer/config'
       - '{{global_lib}}vdirsyncer:/vdirsyncer'
-      - '{{global_log}}vdirsyncer:/vdirsyncer/log'
     container_readyness: { "type": "state_check" }
   include_tasks: roles/container/shared/create_podman_service.yml
   tags: ['podman_container','systemd_watcher_config','systemd_service_config']
