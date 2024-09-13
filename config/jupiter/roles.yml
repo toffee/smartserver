@@ -18,7 +18,7 @@
 
 #TODO- { import_role: { name: "config/jupiter/roles/hosts" }, tags: [ 'hosts' ] }             # add local host names/IPs to DNS 
 - { import_role: { name: "config/jupiter/roles/zigbee2mqtt" }, tags: [ 'zigbee2mqtt' ] } # configuration of zigbee2mqtt        
-#NICETOHAVE- { import_role: { name: "config/jupiter/roles/unifi" }, tags: [ 'unifi' ] }
+- { import_role: { name: "config/jupiter/roles/unifi" }, tags: [ 'unifi' ] }
 - { import_role: { name: "config/jupiter/roles/mytracker" }, tags: [ 'mytracker' ] }
 - { import_role: { name: "config/jupiter/roles/hikvision" }, tags: [ 'hikvision' ] }
 - { import_role: { name: "config/jupiter/roles/snapcast" }, tags: [ 'snapcast' ] }

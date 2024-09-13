@@ -1,73 +1,141 @@
-- name: ensure user and group exists
+- name: "create user and group => user or group does not exists"
   vars:
-    user: { name: "unifi", system: true, home: "{{global_etc}}unifi" }
+    user: { name: "unifi", system: true, home: "{{   global_etc }}unifi" }
     group: { name: "unifi", system: true }
   include_tasks: roles/user/shared/add_system_user.yml
+  when: "'unifi' not in system_users or 'unifi' not in system_groups"
+  
+- name: "create user and group => user or group does not exists"
+  vars:
+    user: { name: "mongo", system: true, home: "{{ global_log }}mongo" }
+    group: { name: "mongo", system: true }
+  include_tasks: roles/user/shared/add_system_user.yml
+  when: "'mongo' not in system_users or 'mongo' not in system_groups"
 
 - name: set unifi version
   set_fact:
-    unifi_version: "8.0.24-ls220"
+    unifi_version: "8.4.62-ls64"
+    mongo_version: "8.0.0-rc20-noble"
     unifi_uid: "{{system_users['unifi'].id}}"
     unifi_user: "{{system_users['unifi'].name}}"
     unifi_gid: "{{system_groups['unifi'].id}}"
     unifi_group: "{{system_groups['unifi'].name}}"
+    mongo_user: "{{system_users['mongo'].name}}"
+    mongo_group: "{{system_groups['mongo'].name}}"
   tags: [ 'update_notifier_configs' ]
-
-- name: prepare needed config folder
+   
+- name: prepare needed folder
   file:
-    path:  "{{item}}"
+    path: '{{item.path}}'
     state: directory
-    owner: "{{unifi_user}}"
-    group: "{{unifi_group}}"
-    mode: 0750
+    owner: "{{item.user}}"
+    group: "{{item.group}}"
+    mode: "{{item.mode}}"
   with_items:
-    - "{{global_etc}}unifi"
+    - { user: "{{unifi_user}}", group: "{{unifi_group}}", mode: "u=rwx,g=rx,o=", path: "{{global_etc}}unifi" }
+    - { user: "{{mongo_user}}", group: "{{mongo_group}}", mode: "u=rwx,g=rx,o=", path: "{{global_lib}}mongo" }
+    - { user: "{{mongo_user}}", group: "{{mongo_group}}", mode: "u=rwx,g=rx,o=", path: "{{global_opt}}mongo" }
+  notify:
+    - restart mongo
+    - restart unifi
+    
+- name: copy config
+  template:
+    src: "templates/container/init-mongo.sh"
+    dest: "{{global_opt}}mongo/init-mongo.sh"
+    owner: "{{mongo_user}}"
+    group: "{{mongo_group}}"
+    mode: 0755
+  notify: "restart mongo"
 
-- name: check started docker
-  systemd:
-    name: docker
-    state: started
+- name: create container service
+  vars:
+    container_name: "mongo"
+    container_image: "docker.io/mongo:{{mongo_version}}"
+    container_network: "isolated"
+    container_ip: "{{podman_mongo_ip}}"
+    container_exposed_ports:
+      - "27017/tcp"
+    container_env:
+      TZ: "{{timezone}}"
+      MONGO_INITDB_ROOT_USERNAME: "{{mongo_root_username}}"
+      MONGO_INITDB_ROOT_PASSWORD: "{{mnongo_root_password}}"
+      MONGO_USER: "{{unifi_mongo_user}}"
+      MONGO_PASS: "{{unifi_mongo_password}}"
+      MONGO_DBNAME: "{{unifi_mongo_db}}"
+      MONGO_AUTHSOURCE: admin
+    container_volumes:
+      - '{{global_lib}}mongo:/data/db'
+      - '{{global_opt}}mongo/init-mongo.sh:/docker-entrypoint-initdb.d/init-mongo.sh:ro'
+    container_readyness: { "type": "port_check", "ip": "{{podman_mongo_ip}}", "port": "27017" }
+  include_tasks: roles/container/shared/create_podman_service.yml
+  tags: ['podman_container','systemd_watcher_config','systemd_service_config']
 
-- name: create docker container
-  docker_container:
-    name: unifi
-    image: "linuxserver/unifi-controller:{{unifi_version}}"
-    state: present
-    env:
+- name: prepare published_ports
+  set_fact:
+    unifi_published_ports:  |
+      [
+        "28443:8443",
+        "28080:8080",
+        "3478:3478/udp",
+        "10001:10001/udp",
+        {% if default_server_ipv6 is defined %}
+          "[::]:28443:8443",
+          "[::]:28080:8080",
+          "[::]:3478:3478/udp",
+          "[::]:10001:10001/udp",
+        {% endif %}
+      ]
+  tags: ['firewall_config']
+
+- name: create container service
+  vars:
+    container_name: "unifi"
+    container_image: "linuxserver/unifi-network-application:{{unifi_version}}"
+    container_network: "isolated"
+    container_ip: "{{podman_unifi_ip}}"
+    container_published_ports: "{{unifi_published_ports}}"
+    container_env:
       TZ: "{{timezone}}"
       PUID: "{{unifi_uid}}"
       PGID: "{{unifi_gid}}"
+      MONGO_USER: "{{unifi_mongo_user}}"
+      MONGO_PASS: "{{unifi_mongo_password}}"
+      MONGO_HOST: "mongo"
+      MONGO_PORT: 27017
+      MONGO_DBNAME: "{{unifi_mongo_db}}"
+      MONGO_AUTHSOURCE: admin
       MEM_LIMIT: "1024"
-    log_driver: journald
-    log_options:
-      tag: unifi
-    container_default_behavior: "compatibility"
-    network_mode: "default"
-    networks:
-      - name: "isolated"
-        ipv4_address: "{{docker_unifi_ip}}"
-    networks_cli_compatible: yes
-    volumes:
-      - '{{global_etc}}unifi/:/config:z'
-    published_ports:
-      - "3478:3478/udp"
-      - "10001:10001/udp"  
-      - "28080:8080"
-      - "28443:8443"
-  notify: "restart unifi"
+    container_volumes:
+      - '{{global_etc}}unifi/:/config'
+    container_after: [ "mongo" ]
+    container_readyness: { "type": "port_check", "ip": "{{podman_unifi_ip}}", "port": "8080" }
+  include_tasks: roles/container/shared/create_podman_service.yml
+  tags: ['podman_container','systemd_watcher_config','systemd_service_config']
 
-- name: allow unifi service
+- name: allow container service
   vars:
-    name: "unifi"
-    rules:      
-      - "saddr {{docker_unifi_ip}} proto tcp dport 443"
+    service_name: "unifi"
+    nat_rules: { ip: "{{podman_unifi_ip}}", ports: "{{unifi_published_ports}}" }
+    network_to_host_rules:
+      - { protocol: "tcp", dport: "10001", comment: "AP discovery port" }
+    container_to_container_rules:
+      - { saddr: "{{podman_unifi_ip}}", daddr: "{{podman_mongo_ip}}", protocol: "tcp", dport: "27017", comment: "unifi => mongo" }
+    container_to_outside_rules:
+      - { saddr: "{{podman_unifi_ip}}", protocol: "tcp", dport: "443", comment: "unifi => external" }
   include_tasks: roles/firewall/shared/allow_service.yml
-  tags: [ 'firewall_config' ]
+  tags: ['firewall_config']
+
+- name: add container name
+  vars:
+    host_name: "mongo"
+    host_ip_address: "{{podman_mongo_ip}}"
+  include_tasks: roles/_shared/add_to_hosts.yml
 
 - name: add container name
   vars:
     host_name: "unifi"
-    host_ip_address: "{{docker_unifi_ip}}"
+    host_ip_address: "{{podman_unifi_ip}}"
   include_tasks: roles/_shared/add_to_hosts.yml
   
 # ***** FINALIZE *****    
@@ -92,16 +160,6 @@
   include_tasks: roles/fluentd/shared/add_config.yml
   tags: ['fluentd_config']
   when: "monitoring_enabled"
-    
-- name: create systemd service
-  vars:
-    container_name: "unifi"
-  include_tasks: roles/container/shared/add_docker_service.yml
-  
-- name: register service watcher
-  vars:
-    name: "unifi"
-  include_tasks: roles/systemd_watcher/shared/add_watcher.yml
 
 - name: register unifi update notifier
   vars:
@@ -113,10 +171,4 @@
       pattern: "^([0-9\\.]+)-ls([0-9]+)$"
     }
   include_tasks: roles/update_service/shared/add_software.yml
-
-- name: trigger unifi handler
-  vars:
-    notify: "restart unifi"
-    service: "unifi.service"
-  include_tasks: roles/_shared/service_check.yml
 

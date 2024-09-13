@@ -681,6 +681,25 @@ default_variables: {
     ghostfolio_postgres_password:             { dependency: "{{ghostfolio_enabled}}" },
     # **** END GHOSTFOLIO                                                              ***
     # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    
+    # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    # **** BEGIN UNIFI                                                                 ***
+    # The Unifi-network-application software is a powerful, enterprise wireless software
+    # engine ideal for high-density client deployments requiring low latency and high 
+    # uptime performance. 
+    # Roles:
+    # - 'unifi'
+    unifi_enabled:                            { default: no },                                                     # disabled by default   
+    mongo_root_username:                      { "default": "root",
+                                                dependency: "{{unifi_enabled}}" },
+    mnongo_root_password:                     { dependency: "{{unifi_enabled}}" },
+    unifi_mongo_user:                         { "default": "unifi",
+                                                dependency: "{{unifi_enabled}}" },
+    unifi_mongo_password:                     { dependency: "{{unifi_enabled}}" },
+    unifi_mongo_db:                           { "default": "unifi",
+                                                dependency: "{{unifi_enabled}}" },
+    # **** END FIREFLY III                                                             ***
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 }
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -778,7 +797,8 @@ podman_mimic3_ip:                 "172.16.0.214"
 podman_fireflyiii_core_ip:        "172.16.0.215"
 podman_fireflyiii_importer_ip:    "172.16.0.216"
 podman_ghostfolio_ip:             "172.16.0.217"
-docker_jekyll_ip:                 "172.16.0.218"
+podman_jekyll_ip:                 "172.16.0.218"
+podman_mongo_ip:                  "172.16.0.219"
 
 podman_vcontrold_ip:              "172.16.0.230"
 
