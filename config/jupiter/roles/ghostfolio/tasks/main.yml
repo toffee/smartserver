@@ -32,6 +32,8 @@
     container_to_container_rules:
       - { saddr: "{{podman_ghostfolio_ip}}", daddr: "{{podman_postgres_ip}}", protocol: "tcp", dport: "5432", comment: "ghostfolio => postgres" }
       - { saddr: "{{podman_ghostfolio_ip}}", daddr: "{{podman_redis_ip}}", protocol: "tcp", dport: "6379", comment: "ghostfolio => redis" }
+    container_to_outside_rules:
+      - { saddr: "{{podman_ghostfolio_ip}}", protocol: "tcp", dport: "443", oif: "{{default_network_interface}}", comment: "ghostfolio => external - Yahoo Finance" }
   include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
 

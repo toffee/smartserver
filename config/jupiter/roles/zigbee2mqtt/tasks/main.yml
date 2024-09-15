@@ -67,6 +67,7 @@
       - { saddr: "{{podman_zigbee2mqtt_ip}}", daddr: "{{podman_mosquitto_ip}}", protocol: "tcp", dport: "1883", comment: "zigbee2mqtt => mosquitto" }
     container_to_outside_rules:
       - { saddr: "{{podman_zigbee2mqtt_ip}}", daddr: "{{zigbee_adapter_ip}}", protocol: "tcp", dport: "6638", comment: "zigbee2mqtt => zigbee-adapter" }
+      - { saddr: "{{podman_zigbee2mqtt_ip}}", protocol: "tcp", dport: "443", oif: "{{default_network_interface}}", comment: "zigbee2mqtt => external - OTA update checks" }
   include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
 

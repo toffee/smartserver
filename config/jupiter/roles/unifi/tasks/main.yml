@@ -123,7 +123,7 @@
       - { saddr: "{{podman_unifi_ip}}", daddr: "{{podman_mongo_ip}}", protocol: "tcp", dport: "27017", comment: "unifi => mongo" }
       - { saddr: "{{podman_unifi_ip}}", daddr: "224.0.0.22", comment: "unifi => IGMPv3 multicast report address" }
     container_to_outside_rules:
-      - { saddr: "{{podman_unifi_ip}}", protocol: "tcp", dport: "443", comment: "unifi => external" }
+      - { saddr: "{{podman_unifi_ip}}", protocol: "tcp", dport: "443", oif: "{{default_network_interface}}", comment: "unifi => external" }
   include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
 

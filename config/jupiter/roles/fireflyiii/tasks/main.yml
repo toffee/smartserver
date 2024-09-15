@@ -117,6 +117,7 @@
       - { saddr: "{{podman_fireflyiii_importer_ip}}", daddr: "{{podman_fireflyiii_core_ip}}", protocol: "tcp", dport: "8080", comment: "fireflyiii-importer => fireflyiii-core" }
     container_to_outside_rules:
       - { saddr: "{{podman_fireflyiii_importer_ip}}", protocol: "tcp", dport: "443", oif: "{{default_network_interface}}", comment: "fireflyiii-importer => external bankaccountdata.gocardless.com provider" }
+      - { saddr: "{{podman_fireflyiii_importer_ip}}", protocol: "tcp", dport: "465", oif: "{{default_network_interface}}", comment: "fireflyiii-importer => external - mail server" }
   include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
 
