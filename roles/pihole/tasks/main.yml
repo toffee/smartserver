@@ -64,6 +64,14 @@
     group: "{{system_groups['pihole'].name}}"
     mode: 0640
 
+#- name: copy resolv.conf
+#  copy:
+#    src: "templates/resolv.conf"
+#    dest: "{{ global_etc }}pihole/resolv.conf"
+#    owner: "root"
+#    group: "root"
+#    mode: 0644
+
 - name: create container service
   vars:
     container_name: "pihole"
@@ -74,6 +82,12 @@
     container_network: "macvlan"
     container_ip: "{{pihole_ip}}"
     container_ip6: "{{pihole_ipv6 if pihole_ipv6 is defined else ''}}"
+    container_dns: |
+      [
+        {% for dns_forward_ip_address in dns_forward_ip_addresses %}
+            '{{dns_forward_ip_address}}',
+        {% endfor %}
+      ]
     container_exposed_ports:
       - "53/tcp"
       - "53/udp"
@@ -113,6 +127,7 @@
     container_volumes:
       - '{{ global_etc }}pihole/:/etc/pihole/'
       - '{{ global_etc }}pihole/dnsmasq.d/:/etc/dnsmasq.d/'
+#      - '{{ global_etc }}pihole/resolv.conf/:/etc/resolv.conf'
       - '{{ global_lib }}pihole/:/var/lib/pihole/'
     container_readyness: { "type": "port_check", "ip": "{{pihole_ip}}", "port": "80" }
   include_tasks: roles/container/shared/create_podman_service.yml
