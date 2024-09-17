@@ -1,12 +1,7 @@
 # double check for new versions if "copy patch" is still needed
 - name: set version
   set_fact:
-    nextcloud_version: '29.0.7' # patches in "enable_apps" beim nächsten Update überprüfen
-
-    # 1. check for news update (blocker)
-    # 2. upgrade keeweb at the same time
-    # 3. PHP can be updated after too, to version 8.3
-    #nextcloud_version: '28.0.1'
+    nextcloud_version: '30.0.0' # patches in "enable_apps" beim nächsten Update überprüfen
   tags: [ 'update_notifier_config', 'user' ]
 
 # ***** PREPARE FOLDER *****
@@ -165,15 +160,16 @@
     mode: 0640  
 
 # ***** INITIALIZE OLD - POST *****
-- name: upgrade existing database => database exists and nextcloud version changed
-  shell: "podman exec php sh -c \"php {{htdocs_path}}nextcloud/occ upgrade\""
+- name: upgrade => nextcloud version changed
+  shell: "podman exec php sh -c \"php {{htdocs_path}}nextcloud/occ {{item}}\""
+  with_items:
+      - "upgrade"
+      - "db:add-missing-indices"
+      - "db:add-missing-primary-keys"
+      - "db:add-missing-columns"
+      - "maintenance:repair --include-expensive"
   when: "current_nextcloud_version != installed_nextcloud_version"
 
-#occ db:add-missing-indices
-#occ db:add-missing-primary-keys
-#occ db:convert-filecache-bigint
-#occ db:add-missing-columns
-  
 # ***** UPDATE USERS *****
 - name: check for existing users
   shell: "podman exec php sh -c \"php {{htdocs_path}}nextcloud/occ user:list\" | grep -o \"\\- [a-zA-Z0-9]*:\" | grep -o \"[a-zA-Z0-9]*\""
