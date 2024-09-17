@@ -56,7 +56,7 @@
   vars:
     service_name: "pgadmin"
     container_to_container_rules:
-      - { saddr: "{{podman_pgadmin_ip}}", daddr: "{{podman_postgres_ip}}", protocol: "tcp", dport: "5432", comment: "pgadmin => pastgres" }
+      - { saddr: "{{podman_pgadmin_ip}}", daddr: "{{podman_postgres_ip}}", protocol: "tcp", dport: "5432", comment: "pgadmin => postgres" }
   include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
 
