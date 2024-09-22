@@ -77,7 +77,7 @@
     image_name: "custom_ci_service:{{alpine_version}}"
     image_files:
       - roles/ci_service/templates/container/Dockerfile
-    entrypoint_services:
+    entrypoint_startup:
       - "/opt/shared/python/install.py"
       - "{{global_opt}}ci_service/ci_service &"
   include_tasks: roles/container/shared/build_podman_image.yml
@@ -157,7 +157,7 @@
 - name: create check cron job
   vars:
     name: "Continues integration job"
-    cmd: "podman exec ci_service sh -c \"{{global_opt}}ci_service/ci_job_handler start > /dev/null\""
+    cmd: "podman exec ci_service {{global_opt}}ci_service/ci_job_handler start > /dev/null"
     group: "ci_service"
     log: "job"
     minute: "*/5"
