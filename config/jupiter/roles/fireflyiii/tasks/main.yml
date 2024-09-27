@@ -146,7 +146,7 @@
 - name: create cron job
   vars:
     name: "Firefly III Importer cron job"
-    cmd: "podman exec --user www-data fireflyiii-importer sh -c \"php artisan importer:auto-import /var/www/html/storage/configurations/; exit 0\""
+    cmd: "podman exec --user www-data fireflyiii-importer php artisan importer:auto-import /var/www/html/storage/configurations/; exit 0"
     group: "fireflyiii"
     hour: "8"
     minute: "30"

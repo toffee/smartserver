@@ -81,7 +81,7 @@
 - name: create cron job
   vars:
     name: "Postgres Core Backup"
-    cmd: "set -o pipefail && podman exec postgres sh -c \"pg_dump postgres\" | bzip2 -c > {{database_backup_path}}postgres/postgres_$(date +\\%Y-\\%m-\\%d).sql.bz2"
+    cmd: "set -o pipefail && podman exec postgres pg_dump postgres | bzip2 -c > {{database_backup_path}}postgres/postgres_$(date +\\%Y-\\%m-\\%d).sql.bz2"
     group: "postgres"
     log: "dump_postgres"
     hour: "2"
