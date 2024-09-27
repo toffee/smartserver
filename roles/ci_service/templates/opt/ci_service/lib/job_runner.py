@@ -176,24 +176,21 @@ class JobRunner:
                     if e.getDetails() is not None:
                         self._writeWrapppedLog(lf, e.getDetails())
 
+                    cmd_r = []
+                    for key in env:
+                        cmd_r.append("- export {}={}".format(key, env[key]))
+                    cmd_r.append("- {}".format(self._fmtCmd(e.getCmd())))
+                    runtime = timedelta(seconds=duration)
                     if statuscode == "success":
-                        msg = "Command '{}' finished successful after {}.".format(self._fmtCmd(e.getCmd()),timedelta(seconds=duration))
-                        logging.info(msg)
-                        self._writeWrapppedLog(lf, msg)
+                        logging.info("Command '{}' finished successful after {}.".format(self._fmtCmd(e.getCmd()),runtime))
+                        self._writeWrapppedLog(lf, "Command finished successful after {}.".format(runtime) + "\n" + "\n".join(cmd_r) )
                     else:
-                        msg = "Command '{}' stopped unsuccessful ({}) after {}.".format(self._fmtCmd(e.getCmd()),e.getExitCode(),timedelta(seconds=duration))
+                        msg = "Command '{}' stopped unsuccessful ({}) after {}.".format(self._fmtCmd(e.getCmd()),e.getExitCode(),runtime)
                         if self.job.isTerminated():
                             logging.info("{} ({})".format(msg,e.getDetails()))
                         else:
                             logging.error("{} ({})".format(msg,e.getDetails()))
-                        self._writeWrapppedLog(lf, msg)
-
-                    env_r = []
-                    for key in env:
-                        env_r.append("{}={}".format(key, env[key]))
-                    msg = "Used ENV: '{}'".format(" ".join(env_r))
-                    logging.info(msg)
-                    self._writeWrapppedLog(lf, msg)
+                        self._writeWrapppedLog(lf, "Command stopped unsuccessful ({}) after {}.".format(e.getExitCode(),runtime) + "\n" + "\n".join(cmd_r))
 
                     # DEPLOYMENT CLEANUP
                     lf.writeRaw("\n")

@@ -14,6 +14,8 @@ import os
 from datetime import datetime, timedelta
 
 from smartserver.confighelper import ConfigHelper
+from smartserver.metric import Metric
+
 
 class Blocklists(threading.Thread):
     def __init__(self, config, influxdb):
@@ -197,20 +199,20 @@ class Blocklists(threading.Thread):
         self.check_map = check_map
 
         end = time.time()
-        logging.info("Rebuild malware check map in {} seconds".format(round(end-start,2)))
+        logging.info("Rebuild blocklists check map in {} seconds".format(round(end-start,2)))
 
     def check(self, ip):
         return self.check_map[ip] if ip in self.check_map else None
 
     def getStateMetrics(self):
-        metrics = [
-            "system_service_process{{type=\"trafficwatcher.malware\",}} {}".format("1" if self.is_running else "0")
+        metrics = [ 
+            Metric.buildProcessMetric("system_service", "trafficwatcher.blocklists", "1" if self.is_running else "0")
         ]
 
         for name, config in self.configs.items():
-            metrics.append("system_service_blocklists{{listname=\"{}\",type=\"state\"}} {}".format(name, 1 if ( name in self.map_modified and self.map_modified[name] > time.time() - self.max_list_age ) else 0))
-            metrics.append("system_service_blocklists{{listname=\"{}\",type=\"last_modified\"}} {}".format(name, self.map_modified[name] if name in self.map_modified else 0))
-            metrics.append("system_service_blocklists{{listname=\"{}\",type=\"entries\"}} {}".format(name, len(self.map_data[name].keys())))
-            metrics.append("system_service_state{{type=\"trafficwatcher.malware\",details=\"{}_file\"}} {}".format(name, "1" if self.valid_dump_file[name] else "0"))
+            metrics.append(Metric.buildStateMetric("system_service", "trafficwatcher.blocklists", "cache_file", "1" if self.valid_dump_file[name] else "0", { "listname": name, "file": "{}".format(name) } ))
+            metrics.append(Metric.buildStateMetric("system_service", "trafficwatcher.blocklists", "not_outdated", "1" if ( name in self.map_modified and self.map_modified[name] > time.time() - self.max_list_age ) else "0", { "listname": name }))
+            metrics.append(Metric.buildDataMetric("system_service", "trafficwatcher.blocklists", "last_modified", self.map_modified[name] if name in self.map_modified else 0, { "listname": name } ))
+            metrics.append(Metric.buildDataMetric("system_service", "trafficwatcher.blocklists", "entries", len(self.map_data[name].keys()), { "listname": name }))
 
         return metrics

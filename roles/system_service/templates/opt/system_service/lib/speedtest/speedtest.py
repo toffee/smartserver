@@ -11,6 +11,8 @@ import logging
 from datetime import datetime
 
 from smartserver import command
+from smartserver.metric import Metric
+
 
 class Speedtest():
     def __init__(self, config, handler, mqtt, influxdb, info ):
@@ -159,16 +161,13 @@ class Speedtest():
 
     def getStateMetrics(self):
         metrics = []
-
         if self.resultUp != -1:
-            metrics.append("system_service_speedtest{{type=\"upstream_rate\"}} {}".format(self.resultUp))
+            metrics.append(Metric.buildDataMetric("system_service", "speedtest", "upstream_rate", self.resultUp))
         if self.resultDown != -1:
-            metrics.append("system_service_speedtest{{type=\"downstream_rate\"}} {}".format(self.resultDown))
+            metrics.append(Metric.buildDataMetric("system_service", "speedtest", "downstream_rate", self.resultDown))
         if self.resultPing != -1:
-            metrics.append("system_service_speedtest{{type=\"ping\"}} {}".format(self.resultPing))
-
-        metrics.append("system_service_process{{type=\"speedtest\",}} {}".format("1" if self.is_running else "0"))
-
+            metrics.append(Metric.buildDataMetric("system_service", "speedtest", "ping", self.resultPing))
+        metrics.append(Metric.buildProcessMetric("system_service", "speedtest", "1" if self.is_running else "0"))
         return metrics
 
     def isTesting(self):

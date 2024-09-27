@@ -16,6 +16,7 @@ from lib.ipcache import IPCache
 
 import os
 from smartserver.confighelper import ConfigHelper
+from smartserver.metric import Metric
 
 
 class Info(threading.Thread):
@@ -197,9 +198,10 @@ class Info(threading.Thread):
         return []
 
     def getStateMetrics(self):
-        return [
-            "system_service_info{{type=\"wan_active\"}} {}".format("1" if self.wan_active else "0"),
-            "system_service_info{{type=\"default_isp\"}} {}".format("1" if self.default_isp_connection_active else "0"),
-            "system_service_process{{type=\"info\",}} {}".format("1" if self.is_running else "0")
+        return [ 
+            Metric.buildProcessMetric("system_service", "info", "1" if self.is_running else "0"),
+            Metric.buildStateMetric("system_service", "info", "cache_file", "1" if self.valid_cache_file else "0"),
+            Metric.buildDataMetric("system_service", "info", "wan_active", "1" if self.wan_active else "0"),
+            Metric.buildDataMetric("system_service", "info", "default_isp", "1" if self.default_isp_connection_active else "0")
         ]
 
