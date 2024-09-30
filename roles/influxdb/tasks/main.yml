@@ -41,9 +41,10 @@
     container_exposed_ports:
       - "8086/tcp"
     container_volumes:
-      - '{{ global_etc }}influxdb:/etc/influxdb2'
-      - '{{ global_lib }}influxdb:/var/lib/influxdb2'
-      - '{{database_backup_path}}influxdb:/var/lib/influxdb_backup'
+      # /etc/influxdb2 must be writeable, because influxdb will place its config there
+      - '{{ global_etc }}influxdb:/etc/influxdb2:rw'
+      - '{{ global_lib }}influxdb:/var/lib/influxdb2:rw'
+      - '{{database_backup_path}}influxdb:/var/lib/influxdb_backup:rw'
     container_readyness: { "type": "url_check", "url": "http://{{podman_influxdb_ip}}:8086/ping" }
   include_tasks: roles/container/shared/create_podman_service.yml
   tags: ['podman_container','systemd_watcher_config','systemd_service_config']
@@ -60,7 +61,7 @@
     name: "Influxdb Cleanup"
     cmd: "find {{database_backup_path}}influxdb/ -mindepth 1  -type d -mtime +3 -exec rm -rf {} +;"
     group: "influxdb"
-    log: "dump_cleanup"
+    subgroup: "dump_cleanup"
     hour: "0"
     minute: "45"
   include_tasks: roles/cron/shared/add_cronjob.yml
