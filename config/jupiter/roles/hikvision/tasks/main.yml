@@ -1,67 +1,48 @@
-- name: install required packages => is_suse
-  zypper:
-    name: [
-         python3-systemd
-    ]
-    state: present
-  when: is_suse|bool 
+- name: set version
+  set_fact:
+    hikvision_doorbell_version: "3.0.16-amd64"
+  tags: [ 'update_notifier_config' ]
 
-- name: install required python pip modules
-  pip:
-    name: [
-        paho-mqtt
-    ]
-    executable: "pip3"
-  
-- name: prepare needed folder
-  file:
-    path: "{{item.path}}"
-    state: directory
-    owner: root
-    group: root
-    mode: "{{item.mode}}"
-  with_items:
-    - { mode: "u=rwx,g=rx,o=", path: "/opt/hikvision" }
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{global_etc}}hikvision_doorbell" }
+  include_tasks: roles/_shared/create_directories.yml
     
-- name: synchronize lib dir
-  synchronize:
-    src: "templates/opt/hikvision/{{item.path}}"
-    dest: "/opt/hikvision/"
-    archive: no
-    checksum: yes
-    group: yes
-    owner: yes
-    perms: yes
-    recursive: yes
-    rsync_opts:
-      - "--chown=root:root"
-      - "--chmod={{item.chmod}}"
-  with_items:
-    - { "chmod": "D750,F640", "path": "lib" }
-    
-- name: copy files
+- name: copy config
   template:
-    src: "templates{{item.path}}"
-    dest: "{{item.path}}"
-    owner: root
-    group: root
-    mode: "{{item.mode}}"
-  with_items:
-    - { mode: "u=rwx,g=rx,o=rx", path: "/opt/hikvision/hik.py" }
-    - { mode: "u=rwx,g=rx,o=rx", path: "/opt/hikvision/hcnetsdk.py" }
-    - { mode: "u=rw,g=r,o=r", path: "/etc/systemd/system/hikvision.service" }
-  notify: "restart hikvision"
-  
-# ***** FINALIZE *****
-- name: register systemd service watcher
-  vars:
-    watcher_name: "hikvision"
-  include_tasks: roles/systemd_watcher/shared/add_watcher.yml
-  when: "is_production|bool" # restart handler is also disabled if no production
+    src: "templates/etc/config.yml"
+    dest: "{{global_etc}}hikvision_doorbell/config.yml"
+    owner: "root"
+    group: "root"
+    mode: 0750
+  notify: "restart hikvision_doorbell"
 
-- name: trigger hikvision handler
+- name: create container service
   vars:
-    notify: "restart hikvision"
-    service: "hikvision.service"
-  include_tasks: roles/_shared/service_check.yml
-  when: "is_production|bool" # restart handler is also disabled if no production
+    container_name: "hikvision_doorbell"
+    container_image: "pergolafabio/hikvision-doorbell:{{hikvision_doorbell_version}}"
+    container_network: "host"
+    container_no_healthcheck: yes
+    container_env:
+      CONFIG_FILE_PATH: "/etc/hikvision_doorbell/config.yml"
+    container_volumes:
+      - '{{global_etc}}hikvision_doorbell:/etc/hikvision_doorbell:ro'
+    container_after: [ "mosquitto" ]
+    container_readyness: { "type": "state_check" }
+  include_tasks: roles/container/shared/create_podman_service.yml
+  tags: ['podman_container','systemd_watcher_config','systemd_service_config']
+  
+# ***** DEPENDENCY CONFIGS *****
+- name: register update notifier
+  vars:
+    name: "hikvision_doorbell"
+    type: "docker"
+    url: "https://hub.docker.com/r/pergolafabio/hikvision-doorbell"
+    config: { 
+      repository: "pergolafabio/hikvision-doorbell", 
+      pattern: "^([0-9\\.]+)-amd64$"
+    }
+  include_tasks: roles/update_service/shared/add_software.yml
+  tags: ['update_notifier_config']
+  when: "update_service_software_check_enabled"

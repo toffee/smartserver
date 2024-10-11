@@ -1,9 +1,8 @@
-- name: restart hikvision
+- name: restart hikvision_doorbell
   systemd:
-    name: hikvision
+    name: hikvision_doorbell
     state: restarted
     daemon_reload: yes
     enabled: yes
     masked: no
-  listen: "restart hikvision"
-  when: "is_production|bool"
+  listen: "restart hikvision_doorbell"

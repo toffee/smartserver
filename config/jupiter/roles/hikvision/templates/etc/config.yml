@@ -1,0 +1,28 @@
+# Default configuration file used if the application is run outside of an HA addon (for instance as a standalone container).
+
+# If you want to customize the settings, copy this file and set you own values
+# Each option can be overridden by settings environment variables using __ as delimiter for nesting the object.
+# For example to set system.log_level to DEBUG use the env variable SYSTEM__LOG_LEVEL=DEBUG
+
+# By default no doorbells are defined
+# For a full list of options, have a look at the docs
+doorbells:
+  - name: "gate"
+    ip: "{{custom_camera_09_ip}}"
+    port: 8000
+    username: "{{custom_camera_09_username}}"
+    password: "{{custom_camera_09_password}}"
+
+# Define the following options to enable the MQTT integration
+mqtt:
+  host: "{{podman_mosquitto_ip}}"
+  # Optionals settings:
+  port: 1883
+#  ssl: <boolean>  # Set to true to enable SSL
+#  username: <user>
+#  password: <password>
+
+# Configure general system options
+system:
+  log_level: INFO
+  sdk_log_level: NONE
