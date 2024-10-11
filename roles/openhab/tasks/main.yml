@@ -124,24 +124,19 @@
       - "--chown={{system_users['openhab'].name}}:{{system_groups['openhab'].name}}"
       - "--chmod=F640"
   when: "habpanel_result.rc == 0"
-
-- stat:
-    path: "{{projects_path}}openhab_config/userdata/jsondb"
-  register: jsondb_dir
-
+  
 - name: set symbolic link to jsondb files
-  file:
-    src: "{{projects_path}}openhab_config/userdata/{{item}}"
-    dest: "{{global_lib}}/openhab/{{item}}"
+  file: 
+    src: "{{projects_path}}openhab_config/userdata/jsondb/{{item}}"
+    dest: "{{global_lib}}/openhab/jsondb/{{item}}"
     state: link
     follow: no
-    owner: "{{openhab_user}}"
-    group: "{{openhab_group}}"
+    owner: "{{system_users['openhab'].name}}"
+    group: "{{system_groups['openhab'].name}}"
   with_items:
-    - "jsondb/automation_rules.json"
-    - "jsondb/uicomponents_ui_page.json"
-    - "jsondb/uicomponents_ui_widget.json"
-  when: jsondb_dir.stat.stat.isdir is defined and jsondb_dir.stat.stat.isdir
+    - "automation_rules.json"
+    - "uicomponents_ui_page.json"
+    - "uicomponents_ui_widget.json"
 
 # addons folder
 - name: copy addons folder

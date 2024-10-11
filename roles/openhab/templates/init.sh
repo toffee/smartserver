@@ -10,3 +10,6 @@ if ! grep -q "name=\"org.eclipse.jetty.util.ssl.SslContextFactory.config\"" /ope
     # https://community.openhab.org/t/weak-cipher-suite-warnings/157840
     sed -i 's/<\/Loggers>/\n\t\t<Logger level="ERROR" name="org.eclipse.jetty.util.ssl.SslContextFactory.config"\/>\n\t<\/Loggers>/g' /openhab/userdata/etc/log4j2.xml
 fi
+
+apt-get update
+apt-get install -y ffmpeg
