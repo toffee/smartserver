@@ -29,7 +29,7 @@
       debug:
         msg: 
           - "flags:      is_suse: {{is_suse}}, is_rhel: {{is_rhel}}, is_fedora: {{is_fedora}}, is_ubuntu: {{is_ubuntu}}"
-          - "os-name:    {{ansible_distribution}} {{ansible_distribution_version}} ({{ansible_distribution_release}})"
+          - "os-name:    {{ansible_distribution}} {{ansible_distribution_version}} ({{ansible_distribution_release}}) - {{ansible_architecture}}"
           - "-------------------------------------------------------------"
           - "mode:       {{inventory_hostname}}"
           - "server:     {{default_server_ip}}{{ ( ', ' + default_server_ipv6 ) if default_server_ipv6 is defined else '' }}"
@@ -104,7 +104,8 @@
 
     - { import_role: { name: hardware_mdadm },                                               tags: [ 'hardware_mdadm' ],                                     when: "monitoring_enabled and mdraid_exists" }     # raid weekly check cron job
     - { import_role: { name: hardware_smartd },                                              tags: [ 'hardware_smartd' ],                                    when: "monitoring_enabled" }                       # disk monitoring & checks
-    - { import_role: { name: hardware_sensors },                                             tags: [ 'hardware_sensors' ],                                   when: "monitoring_enabled or netdata_enabled" }    # sensors setups
+    - { import_role: { name: hardware_sensors },                                             tags: [ 'hardware_sensors' ],                                   when: "monitoring_enabled or netdata_enabled" }    # sensors setup
+    - { import_role: { name: hardware_gpu },                                                 tags: [ 'hardware_gpu' ],                                       when: "gpu_enabled" }                              # gpu setup
 
     - { import_role: { name: container },                                                    tags: [ 'container', 'macvlan', 'alpine' ] }                                                                       # container env
 
