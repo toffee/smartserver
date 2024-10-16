@@ -7,45 +7,25 @@
     mode: 0644
   notify: "restart screenoff"
 
-# Add local firewall rules
-# * allow access from dnsmqsq container to pihole container - needed for reverse dns lookup
-# * allow docker containers to access internet (other IPs others than local one)
-# * allow docker containers (host network) to access everything - needed for jekyll (maybe too permisive)
-- name: prepare ferm rules
+- name: privileged vpn clients
   set_fact:
-    jupiter_ferm_rules: |
-      [
-      "saddr {{docker_dns_ip}} daddr {{pihole_ip}}",
-      "saddr {{docker_base_network}}/24 daddr !{{default_server_network}}",
-      "saddr 172.17.0.0/24"
+    vpn_privileged_ips: |
+      [      
+      "{{userdata['alina'].vpn_gates['phone']}}",
+      "{{userdata['alina'].vpn_gates['laptop']}}",
+      "{{userdata['alina'].vpn_gates['tablet']}}"
       ]
-  tags: [ 'firewall_config' ]
+  tags: [ 'user', 'firewall_config' ]
 
-- name: firewall local rules
+- name: specific to my installation firewall rules
   vars:
-    name: "jupiter"
-    rules: "{{jupiter_ferm_rules}}"
-    instant_activation: True
+    service_name: "jupiter"
+    container_to_outside_rules: |
+      [
+          { "saddr": {{ vpn_privileged_ips | to_json}}, "comment": "VPN clients access local network" }
+      ]
+    network_to_host_rules:
+      - { protocol: "udp", dport: "46000", comment: "fineoffsetweatherstation openHAB binding discovery port" }
+      - { protocol: "udp", dport: "54321", comment: "miio openHAB binding discovery port" }
   include_tasks: roles/firewall/shared/allow_service.yml
-  tags: [ 'firewall_config' ]
-
-- name: collect vpn other ip
-  set_fact: 
-    vpn_other_ips: "[ {{userdata['costache'].vpn_gates['tablet']}}, {{userdata['costache'].vpn_gates['phone']}} ]"
-  tags: [ 'firewall_config' ] 
-
-- name: prepare mobile vpn other ip rules
-  set_fact:
-    vpn_other_ip_rules: "{{ (vpn_other_ip_rules | default([])) + [ 'saddr ' + item ] }}"
-  with_items:
-    - "{{userdata['costache'].vpn_gates['tablet']}}"
-    - "{{userdata['costache'].vpn_gates['phone']}}"
-  tags: [ 'firewall_config' ] 
-
-- name: allow mobile vpn to some ips
-  vars:
-    name: "wireguard.mobile_vpn_other"
-    rules: "{{vpn_other_ip_rules}}"
-    is_docker: True
-  include_tasks: roles/firewall/shared/allow_service.yml
-  tags: [ 'firewall_config' ] 
+  tags: ['firewall_config']
