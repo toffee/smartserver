@@ -1,4 +1,6 @@
 {% if cloud_vpn is defined %}{% for peer in cloud_vpn.peers %}
 /{{cloud_vpn.peers[peer].notification_email}}/ {{cloud_vpn.peers[peer].notification_email}}
 {% endfor %}{% endif %}
-/.*/ {{root_email}}
+/.*@{{server_name}}/ {{root_email}}
+/root@{{server_domain}}/ {{root_email}}
+/^[^@]+$/ {{root_email}}

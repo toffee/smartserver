@@ -37,6 +37,13 @@ $CONFIG = array (
   'mail_smtppassword' => '{{mailserver_password}}',
   'mail_domain' => '{{server_domain}}',
   'mail_from_address' => 'root',
+  'mail_smtpstreamoptions' => array (
+    'ssl' => array (
+      'allow_self_signed' => true,
+      'verify_peer' => false,
+      'verify_peer_name' => false,
+    ),
+  ),
   'default_phone_region' => '{{country}}',
   'appcodechecker' => false,
   'secret' => '{{nextcloud_secret}}',
