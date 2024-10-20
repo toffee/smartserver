@@ -10,4 +10,6 @@ config/demo/backup/*
 !config/jupiter/
 config/jupiter/vault/wireguard_mobile/
 config/jupiter/vault/wireguard_cloud/
+config/jupiter/vault/fireflyiii/
+config/jupiter/vault/ssh_auth/
 config/jupiter/vault/letsencrypt.tgz
