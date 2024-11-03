@@ -1,1 +1,1 @@
-mx.Menu.getMainGroup('admin').getSubGroup('tools').addUrl('zigbee2mqtt_ui', ['admin'], '//zigbee2mqtt.{host}/', { 'order': 240, 'title': '{i18n_Zigbee2mqtt}', 'info': '{i18n_Dashboards}', 'icon': 'zigbee2mqtt_logo.svg'});
+mx.Menu.getMainGroup('admin').getSubGroup('tools').addUrl('zigbee2mqtt_ui', ['admin'], '//zigbee2mqtt.{host}/', { 'order': 240, 'title': '{i18n_Zigbee2mqtt}', 'info': '{i18n_Dashboards}', 'icon': 'zigbee2mqtt_logo.svg', 'loading_gear': false });
