@@ -147,6 +147,9 @@ default_variables: {
     # - 'hardware_sensors'
     monitoring_enabled:                       { default: yes },                                                     # enabled by default
 
+    hardware_smartd_temperature:              { default: 50,                                                        # threshold temperature for alert
+                                                dependency: "{{monitoring_enabled}}" },
+    
     # Roles:
     # - 'grafana'
     grafana_enabled:                          { default: yes },                                                     # enabled by default
