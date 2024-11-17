@@ -1,0 +1,72 @@
+- name: set version
+  set_fact:
+    pigallery2_version: '2.0.0'
+  tags: [ 'update_notifier_config' ]    
+
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_etc }}pigallery2/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_lib }}pigallery2/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_tmp }}pigallery2/" }
+  include_tasks: roles/_shared/create_directories.yml
+
+- name: copy config
+  template:
+    src: "templates/etc/{{item}}"
+    dest: "{{ global_etc }}pigallery2/{{item}}"
+    owner: root
+    group: root
+    mode: 0640
+  with_items:
+    - "config.json"
+  notify: "restart pigallery2"
+    
+- name: create container service
+  vars:
+    container_name: "pigallery2"
+    container_image: "bpatrik/pigallery2:{{pigallery2_version}}"
+    container_network: "isolated"
+    container_ip: "{{podman_pigallery2_ip}}"
+    container_exposed_ports:
+      - "80/tcp"
+    container_env:
+      TZ: "{{timezone}}"
+      NODE_ENV: "production"
+    container_volumes:
+      - '{{global_etc}}pigallery2:/app/data/config:rw'
+      - '{{global_lib}}pigallery2:/app/data/db:rw'
+      - '/mnt/ds/photo:/app/data/images:ro'
+      - '{{global_tmp}}pigallery2:/app/data/tmp:rw'
+    container_after: [ "network-online.target", "mariadb" ]
+    container_readyness: { "type": "port_check", "ip": "{{podman_pigallery2_ip}}", "port": "80" }
+  include_tasks: roles/container/shared/create_podman_service.yml
+  tags: ['podman_container','systemd_watcher_config','systemd_service_config']
+
+- name: allow container service
+  vars:
+    service_name: "pigallery2"
+    container_to_container_rules:
+      - { saddr: "{{podman_pigallery2_ip}}", daddr: "{{podman_mariadb_ip}}", protocol: "tcp", dport: "3306", comment: "pigallery2 => mariadb" }
+  include_tasks: roles/firewall/shared/allow_service.yml
+  tags: ['firewall_config']
+
+- name: add service name
+  vars:
+    host_name: "pigallery2"
+    host_ip_address: "{{podman_pigallery2_ip}}"
+  include_tasks: roles/_shared/add_to_hosts.yml
+
+- name: register webui
+  vars:
+    name: "pigallery2"
+    js_file: "templates/webui/pigallery2.js"
+    icons: [ 'templates/webui/icons/pigallery2_logo.svg' ]
+  include_tasks: roles/apache_webui/shared/add_webui.yml
+  tags: ['apache_webui_config']
+
+- name: copy service apache config
+  vars:
+    config_file: "templates/etc/apache2/_.ansible.conf.d/pigallery2.conf"
+  include_tasks: roles/apache/shared/add_config.yml
+  tags: ['apache_config']

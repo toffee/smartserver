@@ -819,6 +819,7 @@ podman_fireflyiii_importer_ip:    "172.16.0.216"
 podman_ghostfolio_ip:             "172.16.0.217"
 podman_jekyll_ip:                 "172.16.0.218"
 podman_mongo_ip:                  "172.16.0.219"
+podman_pigallery2_ip:             "172.16.0.220"
 
 podman_vcontrold_ip:              "172.16.0.230"
 

@@ -1,0 +1,8 @@
+- name: restart pigallery2
+  systemd:
+    name: pigallery2
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    masked: no
+  listen: "restart pigallery2"
