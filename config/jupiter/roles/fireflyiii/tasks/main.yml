@@ -1,7 +1,7 @@
 - name: set version
   set_fact:
-    fireflyiii_core_version: 'version-6.1.21'
-    fireflyiii_importer_version: 'version-1.5.6'
+    fireflyiii_core_version: 'version-6.1.22'
+    fireflyiii_importer_version: 'version-1.5.7'
   tags: [ 'update_notifier_config' ]
 
 - name: prepare needed folder
@@ -166,6 +166,7 @@
   vars:
     config_file: "templates/etc/apache2/_.ansible.conf.d/fireflyiii.conf"
   include_tasks: roles/apache/shared/add_config.yml
+  tags: ['apache_config']
  
 - name: copy apache vhost
   vars:
