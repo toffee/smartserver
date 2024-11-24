@@ -29,3 +29,10 @@
       - { protocol: "udp", dport: "54321", comment: "miio openHAB binding discovery port" }
   include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
+  
+# TODO (see nfs_cloud for example)
+# mount ds photo nfs share
+# mkdir /mnt/ds
+# mkdir /mnt/ds/photo
+# mount -t nfs 192.168.120.4:/volume1/photo /mnt/ds/photo
+# add to /etc/fstab: 192.168.120.4:/volume1/photo               /mnt/ds/photo      nfs   defaults      0  0
