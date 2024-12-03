@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    pigallery2_version: '2.0.0'
+    pigallery2_version: 'edge-alpine'
   tags: [ 'update_notifier_config' ]    
 
 - name: prepare needed directories
