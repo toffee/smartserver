@@ -1,3 +1,21 @@
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_log }}rsyslog/" }
+  include_tasks: roles/_shared/create_directories.yml
+  
+- name: copy config
+  template:
+    src: "templates{{item.path}}"
+    dest: "{{item.path}}"
+    owner: root
+    group: root
+    mode: "{{item.mode}}"
+  with_items:
+    - { mode: "u=rw,g=,o=", path: "/etc/rsyslog.d/01-terminus.frule" }
+    - { mode: "u=rw,g=,o=", path: "/etc/rsyslog.d/remote.conf" }
+  notify: "restart rsyslog"
+
 - name: "create systemd service"
   template:
     src: "templates/etc/systemd/system/screenoff.service"

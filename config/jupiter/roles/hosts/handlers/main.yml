@@ -6,3 +6,12 @@
     enabled: yes
     masked: no
   listen: "restart screenoff"
+
+- name: restart rsyslog
+  systemd:
+    name: rsyslog
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    masked: no
+  listen: "restart rsyslog"
