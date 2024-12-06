@@ -1,0 +1,8 @@
+#
+# terminus  messages into separate file and stop their further processing
+#
+if      ($fromhost-ip == '{{ terminus_ip }}') \
+then {
+        -{{global_log}}rsyslog/terminus.log
+        stop
+}
