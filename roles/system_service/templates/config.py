@@ -24,19 +24,15 @@ librenms_token = "{% if librenms_devices|length > 0 %}{{librenms_api_token if li
 librenms_rest = "{% if librenms_devices|length > 0 %}http://librenms:8000/api/v0/{% endif %}";
 librenms_poller_interval = {{librenms_poller_interval | int * 60}}
 
-openwrt_username = "{% if openwrt_devices|length > 0 %}{{system_service_openwrt_api_username | default('')}}{% endif %}"
-openwrt_password = "{% if openwrt_devices|length > 0 %}{{system_service_openwrt_api_password | default('')}}{% endif %}"
-openwrt_devices = [{% if openwrt_devices|length > 0 %}"{{openwrt_devices | map(attribute='host') | list | join('","') }}"{% endif %}]
+openwrt_devices = {
+{% for openwrt_device in openwrt_devices %}
+    {% if loop.index > 1 %},{% endif %}"{{openwrt_device.host}}": {"username": "{{openwrt_device.config.openwrt.api_username}}", "password": "{{openwrt_device.config.openwrt.api_password}}" }
+{% endfor %}
+}
 
-fritzbox_username = "{% if fritzbox_devices|length > 0 %}{{system_service_fritzbox_api_username}}{% endif %}"
-fritzbox_password = "{% if fritzbox_devices|length > 0 %}{{system_service_fritzbox_api_password}}{% endif %}"
-fritzbox_devices = [{% if fritzbox_devices|length > 0 %}"{{fritzbox_devices | map(attribute='host') | list | join('","') }}"{% endif %}]
-
-switch_uplinks = {
-{% for system_service_device in system_service_devices %}
-{% if system_service_device.config.system_service.switch_uplink is defined %}
-    {% if loop.index > 1 %},{% endif %}"{{system_service_device.host}}": "{{system_service_device.config.system_service.switch_uplink}}"
-{% endif %}
+fritzbox_devices = {
+{% for fritzbox_device in fritzbox_devices %}
+    {% if loop.index > 1 %},{% endif %}"{{fritzbox_device.host}}": {"username": "{{fritzbox_device.config.fritzbox.api_username}}", "password": "{{fritzbox_device.config.fritzbox.api_password}}" }
 {% endfor %}
 }
 

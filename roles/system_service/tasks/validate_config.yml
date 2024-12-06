@@ -1,11 +1,17 @@
 - name: "system_service: validate_config : process config"
   vars:
-    system_service_fields: "{{ ['switch_uplink'] }}"
+    openwrt_fields: "{{ ['api_username', 'api_password'] }}"
+    fritzbox_fields: "{{ ['api_username', 'api_password'] }}"
     system_service_device_result: |
       [
-          {% for system_service_device in system_service_devices %}
-              {% if system_service_fields | difference(system_service_device.config.system_service.keys()) | length > 0 %}
-                  "{{'<system_service_device ' + ( loop.index | string ) + '>'}}: missing system service attribute(s) {{ system_service_fields | difference(system_service_device.config.system_service.keys()) }}",
+          {% for openwrt_device in openwrt_devices %}
+              {% if openwrt_fields | difference(openwrt_device.config.openwrt.keys()) | length > 0 %}
+                  "{{'<openwrt_device ' + ( loop.index | string ) + '>'}}: missing openwrt attribute(s) {{ openwrt_fields | difference(openwrt_device.config.openwrt.keys()) }}",
+              {% endif %}
+          {% endfor %}
+          {% for fritzbox_device in fritzbox_devices %}
+              {% if fritzbox_fields | difference(fritzbox_device.config.fritzbox.keys()) | length > 0 %}
+                  "{{'<fritzbox_device ' + ( loop.index | string ) + '>'}}: missing fritzbox attribute(s) {{ fritzbox_fields | difference(fritzbox_device.config.fritzbox.keys()) }}",
               {% endif %}
           {% endfor %}
       ]
