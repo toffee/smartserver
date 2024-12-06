@@ -1,6 +1,6 @@
 - name: "disable: copy resolv.conf (external)"
   vars:
-    local_resolv_server: "{{router_ip}}"
+    local_resolv_server: "{{terminus_ip}}"
   template:
     src: templates/resolv.conf
     dest: /etc/resolv.conf
