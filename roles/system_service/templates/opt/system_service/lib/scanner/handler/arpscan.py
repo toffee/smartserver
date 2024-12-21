@@ -51,24 +51,9 @@ class DeviceChecker(threading.Thread):
 
         self.type = type
 
-        if self.type == "android":
-            self.offlineArpRetries =  1
-        else:
-            # needed for multiple calls of 'knock' during offline check time
-            self.offlineArpRetries =  int( math.floor( (timeout / 4) * 1 / 10 ) )
-          
-        # needed for multiple calls of 'ping' and 'knock' during online check time
-        self.onlineArpRetries =  int( math.floor( (timeout / 4) * 3 / 10 ) )
+        self.timeout = timeout
 
-        self.onlineArpCheckTime = int( math.floor( (timeout / 4) * 3 / self.onlineArpRetries ) )
-        self.offlineArpCheckTime = int( math.floor( (timeout / 4) * 1 / self.offlineArpRetries ) )
-        self.onlineSleepTime = timeout - (self.onlineArpRetries * self.onlineArpCheckTime)
-        self.offlineSleepTime = timeout - (self.offlineArpRetries * self.offlineArpCheckTime)
-
-        #self.lastSeen = datetime(1, 1, 1, 0, 0)
-        #self.lastPublished = datetime(1, 1, 1, 0, 0)
-        
-        #self.isOnline = None
+        self.longCheck = False
 
     def _isRunning(self):
         return self.is_running
@@ -85,15 +70,23 @@ class DeviceChecker(threading.Thread):
                     logging.warning("Resume DeviceChecker")
                     is_supended = False
                 
-                sleepTime = self.onlineSleepTime if self.stat.isOnline() else self.offlineSleepTime
-                
-                self.event.wait(sleepTime)
+                self.event.wait(60 if self.stat.isOnline() else 300)
+                self.event.clear()
                     
                 if not self._isRunning():
                     break
-                
-                timeout = self.onlineArpCheckTime if self.stat.isOnline() else self.offlineArpCheckTime
-                arpRetries = self.onlineArpRetries if self.stat.isOnline() else self.offlineArpRetries
+
+                if self.stat.isOnline():
+                    self.longCheck = True
+
+                if self.longCheck:
+                    arpRetries = 5
+                    # divided by 2, because the timeout is applied twice. One time for arpping and one time for normal ping
+                    timeout = int( math.floor( (self.timeout / arpRetries / 2 ) ) )
+                else:
+                    # non android devices neededs more retries because of for multiple calls of 'knock' during offline check time
+                    arpRetries = 1 if self.type == "android" else 3
+                    timeout = 10
                     
                 startTime = datetime.now()
                 
@@ -106,10 +99,10 @@ class DeviceChecker(threading.Thread):
                     if self.type != "android":
                         AddressHelper.knock(self.address_family,ip_address)
                         time.sleep(0.05)
-                        
+
                     methods = ["arping"]
                     answering_mac = Helper.getMacFromArpPing(ip_address, self.interface, timeout, self._isRunning)
-                    if answering_mac is None and self.stat.isOnline():
+                    if answering_mac is None and self.longCheck:
                         methods.append("ping")
                         answering_mac = Helper.getMacFromPing(ip_address, timeout, self._isRunning)
                         
@@ -140,6 +133,8 @@ class DeviceChecker(threading.Thread):
                                 self.cache.confirmStat( self, self.stat )
                                 self.cache.unlock(self)
                         break
+
+                self.longCheck = self.stat.isOnline()
                     
             except Exception as e:
                 self.cache.cleanLocks(self, events)
@@ -152,8 +147,12 @@ class DeviceChecker(threading.Thread):
                 
             if is_supended:
                 self.event.wait(900)
+                self.event.clear()
 
         logging.info("Device checker for {} stopped".format(self.device))
+
+    def wakeup(self):
+        self.event.set()
 
     def terminate(self):
         self.is_running = False
@@ -341,7 +340,7 @@ class ArpScanner(_handler.Handler):
                     for device in self.cache.getDevices():
                         if device.getMAC() in refreshed_macs:
                             continue
-                        self._checkDevice(device)
+                        self._checkDevice(device, False)
                 
                 except Exception as e:
                     self.cache.cleanLocks(self)
@@ -388,26 +387,27 @@ class ArpScanner(_handler.Handler):
         
         return [outdated, maybe_offline, ping_check]
 
-    def _checkDevice(self, device, force = False):
+    def _checkDevice(self, device, force_maybe_offline = False):
         mac = device.getMAC()
         
+        # UserIP's should be delegated to DeviceChecker
+        if mac in self.registered_devices and self.registered_devices[mac] is not None:
+            if force_maybe_offline:
+                self.registered_devices[mac].wakeup()
+            return
+
         stat = self.cache.getUnlockedDeviceStat(mac)
         if stat is None:
             logging.info("Can't check device {}. Stat is missing.".format(device))
             return
  
-        if force:
+        if force_maybe_offline:
             maybe_offline = True
             ping_check = True
         else:
             [outdated, maybe_offline, ping_check] = self._possibleOfflineStates(device, stat)
-            
             if outdated:
                 self._removeDevice(mac)
-                return
-
-            # State checke only for devices without DeviceChecker
-            if mac in self.registered_devices and self.registered_devices[mac] is not None:
                 return
 
         if maybe_offline:
@@ -473,7 +473,7 @@ class ArpScanner(_handler.Handler):
         
         if mac not in self.registered_devices:
             self.registered_devices[mac] = None
-            
+
         if self.registered_devices[mac] is not None:
             return
         
