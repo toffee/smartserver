@@ -1,6 +1,7 @@
 - name: set terminus version
   set_fact:
     terminus_version: '23.05.5'
+    tasmota_version: '14.4.1'
   tags: [ 'update_notifier_config' ]
 
 - name: prepare needed directories
@@ -69,6 +70,19 @@
       project: "openwrt/openwrt",
       pattern: "^v([0-9\\.]+[-rc0-9\\.]*)$",
       version: "v{{terminus_version}}"
+    }
+  include_tasks: roles/update_service/shared/add_software.yml
+  tags: ['update_notifier_config']
+  
+- name: register update notifier for tasmota
+  vars:
+    name: "tasmota"
+    type: "github"
+    url: "https://github.com/arendst/Tasmota/releases/"
+    config: {
+      project: "arendst/Tasmota",
+      pattern: "^v([0-9\\.]+)$",
+      version: "v{{tasmota_version}}"
     }
   include_tasks: roles/update_service/shared/add_software.yml
   tags: ['update_notifier_config']

@@ -1,6 +1,6 @@
 config softflowd
   option enabled        '1'
-  option interface      'br-lan'
+  option interface      'eth0'
   option pcap_file      ''
   option timeout        'maxlife=60'
   option max_flows      '8192'

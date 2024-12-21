@@ -47,7 +47,7 @@
 
 #https://www.zigbee2mqtt.io/devices/8718699703424.html
 '0x001788010d0ccb7d':
-  friendly_name: 'lightstrip_victor'
+  friendly_name: 'lightstrip_victor_desk'
 
 #https://www.zigbee2mqtt.io/devices/TS011F_plug_1.html
 '0xa4c1383cac785d48':
@@ -60,3 +60,7 @@
 #https://www.zigbee2mqtt.io/devices/TS011F_plug_1.html
 '0xa4c1382fe2938d45':
   friendly_name: 'socket_white'
+
+#https://www.zigbee2mqtt.io/devices/8718699703424.html
+'0x001788010e2d0936':
+  friendly_name: 'lightstrip_victor_bed'
