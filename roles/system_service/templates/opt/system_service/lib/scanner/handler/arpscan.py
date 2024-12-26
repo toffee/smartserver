@@ -371,7 +371,7 @@ class ArpScanner(_handler.Handler):
     def _possibleOfflineStates(self, device, stat):
         now = datetime.now()
  
-        validated_last_seen_diff = (now - stat.getValidatedLastSeen()).total_seconds()
+        validated_last_seen_diff = (now - (stat.getValidatedLastSeen() if stat.isValidated() else stat.getUnvalidatedLastSeen())).total_seconds()
         unvalidated_last_seen_diff = (now - stat.getUnvalidatedLastSeen()).total_seconds()
         
         # maybe offline if unvalidated check (arpping or ping) was older then "arp_soft_offline_device_timeout"
@@ -411,7 +411,10 @@ class ArpScanner(_handler.Handler):
                 return
 
         if maybe_offline:
-            if device.getIP() is not None and ping_check:
+            if not stat.isValidated() or device.getIP() in self.config.disabled_active_scans_for_ips:
+                logging.info("Device {} is offline. No active checks applied".format(device))
+
+            elif device.getIP() is not None and ping_check:
                 check_thread = threading.Thread(target=self._pingDevice, args=(device, stat, ))
                 check_thread.start()
                 return
