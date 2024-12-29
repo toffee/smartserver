@@ -105,27 +105,17 @@ mx.NetworkTooltip = (function( ret )
         let device_stat = device.deviceStat;
         if( device_stat )
         {
-            let dateTimeMsg = "";
-            
-            if( device.isOnline )
+            let lastSeenTimestamp = Date.parse(device_stat["last_seen"]);
+            let lastSeenDatetime = new Date(lastSeenTimestamp)
+
+            let statusMsg = lastSeenDatetime.toLocaleTimeString();
+            if( ( ( new Date().getTime() - lastSeenTimestamp ) / 1000 ) > 60 * 60 * 12 )
             {
-                dateTimeMsg = "Online";
+                statusMsg = lastSeenDatetime.toLocaleDateString() + " " + statusMsg
             }
-            else
-            {
-                let lastSeenTimestamp = Date.parse(device_stat["offline_since"]);
-                let lastSeenDatetime = new Date(lastSeenTimestamp)
-                
-                dateTimeMsg = lastSeenDatetime.toLocaleTimeString();
-                if( ( ( new Date().getTime() - lastSeenTimestamp ) / 1000 ) > 60 * 60 * 12 )
-                {
-                    dateTimeMsg = lastSeenDatetime.toLocaleDateString() + " " + dateTimeMsg
-                }
-                
-                dateTimeMsg = "Offline since " + dateTimeMsg;
-            }
+            statusMsg = ( device.isOnline ? "Online " : "Offline " ) + statusMsg;
             
-            html += "<div><div>Status:</div><div>" + dateTimeMsg + "</div></div>";
+            html += "<div><div>Status:</div><div>" + statusMsg + "</div></div>";
         }
         if( device.info ) html += "<div><div>Info:</div><div>" + device.info + "</div></div>";
         html += "<div><div>Type:</div><div>" + device.type + "</div></div>";
@@ -975,7 +965,7 @@ mx.NetworkStructure = (function( ret )
         node.selectAll("foreignObject.traffic").each( setTrafficContent );
 
         let online_circle = node.selectAll("circle");
-        online_circle.attr("class", d => ( d.data.device.isOnline ? "online" : "offline" ) );
+        online_circle.attr("class", d => ( d.data.device.isOnline ? "online" : ( d.data.device.silent == 1 ? "silent" : "offline" ) ) );
     };
     
     function redrawMatch(){
@@ -1001,7 +991,7 @@ mx.NetworkStructure = (function( ret )
 
         rect.setAttribute("class", "container " + d.data.device.type + ( searchTerm && mx.NetworkHelper.isSearchMatch(searchTerm, d.data.device) ? " match" : "" ) );
         let circle = foreignobject.node().parentNode.querySelector("circle");
-        circle.setAttribute("class", d.data.device.isOnline ? "online" : "offline");
+        circle.setAttribute("class", d.data.device.isOnline ? "online" : ( d.data.device.silent == 1 ? "silent" : "offline" ) );
 
         let fontSize = foreignobject.attr("font-size");
         let infoFontSize = fontSize * 0.9;

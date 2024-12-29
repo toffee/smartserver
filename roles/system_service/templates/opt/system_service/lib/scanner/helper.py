@@ -55,20 +55,39 @@ class Helper():
             return match[1]
         return None
 
+    def getIPFromArpTable(mac):
+        returncode, result = command.exec2(["/sbin/ip", "neighbor"])
+        if returncode != 0:
+            raise Exception("Cmd 'arpscan' was not successful")
+
+        match = re.search(r"({}) .*{}.*".format("[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}",mac), result)
+        if match:
+            return match[1]
+        return None
+
     def arpscan(interface, network, is_running_callback = None):
         returncode, result = command.exec2(["/usr/bin/arp-scan", "--numeric", "--plain", "--timeout=2000", "--retry=1", "--interface", interface, network], is_running_callback=is_running_callback)
         if returncode != 0:
             raise Exception("Cmd 'arpscan' was not successful")
 
-        arp_result = []
+        processed_ips = {}
+        processed_macs = {}
         for row in result.split("\n"):
             columns = row.split("\t")
             if len(columns) != 3:
                 continue
+            columns[2] = re.sub(r"\s\(DUP: [0-9]+\)", "", columns[2]) # eleminate dublicate marker
+            if columns[2] == "(Unknown)":
+                columns[2] = None
 
-            arp_result.append({"ip": columns[0], "mac": columns[1], "info": columns[2] })
 
-        return arp_result
+            if columns[0] in processed_ips or columns[1] in processed_macs:
+                continue
+
+            processed_ips[columns[0]] = columns[1]
+            processed_macs[columns[1]] = {"ip": columns[0], "mac": columns[1], "info": columns[2] }
+
+        return list(processed_macs.values())
             
     def _nmap_parser(result, services):
         for row in result.split("\n"):

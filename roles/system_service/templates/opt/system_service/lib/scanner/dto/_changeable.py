@@ -67,6 +67,11 @@ class Changeable():
             else:
                 self._markAsChanged("_{}".format(key), "remove {}".format(key))
 
+    def _clearPriorizedData(self, key):
+        self.priorized_data[key] = {}
+        self.priorized_value[key] = None
+        self._markAsChanged("{}".format(key), "{}{}".format("clear ", key))
+
     def getDetail(self, key, fallback = None):
         return self.details[key]["value"] if key in self.details else fallback
 
@@ -130,7 +135,8 @@ class Changeable():
             #raise Exception("Still locked " + str(self) + " in " + last_log_source_msg )
             raise Exception("{} still locked".format(str(self)) )
         
-        if self._lock_owner is not None and self._lock_owner != owner:
+        #if self._lock_owner is not None and self._lock_owner != owner:
+        if self._lock_owner is not None:
             raise Exception("Lock of {} owned by {}".format(str(self), str(self._lock_owner)) )
         
         self._lock = True

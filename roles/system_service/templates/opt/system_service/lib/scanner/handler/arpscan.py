@@ -53,8 +53,6 @@ class DeviceChecker(threading.Thread):
 
         self.timeout = timeout
 
-        self.longCheck = False
-
     def _isRunning(self):
         return self.is_running
       
@@ -63,88 +61,95 @@ class DeviceChecker(threading.Thread):
         is_supended = False
         
         while self._isRunning():
-            events = []
-
             try:
                 if is_supended:
                     logging.warning("Resume DeviceChecker")
                     is_supended = False
-                
-                self.event.wait(60 if self.stat.isOnline() else 300)
-                self.event.clear()
-                    
-                if not self._isRunning():
-                    break
+
+                # online devices waiting time = 60 seconds
+                if self.stat.isOnline() or self.stat.getValidatedLastSeen() is None:
+                    if self.stat.getValidatedLastSeen() is not None:
+                        while self._isRunning():
+                            last_seen = (datetime.now() - self.stat.getValidatedLastSeen()).total_seconds()
+                            diff = 60 - last_seen
+                            if diff > 0:
+                                #logging.info("CHECKER: SLEEP: {} {}".format(self.device, diff))
+                                self.event.wait(diff)
+                                self.event.clear()
+                            else:
+                                #logging.info("CHECKER: BREAK: {} {}".format(self.device, diff))
+                                break
+                # offline devices waiting time = 300 seconds
+                else:
+                    self.event.wait(300)
+                    self.event.clear()
+
+                arp_timeout = 10
+                ping_timeout = 10
 
                 if self.stat.isOnline():
-                    self.longCheck = True
-
-                if self.longCheck:
-                    arpRetries = 5
-                    # divided by 2, because the timeout is applied twice. One time for arpping and one time for normal ping
-                    timeout = int( math.floor( (self.timeout / arpRetries / 2 ) ) )
+                    total_timeout = self.timeout
                 else:
                     # non android devices neededs more retries because of for multiple calls of 'knock' during offline check time
-                    arpRetries = 1 if self.type == "android" else 3
-                    timeout = 10
-                    
-                startTime = datetime.now()
-                
+                    total_timeout = ( 1 if self.type == "android" else 3 ) * ( arp_timeout + ping_timeout )
+
+                start_time = datetime.now()
                 ip_address = self.device.getIP()
-                mac_address = self.device.getMAC()
-                address_family = AddressHelper.getAddressFamily(ip_address)
-                
-                loopIndex = 0
+                validated_last_seen = self.stat.getValidatedLastSeen()
                 while self._isRunning():
                     if self.type != "android":
-                        AddressHelper.knock(self.address_family,ip_address)
+                        AddressHelper.knock(AddressHelper.getAddressFamily(ip_address), ip_address)
                         time.sleep(0.05)
 
                     methods = ["arping"]
-                    answering_mac = Helper.getMacFromArpPing(ip_address, self.interface, timeout, self._isRunning)
-                    if answering_mac is None and self.longCheck:
+                    answering_mac = Helper.getMacFromArpPing(ip_address, self.interface, arp_timeout, self._isRunning)
+                    if answering_mac is None:
                         methods.append("ping")
-                        answering_mac = Helper.getMacFromPing(ip_address, timeout, self._isRunning)
-                        
-                    duration = round((datetime.now() - startTime).total_seconds(),2)
+                        answering_mac = Helper.getMacFromPing(ip_address, ping_timeout, self._isRunning)
+
+                    duration = round((datetime.now() - start_time).total_seconds(),2)
 
                     if answering_mac is not None:
-                        validated = answering_mac == mac_address
-                        logging.info("Device {} is {} online. Checked with {} in {} seconds".format(ip_address, "validated" if validated else "unvalidated"," & ".join(methods),duration))
-                        self.lastSeen = datetime.now()
-                        self.stat.setLastSeen(validated) # no lock needed
-                        if not self.stat.isOnline():
+                        if answering_mac != self.device.getMAC():
+                            logging.info("Device {} has wrong ip. Answering MAC was {} after {} seconds".format(self.device, answering_mac, duration))
+                            self.cache.lock(self)
+                            self.device.lock(self)
+                            self.device.clearIP()
+                            self.device.unlock(self)
+                            self.stat.lock(self)
+                            self.stat.setOffline()
+                            self.cache.confirmStat( self, self.stat )
+                            self.cache.unlock(self)
+
+                            self.is_running = False
+                            self.arpscanner._stopDeviceChecker(self.device.getMAC())
+                        else:
+                            logging.info("Device {} is online. Checked with {} in {} seconds".format(self.device, " & ".join(methods), duration))
                             self.cache.lock(self)
                             self.stat.lock(self)
-                            self.stat.setOnline(True)
+                            self.stat.setLastSeen(True)
                             self.cache.confirmStat( self, self.stat )
                             self.cache.unlock(self)
                         break
                         
-                    loopIndex += 1
-                    if loopIndex == arpRetries:
-                        [_, maybe_offline, _] = self.arpscanner._possibleOfflineStates(self.device, self.stat)
-                        if maybe_offline:
-                            logging.info("Device {} is offline. Checked with {} in {} seconds".format(ip_address," & ".join(methods),duration))
-                            if self.stat.isOnline():
-                                self.cache.lock(self)
-                                self.stat.lock(self)
-                                self.stat.setOnline(False)
-                                self.cache.confirmStat( self, self.stat )
-                                self.cache.unlock(self)
+                    if validated_last_seen != self.stat.getValidatedLastSeen():
                         break
 
-                self.longCheck = self.stat.isOnline()
+                    if duration >= total_timeout:
+                        logging.info("Device {} is offline. Checked with {} in {} seconds".format(self.device," & ".join(methods), duration))
+                        self.cache.lock(self)
+                        self.stat.lock(self)
+                        self.stat.setOffline()
+                        self.cache.confirmStat( self, self.stat )
+                        self.cache.unlock(self)
+                        break
                     
             except Exception as e:
-                self.cache.cleanLocks(self, events)
+                self.cache.cleanLocks(self)
                 logging.error("DeviceChecker got unexpected exception. Will suspend for 15 minutes.")
                 logging.error(traceback.format_exc())
                 is_supended = True
                     
-            if len(events) > 0:
-                self.arpscanner._dispatch(events)
-                
             if is_supended:
                 self.event.wait(900)
                 self.event.clear()
@@ -229,7 +234,9 @@ class DHCPListener(threading.Thread):
                             device.setDNS("nslookup", 1, client_dns)
                             self.cache.confirmDevice( self, device )
 
-                            self.arpscanner._refreshDevice( device, True )
+                            stat = self.cache.getDeviceStat(client_mac)
+                            stat.setLastSeen(True)
+                            self.cache.confirmStat( self, stat )
 
                             logging.info("New dhcp request for {} processed".format(client_ip))
                             self.cache.unlock(self)
@@ -261,7 +268,9 @@ class ArpScanner(_handler.Handler):
     def __init__(self, config, cache ):
         super().__init__(config,cache)
         
+        self.lock = threading.Lock()
         self.registered_devices = {}
+        self.last_cleanup = {}
 
         self.dhcp_listener = DHCPListener(self, self.cache, self.config.main_interface)
 
@@ -272,9 +281,10 @@ class ArpScanner(_handler.Handler):
 
     def terminate(self):
         self.dhcp_listener.terminate()
-        for mac in self.registered_devices:
-            if self.registered_devices[mac] is not None:
-                self.registered_devices[mac].terminate()
+        with self.lock:
+            for mac in self.registered_devices:
+                if self.registered_devices[mac] is not None:
+                    self.registered_devices[mac].terminate()
         super().terminate()
 
     def _run(self):
@@ -294,54 +304,66 @@ class ArpScanner(_handler.Handler):
         while self._isRunning():
             if not self._isSuspended():
                 try:
-                    collected_arps = self._fetchArpResult(ipv4_networks)
+                    collected_arps = []
+                    for network in ipv4_networks:
+                        arp_result = Helper.arpscan(self.config.main_interface, network, self._isRunning)
+                        for arp_data in arp_result:
+                            ip = arp_data["ip"]
+                            mac = arp_data["mac"]
+                            info = arp_data["info"]
+                            dns = self.cache.nslookup(ip)
+                            collected_arps.append([ip, mac, dns, info])
                 except Exception as e:
                     if not self.is_running:
                         break
                     raise e
 
                 try:
-                    processed_ips = {}
-                    processed_macs = {}
-                    for [ip, mac, dns, info] in collected_arps:
-                        if mac not in processed_macs:
-                            if ip not in processed_ips:
-                                info = re.sub(r"\s\(DUP: [0-9]+\)", "", info) # eleminate dublicate marker
-                                if info == "(Unknown)":
-                                    info = None
-                                processed_macs[mac] = {"mac": mac, "ip": ip, "dns": dns, "info": info}
-                                processed_ips[ip] = mac
-                    
-                    self.cache.lock(self)
-                    
-                    refreshed_macs = []
-                    for entry in processed_macs.values():
-                        mac = entry["mac"]
-                        device = self.cache.getDevice(mac)
-                        device.setIP("arpscan", 1, entry["ip"])
-                        device.setDNS("nslookup", 1, entry["dns"])
-                        device.setInfo(entry["info"])
+                    with self.lock:
+                        self.cache.lock(self)
+
+                        processed_macs = {}
+                        for [ip, mac, dns, info] in collected_arps:
+                            device = self.cache.getDevice(mac)
+                            device.setIP("arpscan", 1, ip)
+                            device.setDNS("nslookup", 1, dns)
+                            device.setInfo(info)
+                            self.cache.confirmDevice( self, device )
+
+                            self._initDevice(device) # can be called here, because no nslookup happens, because IP is already set
+
+                            stat = self.cache.getDeviceStat(mac)
+                            #logging.info("ARPSCAN LAST SEEN: {}".format(device))
+                            stat.setLastSeen(True)
+                            self.cache.confirmStat( self, stat )
+
+                            processed_macs[mac] = ip
+                            #processed_ips[ip] = mac
+
+                        device = self.cache.getDevice(server_mac)
+                        device.setIP("arpscan", 1, self.config.server_ip)
+                        device.setDNS("nslookup", 1, self.config.server_domain)
+                        device.setInfo(self.config.server_name)
                         self.cache.confirmDevice( self, device )
-                                            
-                        self._refreshDevice( device, True)
-                        refreshed_macs.append(mac)
-                                    
-                    device = self.cache.getDevice(server_mac)
-                    device.setIP("arpscan", 1, self.config.server_ip)
-                    device.setDNS("nslookup", 1, self.config.server_domain)
-                    device.setInfo(self.config.server_name)
-                    self.cache.confirmDevice( self, device )
-                        
-                    self._refreshDevice( device, True)
-                    refreshed_macs.append(server_mac)
 
-                    self.cache.unlock(self)
+                        self._initDevice(device) # can be called here, because no nslookup happens, because IP is already set
 
-                    for device in self.cache.getDevices():
-                        if device.getMAC() in refreshed_macs:
-                            continue
-                        self._checkDevice(device, False)
+                        stat = self.cache.getDeviceStat(server_mac)
+                        stat.setLastSeen(True)
+                        self.cache.confirmStat( self, stat )
+
+                        processed_macs[server_mac] = self.config.server_ip
+
+                        for device in self.cache.getDevices():
+                            if device.getMAC() in processed_macs:
+                                continue
+
+                            self._initDevice(device)
+
+                            self._cleanDevice(device)
                 
+                        self.cache.unlock(self)
+
                 except Exception as e:
                     self.cache.cleanLocks(self)
                     self._handleUnexpectedException(e)
@@ -354,145 +376,110 @@ class ArpScanner(_handler.Handler):
                         
             self._wait(timeout)
 
-    def _fetchArpResult(self, ipv4_networks):
-        collected_arps = []
-        for network in ipv4_networks:
-            arp_result = Helper.arpscan(self.config.main_interface, network, self._isRunning)
-            for arp_data in arp_result:
-                ip = arp_data["ip"]
-                mac = arp_data["mac"]
-                info = arp_data["info"]
-                
-                dns = self.cache.nslookup(ip)
-                        
-                collected_arps.append([ip, mac, dns, info])
-        return collected_arps
-                
-    def _possibleOfflineStates(self, device, stat):
-        now = datetime.now()
- 
-        validated_last_seen_diff = (now - (stat.getValidatedLastSeen() if stat.isValidated() else stat.getUnvalidatedLastSeen())).total_seconds()
-        unvalidated_last_seen_diff = (now - stat.getUnvalidatedLastSeen()).total_seconds()
-        
-        # maybe offline if unvalidated check (arpping or ping) was older then "arp_soft_offline_device_timeout"
-        # => validated means, the answer was from the expected ip and mac
-        # => unvalidated means, the answer was from the excpected ip but different mac
-        maybe_offline = unvalidated_last_seen_diff > self.config.arp_soft_offline_device_timeout or validated_last_seen_diff > self.config.arp_hard_offline_device_timeout
+    def _initDevice(self, device):
+        mac = device.getMAC()
 
-        # last check, if the device is really offline AND unvalidated check only allowed if validated check (arp-scan) is not older then "arp_hard_offline_device_timeout"
-        # ping could be unvalidated, means it is only valid until "arp_hard_offline_device_timeout"
-        ping_check = validated_last_seen_diff < self.config.arp_hard_offline_device_timeout
-        
-        outdated = validated_last_seen_diff > ( self.config.arp_clean_unknown_device_timeout if device.getIP() is None else self.config.arp_clean_known_device_timeout )
-        
-        return [outdated, maybe_offline, ping_check]
+        if device.getIP() is None:
+            ip_address = Helper.getIPFromArpTable(mac)
+            if ip_address is not None:
+                device.lock(self)
+                dns = self.cache.nslookup(ip_address)
+                device.setIP("arpscan", 1, ip_address)
+                device.setDNS("nslookup", 1, dns)
+                self.cache.confirmDevice( self, device )
 
-    def _checkDevice(self, device, force_maybe_offline = False):
+        if mac not in self.registered_devices:
+            self.registered_devices[mac] = None
+
+        if self.registered_devices[mac] is None and device.getIP() in self.config.user_devices:
+            # force creation of a new device stat object
+            stat = self.cache.getDeviceStat(mac)
+            stat.unlock(self)
+            user_config = self.config.user_devices[device.getIP()]
+            self.registered_devices[mac] = DeviceChecker(self, self.cache, device, stat, self.config.main_interface, user_config["type"], user_config["timeout"])
+            self.registered_devices[mac].start()
+
+    def _cleanDevice(self, device):
         mac = device.getMAC()
         
         # UserIP's should be delegated to DeviceChecker
         if mac in self.registered_devices and self.registered_devices[mac] is not None:
-            if force_maybe_offline:
-                self.registered_devices[mac].wakeup()
             return
 
         stat = self.cache.getUnlockedDeviceStat(mac)
         if stat is None:
             logging.info("Can't check device {}. Stat is missing.".format(device))
             return
- 
-        if force_maybe_offline:
-            maybe_offline = True
-            ping_check = True
+
+        now = datetime.now()
+
+        if ( now - stat.getUnvalidatedLastSeen() ).total_seconds() > self.config.arp_clean_timeout:
+            self.cache.removeDevice(self, mac)
+            self.cache.removeDeviceStat(self, mac)
+            if self.registered_devices[mac] is not None:
+                self.registered_devices[mac].terminate()
+                del self.registered_devices[mac]
+            return
+
+        if stat.getValidatedLastSeen() is None or ( now - stat.getValidatedLastSeen() ).total_seconds() > self.config.arp_offline_timeout:
+            if mac not in self.last_cleanup or (now - self.last_cleanup[mac]).total_seconds() > self.config.arp_offline_timeout:
+                self.last_cleanup[mac] = now
+                self._checkDevice(device, "Cleaned", True)
+
+    def _checkDevice(self, device, type, long_check):
+        if device.getIP() is None:
+            logging.info("{} device {} has no IP. Ping skipped".format(type, device))
+        elif device.getMAC() in self.config.silent_device_macs:
+            logging.info("{} device {} is a silent device. Ping skipped".format(type, device))
         else:
-            [outdated, maybe_offline, ping_check] = self._possibleOfflineStates(device, stat)
-            if outdated:
-                self._removeDevice(mac)
-                return
-
-        if maybe_offline:
-            if not stat.isValidated() or device.getIP() in self.config.disabled_active_scans_for_ips:
-                logging.info("Device {} is offline. No active checks applied".format(device))
-
-            elif device.getIP() is not None and ping_check:
-                check_thread = threading.Thread(target=self._pingDevice, args=(device, stat, ))
-                check_thread.start()
-                return
-                
-            self._markDeviceAsOffline(device, stat)
+            check_thread = threading.Thread(target=self._pingDevice, args=(device, type, long_check))
+            check_thread.start()
     
-    def _pingDevice(self, device, stat):
-        startTime = datetime.now()
-        
+    def _pingDevice(self, device, type, long_check):
         try:
+            startTime = datetime.now()
+
             methods = ["arping"]
-            answering_mac = Helper.getMacFromArpPing(device.getIP(), self.config.main_interface, 10, self._isRunning)
+            answering_mac = Helper.getMacFromArpPing(device.getIP(), self.config.main_interface, 20 if long_check else 10, self._isRunning)
             if answering_mac is None:
                 methods.append("ping")
-                answering_mac = Helper.getMacFromPing(device.getIP(), 5, self._isRunning)
+                answering_mac = Helper.getMacFromPing(device.getIP(), 20 if long_check else 10, self._isRunning)
 
             duration = round((datetime.now() - startTime).total_seconds(),2)
+
+            self.cache.lock(self)
+
             if answering_mac is not None:
-                validated = answering_mac == device.getMAC()
-                self.cache.lock(self)
-                logging.info("Device {} is {} online. Checked with {} in {} seconds".format(device,"validated" if validated else "unvalidated", " & ".join(methods),duration))
-                self._refreshDevice(device, validated)
-                self.cache.unlock(self)
-                return
-            
-            [_, maybe_offline, ping_check] = self._possibleOfflineStates(device, stat)
-            
-            if maybe_offline or not ping_check:
-                logging.info("Device {} is offline. Checked with {} in {} seconds".format(device," & ".join(methods),duration))
-                self._markDeviceAsOffline(device, stat)
+                if answering_mac != device.getMAC():
+                    logging.info("{} device {} has wrong ip. Answering MAC was {} after {} seconds".format(type, device, answering_mac, duration))
+                    device.lock(self)
+                    device.clearIP()
+                    device.unlock(self)
+                    stat = self.cache.getDeviceStat(device.getMAC())
+                    stat.setOffline()
+                    self.cache.confirmStat( self, stat )
+                else:
+                    logging.info("{} device {} is online. Checked with {} in {} seconds".format(type, device, " & ".join(methods), duration))
+                    stat = self.cache.getDeviceStat(device.getMAC())
+                    stat.setLastSeen(True)
+                    self.cache.confirmStat( self, stat )
+            else:
+                #if long_check:
+                logging.info("{} device {} is offline. Checked with {} in {} seconds".format(type, device, " & ".join(methods), duration))
+
+                stat = self.cache.getDeviceStat(device.getMAC())
+                stat.setOffline()
+                self.cache.confirmStat( self, stat )
+
+            self.cache.unlock(self)
 
         except Exception as e:
             self.cache.cleanLocks(self)
             self._handleUnexpectedException(e, None, -1)
-        
-    def _markDeviceAsOffline(self, device, stat):
-        if device.getIP() is not None:
-            # check if there is another device with the same IP
-            similarDevices = list(filter(lambda d: d.getMAC() != device.getMAC() and d.getIP() == device.getIP(), self.cache.getDevices() ))
-            if len(similarDevices) > 0:
-                self._removeDevice(device.getMAC())
-                return
-        
-        if stat.isOnline():
-            self.cache.lock(self)
-            stat.lock(self)
-            stat.setOnline(False)
-            self.cache.confirmStat( self, stat )
-            self.cache.unlock(self)
 
-    def _refreshDevice(self, device, validated):
-        mac = device.getMAC()
-        
-        stat = self.cache.getDeviceStat(mac)
-        stat.setLastSeen(validated)
-        if validated:
-            stat.setOnline(True)
-        self.cache.confirmStat( self, stat )
-        
-        if mac not in self.registered_devices:
+    def _stopDeviceChecker(self, device):
+        with self.lock:
             self.registered_devices[mac] = None
-
-        if self.registered_devices[mac] is not None:
-            return
-        
-        if device.getIP() in self.config.user_devices:
-            user_config = self.config.user_devices[device.getIP()]
-            self.registered_devices[mac] = DeviceChecker(self, self.cache, device, stat, self.config.main_interface, user_config["type"], user_config["timeout"])
-            self.registered_devices[mac].start()
-    
-    def _removeDevice(self,mac):
-        self.cache.lock(self)
-        self.cache.removeDevice(self, mac)
-        self.cache.removeDeviceStat(self, mac)
-        if self.registered_devices[mac] is not None:
-            self.registered_devices[mac].terminate()
-            del self.registered_devices[mac]
-        self.cache.unlock(self)
 
     def getEventTypes(self):
         return [ 
@@ -502,26 +489,27 @@ class ArpScanner(_handler.Handler):
     def processEvents(self, events):
         disabled_devices = []
         unregistered_devices = []
-        unvalidated_devices = []
-        
-        for event in events:
-            device = event.getObject()
 
-            connection = device.getConnection()
-            if event.hasDetail("connection") and (connection is None or not connection.isEnabled()):
-                disabled_devices.append(device)
-            elif device.getMAC() not in self.registered_devices:
-                unregistered_devices.append(device)
-                
-        if len(disabled_devices) > 0:
-            for device in set(disabled_devices):
-                logging.info("Recheck device {}".format(device))
-                self._checkDevice(device, True)
-        
-        if len(unregistered_devices) > 0:
-            self.cache.lock(self)
-            for device in set(unregistered_devices):
-                logging.info("Register lazy device {}".format(device))
-                self._refreshDevice(device, False)
-            self.cache.unlock(self)
-            
+        with self.lock:
+            for event in events:
+                device = event.getObject()
+
+                connection = device.getConnection()
+                if event.hasDetail("connection") and (connection is None or not connection.isEnabled()):
+                    disabled_devices.append(device)
+                elif device.getMAC() not in self.registered_devices:
+                    unregistered_devices.append(device)
+
+            if len(disabled_devices) > 0 or len(unregistered_devices) > 0:
+                self.cache.lock(self)
+                if len(disabled_devices) > 0:
+                    for device in set(disabled_devices):
+                        self._initDevice(device)
+                        self._checkDevice(device, "Disabled", False)
+
+                if len(unregistered_devices) > 0:
+                    for device in set(unregistered_devices):
+                        self._initDevice(device)
+                        self._checkDevice(device, "New", False)
+                self.cache.unlock(self)
+

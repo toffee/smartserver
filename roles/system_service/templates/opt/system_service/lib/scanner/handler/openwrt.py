@@ -398,22 +398,7 @@ class OpenWRT(_handler.Handler):
 
                     details = client_result["clients"][mac]
 
-                    # mark as online for new clients or if it is not a user device (is checked in arpscan)
-                    #if mac not in self.wifi_clients[openwrt_ip] or device.getIP() is None or device.getIP() not in self.config.user_devices:
-                    #    stat = self.cache.getDeviceStat(mac)
-                    #    stat.setLastSeen(False) # because no IP validation
-                    #    if details["auth"] and details["assoc"] and details["authorized"]:
-                    #        stat.setOnline(True)
-                    #    event = self.cache.confirmStat( self, stat )
-                    #    if event:
-                    #        events.append(event)
-                    if mac not in self.wifi_clients[openwrt_ip]:
-                        stat = self.cache.getDeviceStat(mac)
-                        stat.setLastSeen(False) # because no IP validation
-                        event = self.cache.confirmStat( self, stat )
-                        if event:
-                            events.append(event)
-
+                    validated = False
                     stat = self.cache.getConnectionStat(target_mac,target_interface)
                     stat_data = stat.getData(connection_details)
                     if not details["assoc"] or "bytes" not in details or "rate" not in details or "signal" not in details:
@@ -433,6 +418,7 @@ class OpenWRT(_handler.Handler):
                                 byte_diff = details["bytes"]["tx"] - out_bytes
                                 if byte_diff > 0:
                                     stat_data.setOutAvg(byte_diff / time_diff)
+                                    validated = True
 
                         stat_data.setInBytes(details["bytes"]["rx"])
                         stat_data.setOutBytes(details["bytes"]["tx"])
@@ -444,7 +430,15 @@ class OpenWRT(_handler.Handler):
                         if device.hasMultiConnections():
                             device.generateMultiConnectionEvents(event,events)
                         events.append(event)
-                    
+
+                    stat = self.cache.getDeviceStat(mac)
+                    #if validated:
+                    #    logging.info("OPENWRT LAST SEEN: {}".format(device))
+                    stat.setLastSeen(validated)
+                    event = self.cache.confirmStat( self, stat )
+                    if event:
+                        events.append(event)
+
                     _active_associations.append(uid)
                     self.wifi_associations[openwrt_ip][uid] = [ now, uid, mac, gid, vlan, target_mac, target_interface, connection_details ]
 
@@ -554,14 +548,13 @@ class OpenWRT(_handler.Handler):
             for mac in list(self.delayed_wifi_devices.keys()):
                 if not self._isKnownWifiClient(mac):
                     missing_wifi_macs.append(mac)
-                    
                 del self.delayed_wifi_devices[mac]
-            
+
             triggered_types = {}
-            for openwrt_ip in self.next_run:
-                if len(missing_wifi_macs) > 0:
-                    self.next_run[openwrt_ip]["wifi_clients"] = datetime.now()
-                    triggered_types["wifi"] = True
+            if len(missing_wifi_macs) > 0:
+                for openwrt_ip in self.next_run:
+                        self.next_run[openwrt_ip]["wifi_clients"] = datetime.now()
+                        triggered_types["wifi"] = True
                     
             if triggered_types:
                 logging.info("Delayed trigger runs for {}".format(" & ".join(triggered_types)))
@@ -582,7 +575,7 @@ class OpenWRT(_handler.Handler):
                 if device is None:
                     logging.error("Unknown device for stat {}".format(stat))
                 
-                if not self.has_wifi_networks or not device.supportsWifi() or not stat.isOnline():
+                if not self.has_wifi_networks or not device.supportsWifi() or not stat.isOnline() or self._isKnownWifiClient(device.getMAC()):
                     continue
                     
                 self.delayed_wifi_devices[device.getMAC()] = device
