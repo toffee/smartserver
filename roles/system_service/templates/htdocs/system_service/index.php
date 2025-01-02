@@ -8,7 +8,22 @@ require "../shared/libs/ressources.php";
 <?php echo Ressources::getModules(["/shared/mod/websocket/","/system_service/"]); ?>
 <script>
 mx.UNCore = (function( ret ) {
-    var groups = {};    
+    var wifiColors = [
+        "#66C5CC",
+        //"#F6CF71",
+        //"#F89C74",
+        "#DCB0F2",
+        "#87C55F",
+        "#9EB9F3",
+        //"#FE88B1",
+        "#C9DB74",
+        "#8BE0A4",
+        "#B497E7",
+        "#B3B3B3"
+    ];
+    var wifiNetworks = {};
+
+    var groups = {};
     var devices = {};    
     var stats = {};    
     var root_device_mac = null;
@@ -23,11 +38,98 @@ mx.UNCore = (function( ret ) {
     var demo_ip_map = {};
     var demo_mac_map = {};
 
-    function getDeviceSignal(device)
+    function initWifiNetworks(_wifi_networks, _wifi_bands)
+    {
+        var clients = {};
+        var tuples = [];
+        for (var key in _wifi_networks) tuples.push([key, _wifi_networks[key]]);
+        tuples.sort(function(a, b) {
+            a = a[1];
+            b = b[1];
+            return a > b ? -1 : (a < b ? 1 : 0);
+        });
+        for (var k in tuples)
+        {
+            clients[tuples[k][0]] = tuples[k][1];
+
+            if( wifiNetworks.hasOwnProperty(tuples[k][0]) ) continue;
+
+            wifiNetworks[tuples[k][0]] = wifiColors[Object.keys(wifiNetworks).length];
+        }
+
+        let toolbar = mx.$("#networkToolbar .networkSearchWifi");
+        let new_buttons = [];
+        Object.entries(wifiNetworks).forEach(([key,value]) => {
+            let id = "ssid_" + key;
+            let button = mx.$("#" + id);
+            if( !button )
+            {
+                button = document.createElement("div");
+                button.id = id;
+                button.setAttribute("class", "form button");
+                button.style.backgroundColor = value + "99";
+                button.innerHTML = key.toLowerCase() + " (" + clients[key] + ")";
+                toolbar.appendChild(button);
+                new_buttons.push([button,"ssid",key]);
+            }
+        });
+        Object.entries(_wifi_bands).forEach(([key,value]) => {
+            let id = "band_" + key;
+            let button = mx.$("#" + id);
+            if( !button )
+            {
+                button = document.createElement("div");
+                button.id = id;
+                button.setAttribute("class", "form button");
+                button.innerHTML = key.toLowerCase() + " (" + value + ")";
+                toolbar.appendChild(button);
+                new_buttons.push([button,"band",key]);
+            }
+        });
+
+        for( _key in new_buttons )
+        {
+            let [ button, group, name ] = new_buttons[_key];
+
+            button.addEventListener("click",function()
+            {
+                let is_active = button.classList.toggle("active");
+                mx.$$("#networkToolbar .networkSearchWifi .button").forEach((_button) => {
+                    if( _button == button ) return;
+                    _button.classList.remove("active");
+                });
+
+                if( is_active )
+                {
+                    if( group == "ssid" )
+                    {
+                        activeTerm = ["wifi_ssid", name];
+                    }
+                    else if( group == "band" )
+                    {
+                        activeTerm = ["wifi_band", name];
+                    }
+                }
+                else
+                {
+                    activeTerm = "";
+                }
+
+                if( isTable)
+                {
+                    mx.NetworkTable.search(activeTerm);
+                }
+                else
+                {
+                    mx.NetworkStructure.search(activeTerm);
+                }
+            });
+        }
+    }
+
+    function getDeviceGroup(device)
     {
         let group = null;
-        let stat = null;
-        
         device.groups.forEach(function(_group)
         {
             if( group == null || group.details.priority["value"] < _group.details.priority["value"] )
@@ -35,27 +137,29 @@ mx.UNCore = (function( ret ) {
                 group = _group;
             }
         });
+        return group;
+    }
 
-        if( group != null )
+    function getDeviceInterfaceStat(device, group)
+    {
+        let stat = null;
+        let _stat = device.interfaceStat.data.filter(data => data["connection_details"]["gid"] == group.gid);
+        if( _stat.length > 0)
         {
-            let _stat = device.interfaceStat.data.filter(data => data["connection_details"]["gid"] == group.gid);
-            if( _stat.length > 0)
-            {
-                stat = _stat[0];
-            }
-            else
-            {
-                console.log("----");
-                console.log(device.groups);
-                console.log(device.interfaceStat);
-                console.log(group);
-                console.log(stats);
-            }
+            stat = _stat[0];
         }
-        
-        if( group && stat && stat.details["signal"] )
-        {    
-            return { "group": group, "stat": stat }
+        else
+        {
+            console.log("----");
+            console.log(device.groups);
+            console.log(device.interfaceStat);
+            console.log(group);
+            console.log(stats);
+        }
+
+        if( stat && stat.details["signal"] )
+        {
+            return stat
         }
         
         return null;
@@ -155,7 +259,7 @@ mx.UNCore = (function( ret ) {
         if( rootDevices.length > 0 )
         {
             rootNode = initNode(rootDevices[0], stats);
-        
+
             if( rootNode["device"]["connected_from"].length > 0 )
             {
                 initChildren(rootNode, devices, stats);
@@ -270,6 +374,8 @@ mx.UNCore = (function( ret ) {
             delete stats[key];
         });
         
+        let _wifi_networks = [];
+        let _wifi_bands = [];
         Object.values(devices).forEach(function(device)
         {
             device["isOnline"] = isOnline(device);
@@ -292,20 +398,34 @@ mx.UNCore = (function( ret ) {
             device["wifi_signal"] = "";
             device["wifi_band"] = "";
             device["wifi_ssid"] = "";
-            if( _groups.length > 0 && device["interfaceStat"] )
+            if( _groups.length > 0 )
+            // && device["interfaceStat"] )
             {
-                let signal = getDeviceSignal(device);
-                if( signal )
+                let group = getDeviceGroup(device);
+                if( group != null )
                 {
-                    device["wifi_signal"] = signal["stat"].details.signal["value"];
-                    device["wifi_band"] = signal["group"].details.band["value"];
-                    device["wifi_ssid"] = signal["group"].details.ssid["value"];
+                    device["wifi_band"] = group.details.band["value"];
+                    device["wifi_ssid"] = group.details.ssid["value"];
+
+                    if( !_wifi_networks.hasOwnProperty(device["wifi_ssid"]) ) _wifi_networks[device["wifi_ssid"]] = 0;
+                    _wifi_networks[device["wifi_ssid"]] += 1;
+                    if( !_wifi_bands.hasOwnProperty(device["wifi_band"]) ) _wifi_bands[device["wifi_band"]] = 0;
+                    _wifi_bands[device["wifi_band"]] += 1;
+
+                    if( device["interfaceStat"] )
+                    {
+                        let stat = getDeviceInterfaceStat(device, group);
+                        if( stat )
+                        {
+                            device["wifi_signal"] = stat.details.signal["value"];
+                        }
+                    }
                 }
             }
         });
-        
-        //console.log(stats);
-        
+
+        initWifiNetworks(_wifi_networks, _wifi_bands);
+
         if( rootNode == null )
         {
             mx.Error.handleError( mx.I18N.get("Network analysis is in progress")  );
@@ -318,7 +438,7 @@ mx.UNCore = (function( ret ) {
             }
             else
             {
-                mx.NetworkStructure.draw( activeTerm, replacesNodes ? rootNode : null, groups, stats);
+                mx.NetworkStructure.draw( activeTerm, replacesNodes ? rootNode : null, groups, stats, wifiNetworks);
             }
         }
     }
@@ -343,7 +463,7 @@ mx.UNCore = (function( ret ) {
             else
             {
                 mx.$("#networkToolbar .networkDisplay.button span").className = "icon-table";
-                mx.NetworkStructure.draw( activeTerm, rootNode, groups, stats);
+                mx.NetworkStructure.draw( activeTerm, rootNode, groups, stats, wifiNetworks);
             }
         });
         
@@ -378,6 +498,9 @@ mx.UNCore = (function( ret ) {
                     return;
 
                 activeTerm = _term.toLowerCase();
+
+                let activeSearchButton = mx.$("#networkToolbar .networkSearchWifi .button.active");
+                if( activeSearchButton ) activeSearchButton.classList.remove("active");
                 
                 if( isTable)
                 {
@@ -424,6 +547,6 @@ mx.OnSharedModWebsocketReady.push(function(){
 <div id="networkStructure"></div>
 <div id="networkList"></div>
 </div>
-<div id="networkToolbar"><div class="networkDisplay form button"><span class="icon-table"></span></div><div class="networkSearch form button"><span class="icon-search-1"></span></div><div class="networkSearchInput"><input></div></div>
+<div id="networkToolbar"><div class="networkDisplay form button"><span class="icon-table"></span></div><div class="networkSearch form button"><span class="icon-search-1"></span></div><div class="networkSearchInput"><input></div><div class="networkSearchWifi"></div></div>
 </body>
 </html>
