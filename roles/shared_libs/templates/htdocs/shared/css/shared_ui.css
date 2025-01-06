@@ -31,6 +31,21 @@ body.dark .form.button:focus {
     cursor: default;
     opacity: 0.5;
 }
+.form.button.active:after {
+    content: '\A';
+    position: absolute;
+    width: 100%;
+    height: calc(100% - 5px);
+    top:0;
+    left:0;
+    border-bottom: 5px solid rgba(0,0,0,0.1);
+    transition: all 0.15s;
+}
+:root body.dark {
+    .form.button.active:after {
+        border-bottom: 5px solid rgba(255,255,255,0.3);
+    }
+}
 .form.button span.ripple {
   position: absolute;
   border-radius: 50%;
@@ -326,6 +341,16 @@ div.buttonSelection > div.buttonSelectionLayer > div:hover {
 .autoCompleteLayer > div.row.active {
   background-color: rgba(51,122,183,.20);
 }
+.autoCompletionInputWrapper {
+    position: relative;
+}
+.autoCompletionInputClear {
+    position: absolute;
+    right: 3px;
+    top: 0;
+    visibility: hidden;
+    cursor: pointer;
+}
 .autoCompletionSelection {
     display: none;
     flex-flow: wrap;
@@ -352,7 +377,7 @@ div.buttonSelection > div.buttonSelectionLayer > div:hover {
     display: inline-block;
     position: absolute;
     right: 4px;
-    top: 0;
+    top: -1px;
     bottom: 0;
     margin: auto;
 }

@@ -344,8 +344,14 @@ mx.NetworkTooltip = (function( ret )
     
     ret.toggleTooltip = function(device)
     {
-        if( active_tooltip_d && active_tooltip_d == device ) mx.NetworkTooltip.hideTooltip();
-        else mx.NetworkTooltip.showTooltip(device);
+        if( active_tooltip_d && active_tooltip_d == device )
+        {
+            mx.NetworkTooltip.hideTooltip();
+            return false;
+        }
+
+        mx.NetworkTooltip.showTooltip(device);
+        return true;
     }
     
     ret.positionTooltip = function(element)
@@ -359,6 +365,7 @@ mx.NetworkTooltip = (function( ret )
         
         let tooltipRect = mx.Tooltip.getRootElementRect();
         let body_height = window.innerHeight;
+        let body_width = window.innerWidth;
 
         if( element.clientX )
         {
@@ -393,7 +400,7 @@ mx.NetworkTooltip = (function( ret )
             let nodeRect = element.getBoundingClientRect();
 
             arrowOffset = 0;
-            arrowPosition = "right";
+            arrowPosition = "left";
             
             top = nodeRect.top;
             if( top + tooltipRect.height > body_height ) 
@@ -403,14 +410,14 @@ mx.NetworkTooltip = (function( ret )
             }
             else
             {
-                arrowOffset = nodeRect.height / 2;
+                arrowOffset = nodeRect.height / 2 - 4;
             }
 
-            left = nodeRect.left - tooltipRect.width - 6;
-            if( left < 0 )
+            left = nodeRect.left + nodeRect.width + 6;
+            if( left > body_width - tooltipRect.width )
             {
-                left = nodeRect.left + nodeRect.width + 6;
-                arrowPosition = "left";
+                left = nodeRect.left - tooltipRect.width - 12;
+                arrowPosition = "right";
             }
         }
 
@@ -425,10 +432,11 @@ mx.NetworkTooltip = (function( ret )
         return active_tooltip_d;
     }
     
-    ret.init = function()
+    ret.init = function( callback )
     {
         mx.$("body").addEventListener("click", function(e){
             mx.NetworkTooltip.hideTooltip();
+            callback();
         });
     }
     
@@ -791,17 +799,43 @@ mx.NetworkStructure = (function( ret )
         if( tooltip_device != null )
         {
             let element = node.filter(n => tooltip_device["mac"] == n.data.device["mac"] );
-            if( element.length > 0)
+
+            if( element.size() > 0)
             {
-                console.log("refresh");
-                mx.NetworkTooltip.showTooltip(tooltip_device);
+                mx.NetworkTooltip.showTooltip(tooltip_device, function(){ highlightConnections(element.data()[0]); });
                 mx.NetworkTooltip.positionTooltip(element.node().querySelector("rect.container"));
             }
             else
             {
                 mx.NetworkTooltip.hideTooltip();
+                cleanupConnections();
             }
         }
+    }
+
+    ret.tooltipCleanup = function()
+    {
+        link.classed("highlighted", false)
+    }
+
+    function highlightConnections(d)
+    {
+        _targets = [];
+        let _d = d;
+        while( _d.parent != null )
+        {
+            _targets.push(_d.data.device.mac);
+            _d = _d.parent;
+        }
+
+        link.classed("highlighted", false)
+            .filter(l => _targets.includes(l.target.data.device.mac))
+            .classed("highlighted", true );
+    }
+
+    function cleanupConnections()
+    {
+        link.classed("highlighted", false);
     }
         
     function initTree(endCount, maxDepth)
@@ -849,11 +883,9 @@ mx.NetworkStructure = (function( ret )
         
         d3.selectAll("#networkStructure svg").remove();
         const svg = d3.selectAll("#networkStructure").append("svg")
-            //.attr("viewBox", [-dy / 2 + ( dy / 3 ), x0 - box_height, viewboxWidth, viewboxWidth])
             .attr("viewBox", [0, 0, viewboxWidth, viewboxHeight])
             .attr("font-family", "sans-serif");
         
-        //svg.selectAll("g").remove()
         link = svg.append("g")
                 .classed("links", true)
             .selectAll("path")
@@ -862,29 +894,17 @@ mx.NetworkStructure = (function( ret )
                 .attr("d", linkGenerator)
                 .attr("class", function(d){ return "state_" + d.source.data["device"]["connection_state"] } );
                 
-        //var tooltip = d3.select("#tooltip");
-                        
         node = svg.append("g")
             .classed("nodes", true)
             .selectAll("a")
             .data(root.descendants())
             .join("a")
-        //      .attr("xlink:href", link == null ? null : d => link(d.data, d))
-        //      .attr("target", link == null ? null : linkTarget)
             .attr("transform", d => `translate(${d.y},${d.x})`)
             .attr("id", function(d) { return d.data.uid; })
             .on("mouseenter", function(e, d){ 
                 e.stopPropagation();
 
-                mx.NetworkTooltip.showTooltip(d.data.device, function()
-                {
-                    link
-                        .classed("online", false)
-                        .classed("offline", false)
-                        .filter(l => l.source.data === d.data || l.target.data === d.data)
-                        .classed("online", d.data.device.isOnline )
-                        .classed("offline", !d.data.device.isOnline );
-                });
+                mx.NetworkTooltip.showTooltip(d.data.device, function() { highlightConnections(d); });
                 mx.NetworkTooltip.positionTooltip(this.querySelector("rect.container"));
             })
             .on("mousemove", function(e, d){
@@ -892,29 +912,17 @@ mx.NetworkStructure = (function( ret )
 
                 mx.NetworkTooltip.positionTooltip(this.querySelector("rect.container"));
             })
-            .on("mouseleave", function(){
-                link
-                    .classed("online", false)
-                    .classed("offline", false);
-            })
             .on("click", function(e, d){
                 e.stopPropagation();
 
                 if( mx.Core.isTouchDevice() )
                 {
-                    mx.NetworkTooltip.showTooltip(d.data.device, function()
-                    {
-                        link
-                            .classed("online", false)
-                            .classed("offline", false)
-                            .filter(l => l.source.data === d.data || l.target.data === d.data)
-                            .classed("online", d.data.device.isOnline )
-                            .classed("offline", !d.data.device.isOnline );
-                    });
+                    mx.NetworkTooltip.showTooltip(d.data.device, function(){ highlightConnections(d); });
                 }
                 else
                 {
-                    mx.NetworkTooltip.toggleTooltip(d.data.device);
+                    if( mx.NetworkTooltip.toggleTooltip(d.data.device) ){ highlightConnections(d); }
+                    else { cleanupConnections(); }
                 }
 
                 mx.NetworkTooltip.positionTooltip(this.querySelector("rect.container"));
@@ -1109,15 +1117,8 @@ mx.NetworkStructure = (function( ret )
         let offset = in_data && out_data  ? font_size * 0.1 : font_size * 0.9;
         
         let html = '';
-        if( in_data ) 
-        {
-            html += "<div class='in'>⇨ " + in_data + "</div>";
-        }
-
-        if( out_data )
-        {
-            html += "<div class='out'>⇦ " + out_data + "</div>";
-        }
+        if( in_data ) html += "<div class='in'>⇨ " + in_data + "</div>";
+        if( out_data ) html += "<div class='out'>⇦ " + out_data + "</div>";
         
         foreignobject.html(d => "<div><div>" + html + "</div></div>" );
         
@@ -1165,18 +1166,6 @@ mx.NetworkStructure = (function( ret )
             return path(d);
         }
     }
-       
-/*    function wrap( d ) {
-        var self = d3.select(this),
-            textLength = self.node().getComputedTextLength(),
-            text = self.text();
-        while ( ( textLength > 145 )&& text.length > 0) {
-            text = text.slice(0, -1);
-            self.text(text + '...');
-            textLength = self.node().getComputedTextLength();
-        }
-    }
-*/
             
     return ret;
 })( mx.NetworkStructure || {} );

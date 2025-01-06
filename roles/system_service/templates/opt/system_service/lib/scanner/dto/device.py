@@ -71,7 +71,6 @@ class Device(Changeable):
         self.info = None
         
         self.hop_connection_map = {}
-        self.multi_connections = False
         self.connection = None
         self.connection_state = 0
 
@@ -183,7 +182,7 @@ class Device(Changeable):
                 
             self.hop_connection_map[key] = Connection(type, target_mac, target_interface, [ details ] if details is not None else [] )
             action = Device.EVENT_DETAIL_CONNECTION_ADD
-            
+
         if action is None:
             return
 
@@ -232,25 +231,8 @@ class Device(Changeable):
     def getConnection(self):
         return self.virtual_connection if self.virtual_connection is not None else self.connection
    
-    def hasMultiConnections(self):
-        return self.multi_connections
-        
-    def generateMultiConnectionEvents(self, event, events):
-        if not event.hasDetail("signal"):
-            return
-        
-        found = False
-        for event in events:
-            if event.getType() == self.getEventType() and event.getObject() == self and event.hasDetail("connection"):
-                found = True
-        
-        if not found:
-            events.append(Event(self.getEventType(), Event.ACTION_MODIFY, self, ["connection", "connection_helper"]))
-        
-    def calculateConnectionPath(self, _backward_interfaces):
+    def calculateConnectionPath(self):
         #logging.info("CALCULATE")
-
-        multi_connections = False
 
         if self.getMAC() == self._getCache().getGatewayMAC():
             connection = self.getHopConnections()[0]
@@ -259,8 +241,11 @@ class Device(Changeable):
             connection = None
             connection_state = 3
 
-            for _connection in self.getHopConnections():
-                if _connection.getType() == Connection.WIFI:
+            if self.supportsWifi():
+                for _connection in self.getHopConnections():
+                    if _connection.getType() != Connection.WIFI:
+                        continue
+
                     if connection is None:
                         connection = _connection
                         connection_state = 0
@@ -282,16 +267,12 @@ class Device(Changeable):
                         if _max_signal > max_signal:
                             connection = _connection
 
-                        multi_connections = True
-
             if connection is None:
                 _tmp_connections = {}
                 _hob_connections = {}
 
                 for _connection in self.getHopConnections():
                     _key = "{}:{}".format(_connection.getTargetMAC(),_connection.getTargetInterface())
-                    if _key in _backward_interfaces:
-                        continue
                     _tmp_connections[_key] = _connection
 
                     _target_device = self.cache.getUnlockedDevice(_connection.getTargetMAC())
@@ -300,8 +281,6 @@ class Device(Changeable):
 
                     for __connection in _target_device.getHopConnections():
                         __key = "{}:{}".format(__connection.getTargetMAC(),__connection.getTargetInterface())
-                        if __key in _backward_interfaces:
-                            continue
                         _hob_connections[__key] = True
 
                 _filtered_connections = {k: v for k, v in _tmp_connections.items() if k not in _hob_connections}
@@ -322,7 +301,6 @@ class Device(Changeable):
                     logging.error("Not able to detect any network route of " + str(self))
 
         if connection != self.connection:
-            self.multi_connections = multi_connections
             self.connection = connection
             self.connection_state = connection_state
             return True
