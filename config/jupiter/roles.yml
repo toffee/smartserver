@@ -29,5 +29,6 @@
 - { import_role: { name: "config/jupiter/roles/ghostfolio" }, tags: [ 'ghostfolio' ] }
 - { import_role: { name: "config/jupiter/roles/vdirsyncer" }, tags: [ 'vdirsyncer' ] }
 - { import_role: { name: "config/jupiter/roles/pigallery2" }, tags: [ 'pigallery2' ] }
+#- { import_role: { name: "config/jupiter/roles/windows" }, tags: [ 'windows' ] }
 #NICETOHAVE- { import_role: { name: "config/jupiter/roles/jekyll" }, tags: [ 'jekyll' ] }
 #NICETOHAVE- { import_role: { name: "config/jupiter/roles/hugo" }, tags: [ 'hugo' ] }

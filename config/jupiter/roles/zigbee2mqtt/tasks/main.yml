@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    zigbee2mqtt_version: "1.42.0"
+    zigbee2mqtt_version: "2.0.0"
   tags: [ 'update_notifier_config' ]
 
 - name: prepare needed directories
@@ -20,7 +20,6 @@
   with_items:
     - "configuration.yaml"
     - "devices.yaml"
-    - "groups.yaml"
   notify: "restart zigbee2mqtt"
 
 - name: build podman image
