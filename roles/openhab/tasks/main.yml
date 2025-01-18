@@ -269,7 +269,7 @@
       - "{{global_etc}}openhab/python/configuration.py"
       - "{{global_etc}}openhab/conf/automation/python/lib"
   notify: "restart openhab"
-  
+ 
 - name: copy init.sh
   copy:
     src: "templates/init.sh"

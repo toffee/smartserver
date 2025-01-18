@@ -93,7 +93,7 @@
     - { import_role: { name: firewall },                                                     tags: [ 'firewall' ] }                                                                                             # firewall configuration
 
     # ************ FLUSH HANDLER ***********    
-    - { meta: flush_handlers, tags: always } # activate network configs (network & firewall). Otherwise docker related iptables rules are sometime lost and prevents to continue
+    - { meta: flush_handlers, tags: ["all"] } # activate network configs (network & firewall). Otherwise docker related iptables rules are sometime lost and prevents to continue
     # **************************************
 
     - { import_role: { name: cron },                                                         tags: [ 'cron' ] }                                                                                                 # basic cron configuration + common cron jobs
@@ -146,14 +146,14 @@
     - { import_role: { name: fluentd },                                                      tags: [ 'fluentd' ],                                            when: "monitoring_enabled" }                       # log collector
 
     # ************ FLUSH HANDLER ***********    
-    - { meta: flush_handlers, tags: always } # Previous roles are independent from upcoming roles, But lot of upcoming roles are depending from previous roles
+    - { meta: flush_handlers, tags: ["all", "mariadb", "influxdb", "php", "apache"] } # Previous roles are independent from upcoming roles, But lot of upcoming roles are depending from previous roles
     # **************************************
 
     - { import_role: { name: openhab },                                                      tags: [ 'openhab' ],                                            when: "openhab_enabled" }                          # openhab iot server
     - { import_role: { name: openhab_toolbox },                                              tags: [ 'openhab_toolbox' ],                                    when: "openhab_enabled" }                          # admin scripts and tools
 
     # ************ FLUSH HANDLER ***********
-    - { meta: flush_handlers, tags: always } # Activate openhab as soon as possible to give openhab more time to initialize until post_tasks are running
+    - { meta: flush_handlers, tags: ["all", "openhab"] } # Activate openhab as soon as possible to give openhab more time to initialize until post_tasks are running
     # **************************************
 
     - { import_role: { name: user },                                                         tags: [ 'user' ] }                                                                                                 # users (linux, samba, web ...)
@@ -206,7 +206,7 @@
     # *****************************************************************************************
 
     # ************ FLUSH HANDLER ***********
-    - { meta: flush_handlers, tags: always } # Finalize everything from 'core' bevore custom roles are deployed
+    - { meta: flush_handlers, tags: ["all"] } # Finalize everything from 'core' bevore custom roles are deployed
     # **************************************
 
     # ************ CUSTOM ROLES ************
@@ -227,7 +227,7 @@
 
     - { import_role: { name: grafana, tasks_from: create_users, handlers_from: empty },      tags: [ 'grafana', 'grafana_users' ],                           when: "grafana_enabled"}                           # create grafana users
 
-    - { import_role: { name: openhab, tasks_from: create_users, handlers_from: empty },      tags: [ 'openhab', 'openhab_users' ],                           when: "openhab_enabled" }                          # create openhab users
+    - { import_role: { name: openhab, tasks_from: apply_config, handlers_from: empty },      tags: [ 'openhab', 'openhab_users', 'openhab_config' ],         when: "openhab_enabled" }                          # create openhab users and setting various log level
 
     - { import_role: { name: update_service, tasks_from: collect_deployment_tags, handlers_from: empty }, tags: [ 'all', 'collect_deployment_tags' ],        when: "update_service_system_check_enabled" }      # get ansible tags
 
