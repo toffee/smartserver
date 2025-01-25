@@ -1,0 +1,8 @@
+- name: copy init.sh to openhab container
+  copy:
+    src: "templates/openhab/init.sh"
+    dest: "{{global_etc}}openhab/cont-init.d/init.sh"
+    owner: "{{system_users['openhab'].name}}"
+    group: "{{system_groups['openhab'].name}}"
+# restart openhab service twice but second fails
+  notify: "restart openhab" 

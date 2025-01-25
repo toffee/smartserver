@@ -9,7 +9,7 @@
 #- { import_role: { name: cloud_check }, tags: [ 'cloud_check', 'alpine' ] }
 
 # *** OPTIONAL OTHERS ***
-- { import_role: { name: vcontrold }, tags: [ 'vcontrold', 'alpine' ] }                  # heating control for viessmann vitodens            [docker,user:nobody|dialout]
+#- { import_role: { name: vcontrold }, tags: [ 'vcontrold', 'alpine' ] }                  # heating control for viessmann vitodens            [docker,user:nobody|dialout]
 - { import_role: { name: openwrt }, tags: [ 'openwrt' ] }                                # openwrt config generator
 
 #- { import_role: { name: openwrt }, tags: [ 'openwrt' ] }                               # openwrt config generator
@@ -18,6 +18,7 @@
 - { import_role: { name: "config/jupiter/roles/menuentries" }, tags: [ 'menuentries' ] } # additional menuentries for external devices
 
 - { import_role: { name: "config/jupiter/roles/hosts" }, tags: [ 'hosts' ] }             # local firewalls rules
+- { import_role: { name: "config/jupiter/roles/hosts", tasks_from: openhab }, tags: [ 'openhab' ], when: "openhab_enabled" }
 - { import_role: { name: "config/jupiter/roles/zigbee2mqtt" }, tags: [ 'zigbee2mqtt' ] } # configuration of zigbee2mqtt        
 - { import_role: { name: "config/jupiter/roles/unifi" }, tags: [ 'unifi' ] }
 - { import_role: { name: "config/jupiter/roles/mytracker" }, tags: [ 'mytracker' ] }
@@ -30,5 +31,6 @@
 - { import_role: { name: "config/jupiter/roles/vdirsyncer" }, tags: [ 'vdirsyncer' ] }
 - { import_role: { name: "config/jupiter/roles/pigallery2" }, tags: [ 'pigallery2' ] }
 #- { import_role: { name: "config/jupiter/roles/windows" }, tags: [ 'windows' ] }
+- { import_role: { name: "config/jupiter/roles/optolink-splitter" }, tags: [ 'optolink-splitter' ] }
 #NICETOHAVE- { import_role: { name: "config/jupiter/roles/jekyll" }, tags: [ 'jekyll' ] }
 #NICETOHAVE- { import_role: { name: "config/jupiter/roles/hugo" }, tags: [ 'hugo' ] }
