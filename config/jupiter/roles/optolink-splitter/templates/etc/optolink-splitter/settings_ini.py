@@ -103,6 +103,8 @@ poll_items = [
     ("getBetriebArt", 0x2323, 1, 1), #0,1,2,3,4	Abschalt,Nur WW,Heizen + WW,Dauernd Reduziert,Dauernd Normal
     ("getTempWWist", 0x0804, 2, 0.1, True),
     ("getTempWWsoll", 0x6300, 1, 1),
+    ("dhwPreparationStatus", 0x650A, 1, 1),
+    ("dhwOneTimeCharge", 0x65F5, 1, 1),
     
     # Tabelle fuer Vitocalxxx-G mit Vitotronic 200 (Typ WO1C) (ab 04/2012)
     # ("error", 0x0491, 1, 1, False),
