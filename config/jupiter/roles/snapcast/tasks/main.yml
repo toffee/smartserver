@@ -1,6 +1,6 @@
 - name: set snapcast version
   set_fact:
-    snapcast_version: "0.30.0"
+    snapcast_version: "0.31.0"
   tags: [ 'update_notifier_config' ]
 
 - name: prepare needed folder
