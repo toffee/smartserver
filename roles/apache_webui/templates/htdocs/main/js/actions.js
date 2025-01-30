@@ -80,9 +80,22 @@ mx.Actions = (function( ret ) {
         {
             //console.log(event.data['type']);
 
+            if( activeCallbacks["iframe"] != null )
+            {
+                if( activeCallbacks["iframe"][event.data['type']] != undefined )
+                {
+                    iframeElement.contentWindow.postMessage(activeCallbacks["iframe"][event.data['type']](), "*");
+                }
+
+                if( activeCallbacks["iframe"]["*"] != undefined )
+                {
+                    let message = activeCallbacks["iframe"]["*"](event.data['type']);
+                    if( message != null ) iframeElement.contentWindow.postMessage(message, "*");
+                }
+            }
+
             if( event.data['type'] == 'ping' )
             {
-                if( activeCallbacks["iframe"] != null && activeCallbacks["iframe"]["ping"] != undefined ) iframeElement.contentWindow.postMessage(activeCallbacks["iframe"]["ping"](), "*");
                 clearIFrameTimer();
                 return;
             }
@@ -296,8 +309,10 @@ mx.Actions = (function( ret ) {
     function replaceMenuContent(is_column_layout, content)
     {
         var submenu = mx.$('#content #submenu');
-        if( is_column_layout ) submenu.classList.add("multi_column");
-        else submenu.classList.remove("multi_column");
+        submenu.classList.remove("multi_column");
+        submenu.innerHTML = content;
+
+        if( is_column_layout && calculateContentHeight(submenu) > submenu.parentNode.clientHeight ) submenu.classList.add("multi_column");
     }
 
     function showMenuContent(is_column_layout, content, callbacks, title )
@@ -339,11 +354,12 @@ mx.Actions = (function( ret ) {
         if( isIFrameVisible() || submenu.innerHTML.length == 0 )
         //mx.History.getActiveNavigation() == null || mx.History.getActiveNavigation().getType() == "entry" )
         {
-            if( is_column_layout ) submenu.classList.add("multi_column");
-            else submenu.classList.remove("multi_column");
-
             submenu.style.opacity = "0";
+            submenu.classList.remove("multi_column");
             submenu.innerHTML = content;
+
+            if( is_column_layout && calculateContentHeight(submenu) > submenu.parentNode.clientHeight ) submenu.classList.add("multi_column");
+
             init_callbacks.forEach( (callback) => callback(submenu) );
             _fadeInMenu(submenu, post_callbacks);
         }
@@ -354,10 +370,11 @@ mx.Actions = (function( ret ) {
             {
                 mx.Core.waitForTransitionEnd(submenu,function()
                 {
-                    if( is_column_layout ) submenu.classList.add("multi_column");
-                    else submenu.classList.remove("multi_column");
-
+                    submenu.classList.remove("multi_column");
                     submenu.innerHTML = content;
+
+                    if( is_column_layout && calculateContentHeight(submenu) > submenu.parentNode.clientHeight ) submenu.classList.add("multi_column");
+
                     init_callbacks.forEach( (callback) => callback(submenu) );
                     _fadeInMenu(submenu, post_callbacks);
                     
@@ -366,6 +383,27 @@ mx.Actions = (function( ret ) {
             }, 0);
         }
     }
+
+    function calculateContentHeight(submenu)
+    {
+        let style = window.getComputedStyle(submenu);
+        let contentHeight = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+        for(var child=submenu.firstChild; child!==null; child=child.nextSibling) {
+            contentHeight += child.clientHeight;
+        }
+        submenu.dataset.contentHeight = contentHeight;
+        return contentHeight;
+    }
+
+    function calculateMultiColumn(){
+        if( inlineElement.style.display == "" )
+        {
+            var submenu = mx.$('#content #submenu');
+            if( submenu.dataset.contentHeight > submenu.parentNode.clientHeight ) submenu.classList.add("multi_column");
+            else submenu.classList.remove("multi_column");
+        }
+    }
+    window.addEventListener("resize", calculateMultiColumn);
 
     ret.showError = function(errorType, parameter)
     {
@@ -450,9 +488,9 @@ mx.Actions = (function( ret ) {
             {
                 let data = mx.Menu.buildContentSubMenu(subGroup); // prepare menu content
                 
-                let is_column_layout = subGroup.getEntries().length > 8 ? true : false;
+                //let is_column_layout = subGroup.getEntries().length > 8 ? true : false;
 
-                showMenuContent(is_column_layout, data['content'], data['callbacks'], subGroup.getTitle());
+                showMenuContent(true, data['content'], data['callbacks'], subGroup.getTitle());
             
                 mx.History.addMenu(subGroup);
             }

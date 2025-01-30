@@ -72,8 +72,10 @@ default_variables: {
     #     testuser1: "<sambapassword>"
     # }
 
-    gpu_enabled:                              { default: no },
-    gpu_type:                                 { dependency: "{{gpu_enabled}}" },                                    # currently only "nvidia" is supported
+    tpu_enabled:                              { default: "{{ true if tpu_type is defined else false}}" },
+    tpu_type:                                 { optional: yes },                                                    # currently only "coral" is supported
+    gpu_enabled:                              { default: "{{ true if gpu_type is defined else false}}" },
+    gpu_type:                                 { optional: yes },                                                    # currently only "nvidia" is supported
 
     usv_enabled:                              { default: no },
 
@@ -81,8 +83,13 @@ default_variables: {
     # network_devices: [
     #     {
     #         host: "{{default_server_subnet}}.100",                                                                # ip address
-    #         name: "WLan AP Inhouse",                                                                              # device Name will be used in webui for openwrt devices
+    #         name: "WLan AP Inhouse",                                                                              # device name will be used in webui
     #         config: {
+    #             webui: {                                                                                          # optional metadata, used for webui menuentries
+    #                 info: "Model Name",                                                                           # optional device info
+    #                 order: 250                                                                                    # optional device menu
+    #                 icon: "device_printer.svg"                                                                    # optional device icon
+    #             }
     #             librenms: {         # OPTIONAL used in librenms
     #                 snmp_method: "v2c",                                                                           # snmp method (v2, v3)
     #                 snmp_community_string: "intern"                                                               # snmp community string
@@ -395,6 +402,11 @@ default_variables: {
     camera_ftp_password:                      { dependency: "{{camera_enabled}}" },
     camera_ftp_max_file_age:                  { default: "{{2 * 24 * 60}}",                                         # images, older then 2 days are discarded
                                                 dependency: "{{camera_enabled}}" },
+    frigate_enabled:                          { default: no },                                                      # frigate is the successor/replacement of camera_service and camera_ftp => check https://frigate.video/ for details
+    frigate_shm_size:                         { default: "128m",
+                                                dependency: "{{frigate_enabled}}" },
+    frigate_tmpfs_size:                       { default: "512m",
+                                                dependency: "{{frigate_enabled}}" },
     # **** END CAMERA SERVICE                                                          ***
     # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -793,6 +805,7 @@ podman_cloud_check_ip:            "172.16.0.202"
 podman_camera_ftp_ip:             "172.16.0.203"
 podman_camera_service_ip:         "172.16.0.204"
 podman_ci_service_ip:             "172.16.0.205"
+podman_frigate_ip:                "172.16.0.206"
 
 podman_zigbee2mqtt_ip:            "172.16.0.210"
 podman_recorder_ip:               "172.16.0.211"

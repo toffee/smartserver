@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    netdata_version: "2.2.0"
+    netdata_version: "2.2.1"
   tags: [ 'update_notifier_config' ]
 
 - name: prepare needed directories
@@ -151,6 +151,14 @@
   include_tasks: roles/prometheus/shared/add_config.yml
   tags: ['prometheus_config']
   when: "monitoring_enabled"
+
+- name: register system package dependency
+  vars:
+    tag: "netdata"
+    roles: ["hardware_gpu"]
+  include_tasks: roles/update_service/shared/add_dependency.yml
+  tags: ['update_system_config']
+  when: "update_service_system_check_enabled"
 
 - name: register update notifier
   vars:
