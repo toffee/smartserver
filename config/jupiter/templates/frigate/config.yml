@@ -1,0 +1,130 @@
+# check https://docs.frigate.video/configuration/reference for details
+#
+# check also "roles/frigate/templates/etc/frigate/config.yaml" to see default values which are already predefined
+
+detectors:
+  ov:
+    type: openvino
+    device: GPU
+
+model:
+  width: 300
+  height: 300
+  input_tensor: nhwc
+  input_pixel_format: bgr
+  path: /openvino-model/ssdlite_mobilenet_v2.xml
+  labelmap_path: /openvino-model/coco_91cl_bkgr.txt
+
+go2rtc:
+  streams:
+    cam01_main:
+      - rtsp://{{vault_camera_01_username}}:{{ vault_camera_01_password }}@{{custom_camera_01_ip}}:554/streaming/channels/101
+    cam01_third:
+      - rtsp://{{vault_camera_01_username}}:{{ vault_camera_01_password }}@{{custom_camera_01_ip}}:554/streaming/channels/103
+    cam02_main:
+      - rtsp://{{vault_camera_02_username}}:{{ vault_camera_02_password }}@{{custom_camera_02_ip}}:554/streaming/channels/101
+    cam02_third:
+      - rtsp://{{vault_camera_02_username}}:{{ vault_camera_02_password }}@{{custom_camera_02_ip}}:554/streaming/channels/103
+    cam03_main:
+      - rtsp://{{vault_camera_03_username}}:{{ vault_camera_03_password }}@{{custom_camera_03_ip}}:554/streaming/channels/101
+    cam03_third:
+      - rtsp://{{vault_camera_03_username}}:{{ vault_camera_03_password }}@{{custom_camera_03_ip}}:554/streaming/channels/103
+    cam04_main:
+      - rtsp://{{vault_camera_04_username}}:{{ vault_camera_04_password }}@{{custom_camera_04_ip}}:554/streaming/channels/101
+    cam04_third:
+      - rtsp://{{vault_camera_04_username}}:{{ vault_camera_04_password }}@{{custom_camera_04_ip}}:554/streaming/channels/103
+    cam05_main:
+      - rtsp://{{vault_camera_05_username}}:{{ vault_camera_05_password }}@{{custom_camera_05_ip}}:554/streaming/channels/101
+    cam05_third:
+      - rtsp://{{vault_camera_05_username}}:{{ vault_camera_05_password }}@{{custom_camera_05_ip}}:554/streaming/channels/103
+
+cameras:
+  cam01:
+    enabled: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/cam01_main
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/cam01_third
+          roles:
+            - detect
+    live:
+      stream_name: cam01_main
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+    webui_url: "http://{{custom_camera_01_ip}}"
+  
+  cam02:
+    enabled: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/cam02_main
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/cam02_third
+          roles:
+            - detect
+    live:
+      stream_name: cam02_main
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+    webui_url: "http://{{custom_camera_02_ip}}"
+    
+  cam03:
+    enabled: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/cam03_main
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/cam03_third
+          roles:
+            - detect
+    live:
+      stream_name: cam03_main
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+    webui_url: "http://{{custom_camera_03_ip}}"
+    
+  cam04:
+    enabled: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/cam04_main
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/cam04_third
+          roles:
+            - detect
+    live:
+      stream_name: cam04_main
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+    webui_url: "http://{{custom_camera_04_ip}}"
+    
+  cam05:
+    enabled: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/cam05_main
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/cam05_third
+          roles:
+            - detect
+    live:
+      stream_name: cam05_main
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+    webui_url: "http://{{custom_camera_05_ip}}"
