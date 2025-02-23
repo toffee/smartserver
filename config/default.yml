@@ -365,7 +365,12 @@ default_variables: {
     openhab_mariadb_username:                 { default: "openhab",                                                 # used for openhab data
                                                 dependency: "{{openhab_enabled}}" },
     openhab_mariadb_password:                 { dependency: "{{openhab_enabled}}" },
-
+    openhab_extra_args:                       { default: {                                                          # used for various configs
+                                                    upnp: {
+                                                        interface: "{{default_network_interface}}", ip: "{{default_server_ip}}",
+                                                    }
+                                                },
+                                                dependency: "{{openhab_enabled}}" },
     openhab_custom_value_map:                 { optional: yes,                                                      # value map to provide custom variables (like vault vars) to openhab jython scripting
                                                 dependency: "{{openhab_enabled}}" },
     # openhab_custom_value_map: [
@@ -735,7 +740,7 @@ default_variables: {
 project_name:                     "smartserver"
 
 # version of alpine linux used in several container based roles
-alpine_version:                   "3.21.2"
+alpine_version:                   "3.21.3"
 
 flask_version:                    "3.0.0"
 flask_socketio_version:           "5.3.6"
