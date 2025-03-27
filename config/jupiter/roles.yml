@@ -33,4 +33,9 @@
 #- { import_role: { name: "config/jupiter/roles/windows" }, tags: [ 'windows' ] }
 - { import_role: { name: "config/jupiter/roles/optolink-splitter" }, tags: [ 'optolink-splitter' ] }
 #NICETOHAVE- { import_role: { name: "config/jupiter/roles/jekyll" }, tags: [ 'jekyll' ] }
-#NICETOHAVE- { import_role: { name: "config/jupiter/roles/hugo" }, tags: [ 'hugo' ] }
+- { import_role: { name: "config/jupiter/roles/hugo" }, tags: [ 'hugo' ] }
+- { import_role: { name: "config/jupiter/roles/fittrackee" }, tags: [ 'fittrackee' ], when: "fittrackee_enabled"}
+
+- meta: flush_handlers
+
+- { import_role: { name: config/jupiter/roles/fittrackee, tasks_from: create_users }, tags: [ 'fittrackee' ], when: "fittrackee_enabled"} # create fittrackee users

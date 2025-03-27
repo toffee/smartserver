@@ -1,0 +1,100 @@
+- name: set version
+  set_fact:
+    fittrackee_version: '0.9.4'
+  tags: [ 'update_notifier_config' ]
+
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rwx,o=rwx", owner: "root", group: "root", path: "{{global_lib}}fittrackee" }
+      - { mode: "u=rwx,g=rwx,o=rwx", owner: "root", group: "root", path: "{{global_log}}fittrackee" }
+  include_tasks: roles/_shared/create_directories.yml
+
+- name: build container image
+  vars:
+    container_name: "fittrackee"
+    image_name: "custom_fittrackee:{{fittrackee_version}}"
+    image_files:
+      - "{{config_path}}/roles/fittrackee/templates/container/Dockerfile"
+      - "{{config_path}}/roles/fittrackee/templates/container/docker-entrypoint.sh"
+  include_tasks: roles/container/shared/build_podman_image.yml
+
+- name: create container service
+  vars:
+    container_name: "fittrackee"
+    container_image: "custom_fittrackee:{{fittrackee_version}}"
+#    container_image: fittrackee/fittrackee:v{{fittrackee_version}}
+    container_network: "host"
+    container_exposed_ports:
+      - "5000"
+    container_env:
+      FLASK_APP: "fittrackee"
+      FLASK_SKIP_DOTENV: 1
+      APP_PORT: 5000
+      APP_SECRET_KEY: "{{fittrackee_jwt_key}}"
+      APP_LOG: "/usr/src/app/logs/fittrackee.log"
+      POSTGRES_DB: "fittrackee"
+      POSTGRES_USER: "{{fittrackee_postgres_username}}"
+      POSTGRES_PASSWORD: "{{fittrackee_postgres_password}}"
+      DATABASE_URL: "postgresql://{{fittrackee_postgres_username}}:{{fittrackee_postgres_password}}@postgres:5432/{{fittrackee_postgres_db}}"
+      REDIS_URL: "redis://redis:6379"
+      UI_URL: "https://fittrackee.{{server_domain}}/"
+      EMAIL_URL: "smtp://postfix:25"
+      SENDER_EMAIL: "{{root_email}}"
+      #SCRIPT_NAME: "/fittrackee"
+    container_volumes:
+      - "{{global_lib}}fittrackee:/usr/src/app/fittrackee/uploads:rw"
+      - "{{global_log}}fittrackee:/usr/src/app/logs:rw"
+#    container_command:
+#      - "docker-entrypoint.sh"
+    container_after: [ "postgres" ]
+    container_readyness: { "type": "port_check", "ip": "127.0.0.1", "port": "5000" }
+  include_tasks: roles/container/shared/create_podman_service.yml
+  tags: ['podman_container','systemd_watcher_config','systemd_service_config']
+
+- name: add container name
+  vars:
+    host_name: "fittrackee"
+    host_ip_address: "{{default_server_ip}}"
+  include_tasks: roles/_shared/add_to_hosts.yml
+
+- name: create database
+  vars:
+    database: "{{fittrackee_postgres_db}}"
+    username: "{{fittrackee_postgres_username}}"
+    password: "{{fittrackee_postgres_password}}"
+    backup: yes
+  include_tasks: roles/postgres/shared/add_database.yml
+  tags: ['cron_job','backup_restore']
+  when: "postgres_enabled"
+
+# ***** FINALIZE *****
+- name: register webui
+  vars:
+    name: "fittrackee"
+    js_file: "templates/webui/fittrackee.js"
+    icons: [ 'templates/webui/icons/fittrackee_logo.svg' ]
+  include_tasks: roles/apache_webui/shared/add_webui.yml
+  tags: ['apache_webui_config']
+
+- name: copy apache vhost
+  vars:
+    sub_domain: "fittrackee"
+    usergroup: "user"
+    include: "templates/etc/apache2/_.ansible.vhost.d/fittrackee.inc"
+  include_tasks: roles/apache/shared/add_vhost.yml
+  tags: ['apache_config']
+
+- name: register update notifier
+  vars:
+    name: "fittrackee"
+    type: "docker"
+    url: "https://github.com/SamR1/FitTrackee/releases"
+    config: {
+      repository: "fittrackee/fittrackee",
+      pattern: "^v([0-9\\.]+)$"
+    }
+  include_tasks: roles/update_service/shared/add_software.yml
+  tags: ['update_notifier_config']
+  when: "update_service_software_check_enabled"
+  

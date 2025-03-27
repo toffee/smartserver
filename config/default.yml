@@ -170,9 +170,6 @@ default_variables: {
     monitoring_enabled:                       { default: yes },                                                     # enabled by default
     hardware_smartd_temperature:              { default: 50,                                                        # threshold temperature for alert
                                                 dependency: "{{monitoring_enabled}}" },
-
-    hardware_smartd_temperature:              { default: 50,                                                        # threshold temperature for alert
-                                                dependency: "{{monitoring_enabled}}" },
     
     # Roles:
     # - 'grafana'
@@ -705,6 +702,22 @@ default_variables: {
     unifi_mongo_db:                           { "default": "unifi",
                                                 dependency: "{{unifi_enabled}}" },
     # **** END FIREFLY III                                                             ***
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    
+    # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    # **** BEGIN FITTRACKEE                                                            ***
+    # Self-hosted outdoor activity tracker
+    # Roles:
+    # - 'fittrackee'
+    fittrackee_enabled:                       { default: no,                                                       # disabled by default
+                                                requirement: "postgres_enabled,redis_enabled" },
+    fittrackee_jwt_key:                       { dependency: "{{fittrackee_enabled}}" },
+    fittrackee_postgres_db:                   { "default": "fittrackee",
+                                                dependency: "{{fittrackee_enabled}}" },
+    fittrackee_postgres_username:             { "default": "fittrackee",
+                                                dependency: "{{fittrackee_enabled}}" },
+    fittrackee_postgres_password:             { dependency: "{{fittrackee_enabled}}" },
+    # **** END FITTRACKEE                                                              ***
     # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 }
 

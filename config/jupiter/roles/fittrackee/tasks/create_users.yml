@@ -1,0 +1,4 @@
+- name: add new user
+  shell: "podman exec fittrackee ftcli users create --email {{userdata[item].email}} --password {{userdata[item].password}} --role {{'admin' if 'admin' in userdata[item].groups else 'user'}} {{item}}"  
+  with_items: "{{userdata}}"
+  tags: [ 'user' ]
