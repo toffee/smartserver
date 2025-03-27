@@ -15,6 +15,12 @@
   include_tasks: roles/container/shared/create_podman_service.yml
   tags: ['podman_container','systemd_watcher_config','systemd_service_config']
 
+- name: add service name
+  vars:
+    host_name: "redis"
+    host_ip_address: "{{podman_redis_ip}}"
+  include_tasks: roles/_shared/add_to_hosts.yml
+
 #- name: allow container service
 #  vars:
 #    service_name: "redis"
