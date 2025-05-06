@@ -1,7 +1,7 @@
 - name: set terminus version
   set_fact:
     terminus_version: '23.05.5'
-    tasmota_version: '14.5.0'
+    tasmota_version: '14.6.0'
   tags: [ 'update_notifier_config' ]
 
 - name: prepare needed directories
