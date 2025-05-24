@@ -115,7 +115,10 @@
             , "FTLCONF_dhcp_start": "{{dhcp_range_start}}"
             , "FTLCONF_dhcp_end": "{{dhcp_range_end}}"
             , "FTLCONF_dhcp_router": "{{default_server_gateway}}"
-            , "FTLCONF_dhcp_leaseTime": "24"
+            , "FTLCONF_dhcp_leaseTime": "24h"
+            , "FTLCONF_ntp_ipv4_active": "false"
+            , "FTLCONF_ntp_ipv6_active": "false"
+            , "FTLCONF_misc_etc_dnsmasq_d" : "true"
         {% endif %}
       }
     container_volumes:
