@@ -20,7 +20,7 @@
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['librenms'].name}}", group: "{{system_groups['librenms'].name}}", path: "{{global_lib}}librenms/alert-templates" }
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['librenms'].name}}", group: "{{system_groups['librenms'].name}}", path: "{{global_lib}}librenms/monitoring-plugins" }
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['librenms'].name}}", group: "{{system_groups['librenms'].name}}", path: "{{global_lib}}librenms/plugins" }
-      - { mode: "u=rwx,g=rwx,o=", owner: "{{system_users['librenms'].name}}", group: "{{system_groups['librenms'].name}}", path: "{{global_lib}}librenms/rrd" }                 # mode sync with librenms entrypoint
+      - { mode: "u=rwx,g=rwx,o=rx", owner: "{{system_users['librenms'].name}}", group: "{{system_groups['librenms'].name}}", path: "{{global_lib}}librenms/rrd" }                 # mode sync with librenms entrypoint
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['librenms'].name}}", group: "{{system_groups['librenms'].name}}", path: "{{global_lib}}librenms/weathermap" }
   include_tasks: roles/_shared/create_directories.yml
 
@@ -57,6 +57,8 @@
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
       REDIS_DB: "1"
+      CACHE_DRIVER: "redis"
+      MEMORY_LIMIT: "2048M"
 #      APP_URL: "https://librenms.{{server_domain}}/"
 #      LIBRENMS_BASE_URL: "https://librenms.{{server_domain}}/"
     container_exposed_ports:
