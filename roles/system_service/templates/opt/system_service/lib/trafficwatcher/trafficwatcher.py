@@ -271,6 +271,7 @@ class TrafficWatcher(threading.Thread):
                     service_key = TrafficHelper.getServiceKey(con.dest, con.dest_port) if src_is_external else None
                     if service_key in self.allowed_isp_pattern:
                         if location_org and "org" in self.allowed_isp_pattern[service_key] and self.allowed_isp_pattern[service_key]["org"].match(location_org):
+                            #logging.info("Traffic allowed due to {} matches {}".format(location_org, self.allowed_isp_pattern[service_key]["org"]))
                             allowed = True
                         elif extern_hostname and "hostname" in self.allowed_isp_pattern[service_key] and self.allowed_isp_pattern[service_key]["hostname"].match(extern_hostname):
                             allowed = True
