@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    ghostfolio_version: '2.162.1'
+    ghostfolio_version: '2.167.0'
   tags: [ 'update_notifier_config' ]
 
 - name: create container service
