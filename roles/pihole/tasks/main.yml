@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    pihole_version: '2025.04.0'
+    pihole_version: '2025.06.2'
   tags: [ 'update_notifier_config' ]
 
 - name: "create user and group => user or group does not exists"
@@ -13,8 +13,8 @@
 - name: prepare needed directories
   vars:
     directories:
-      - { mode: "u=rwx,g=rwx,o=", owner: "{{system_users['pihole'].name}}", group: "{{system_groups['pihole'].name}}", path: "{{ global_etc }}pihole/" }
-      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['pihole'].name}}", group: "{{system_groups['pihole'].name}}", path: "{{ global_etc }}pihole/dnsmasq.d/" }
+      - { mode: "u=rwx,g=rx,o=rx", owner: "{{system_users['pihole'].name}}", group: "{{system_groups['pihole'].name}}", path: "{{ global_etc }}pihole/" }
+      - { mode: "u=rwx,g=rx,o=rx", owner: "{{system_users['pihole'].name}}", group: "{{system_groups['pihole'].name}}", path: "{{ global_etc }}pihole/dnsmasq.d/" }
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['pihole'].name}}", group: "{{system_groups['pihole'].name}}", path: "{{ global_lib }}pihole/" }
   include_tasks: roles/_shared/create_directories.yml
 
