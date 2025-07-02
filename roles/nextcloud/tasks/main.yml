@@ -206,7 +206,7 @@
 #  tags: [ 'user' ]
 
 - name: check for existing admin users
-  shell: "podman exec php php {{htdocs_path}}nextcloud/occ group:list -l 1"
+  shell: "podman exec php php {{htdocs_path}}nextcloud/occ group:list --info --output=json_pretty"
   register: nextcloud_group_result
   changed_when: False
   tags: [ 'user' ]
@@ -215,18 +215,9 @@
   shell: "podman exec php php {{htdocs_path}}nextcloud/occ group:adduser admin {{item}}"
   register: result
   failed_when: "result.rc != 0"
-  when: "'admin' in userdata[item].groups and '- ' + item not in nextcloud_group_result.stdout"
+  when: "'admin' in userdata[item].groups and item not in (nextcloud_group_result.stdout | from_json)['admin']['users']"
   with_items: "{{userdata}}"
   tags: [ 'user' ]
-
-- name: prepare user folder # => needed for initial cloud backup links
-  file:
-    path: "{{nextcloud_data_path}}/{{item}}"
-    state: directory
-    owner: "{{system_users['www'].name}}"
-    group: "{{system_groups['www'].name}}"
-  when: "'user' in userdata[item].groups"
-  with_items: "{{userdata}}"
 
 # ***** FINALIZE *****
 - name: create cron job 'cron.php'
