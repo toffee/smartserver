@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    fittrackee_version: '0.10.2'
+    fittrackee_version: '0.10.3'
   tags: [ 'update_notifier_config' ]
 
 - name: prepare needed directories
