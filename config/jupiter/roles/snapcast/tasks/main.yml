@@ -1,6 +1,6 @@
 - name: set snapcast version
   set_fact:
-    snapcast_version: "0.31.0"
+    snapcast_version: "0.32.1"
   tags: [ 'update_notifier_config' ]
 
 - name: prepare needed folder
@@ -43,7 +43,7 @@
   shell: |
     mkdir build
     cd build
-    cmake .. -DBUILD_CLIENT=ON -DBUILD_SERVER=OFF -DBUILD_WITH_PULSE=OFF
+    cmake .. -DBUILD_CLIENT=ON -DBUILD_SERVER=OFF -DBUILD_WITH_PULSE=OFF -DBUILD_WITH_EXPAT=OFF
     cmake --build .
     install -s -D -g root -o root ../bin/snapclient /usr/bin/snapclient
     install -D -g root -o root ../client/snapclient.1 /usr/share/man/man1/snapclient.1

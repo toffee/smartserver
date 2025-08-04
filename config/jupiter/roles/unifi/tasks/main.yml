@@ -14,8 +14,8 @@
 
 - name: set unifi version
   set_fact:
-    unifi_version: "9.2.87-ls93"
-    mongo_version: "8.0.9-noble"
+    unifi_version: "9.3.45-ls99"
+    mongo_version: "8.0.12-noble"
     unifi_uid: "{{system_users['unifi'].id}}"
     unifi_user: "{{system_users['unifi'].name}}"
     unifi_gid: "{{system_groups['unifi'].id}}"
