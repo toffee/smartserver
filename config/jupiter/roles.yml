@@ -36,6 +36,6 @@
 - { import_role: { name: "config/jupiter/roles/hugo" }, tags: [ 'hugo' ] }
 - { import_role: { name: "config/jupiter/roles/fittrackee" }, tags: [ 'fittrackee' ], when: "fittrackee_enabled"}
 
-- meta: flush_handlers
+- { meta: flush_handlers, tags: ["all", "fittrackee"] }
 
 - { import_role: { name: config/jupiter/roles/fittrackee, tasks_from: create_users }, tags: [ 'fittrackee' ], when: "fittrackee_enabled"} # create fittrackee users

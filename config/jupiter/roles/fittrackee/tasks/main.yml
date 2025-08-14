@@ -1,12 +1,13 @@
 - name: set version
   set_fact:
-    fittrackee_version: '0.11.1'
+    fittrackee_version: '0.11.2'
   tags: [ 'update_notifier_config' ]
 
 - name: prepare needed directories
   vars:
     directories:
-      - { mode: "u=rwx,g=rwx,o=rwx", owner: "root", group: "root", path: "{{global_lib}}fittrackee" }
+      - { mode: "u=rwx,g=rwx,o=rwx", owner: "root", group: "root", path: "{{global_lib}}fittrackee/uploads" }
+      - { mode: "u=rwx,g=rwx,o=rwx", owner: "root", group: "root", path: "{{global_lib}}fittrackee/.staticmap_cache" }
       - { mode: "u=rwx,g=rwx,o=rwx", owner: "root", group: "root", path: "{{global_log}}fittrackee" }
   include_tasks: roles/_shared/create_directories.yml
 
@@ -43,7 +44,8 @@
       SENDER_EMAIL: "{{root_email}}"
       #SCRIPT_NAME: "/fittrackee"
     container_volumes:
-      - "{{global_lib}}fittrackee:/usr/src/app/fittrackee/uploads:rw"
+      - "{{global_lib}}fittrackee/uploads:/usr/src/app/fittrackee/uploads:rw"
+      - "{{global_lib}}fittrackee/.staticmap_cache:/usr/src/app/.staticmap_cache:rw"
       - "{{global_log}}fittrackee:/usr/src/app/logs:rw"
 #    container_command:
 #      - "docker-entrypoint.sh"
