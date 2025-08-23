@@ -1,6 +1,6 @@
 - name: set terminus version
   set_fact:
-    terminus_version: '23.05.5'
+    terminus_version: '24.10.2'
     tasmota_version: '15.0.1'
   tags: [ 'update_notifier_config' ]
 
