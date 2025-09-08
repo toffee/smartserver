@@ -334,7 +334,7 @@
       GROUP_ID: "{{system_groups['openhab'].id}}"
       EXTRA_JAVA_OPTS: "{{ openhab_extra_args | join(' ') }}"
       EXTRA_SHELL_OPTS: "+x" # disable debug logs in entrypoint bash script
-      OPENHAB_HTTP_ADDRESS: "0.0.0.0"
+      OPENHAB_HTTP_ADDRESS: "127.0.0.1"
       CRYPTO_POLICY: "unlimited"
       LC_ALL: "{{locale}}" # Language settings are needed to have correct 'locale' support in graal based scripting languages like javascript or python
       LANG: "{{locale}}"
