@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    fireflyiii_core_version: 'version-6.3.2'
+    fireflyiii_core_version: 'version-6.4'
     fireflyiii_importer_version: 'version-1.7.10'
   tags: [ 'update_notifier_config' ]
 
