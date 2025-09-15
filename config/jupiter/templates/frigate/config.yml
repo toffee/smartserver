@@ -49,8 +49,9 @@ cameras:
         - path: rtsp://127.0.0.1:8554/cam01_third
           roles:
             - detect
-    live:
-      stream_name: cam01_main
+    live:      
+      streams:
+        main_stream: cam01_main
     detect:
       enabled: true
       width: 1280
@@ -67,8 +68,9 @@ cameras:
         - path: rtsp://127.0.0.1:8554/cam02_third
           roles:
             - detect
-    live:
-      stream_name: cam02_main
+    live:      
+      streams:
+        main_stream: cam02_main
     detect:
       enabled: true
       width: 1280
@@ -85,8 +87,9 @@ cameras:
         - path: rtsp://127.0.0.1:8554/cam03_third
           roles:
             - detect
-    live:
-      stream_name: cam03_main
+    live:      
+      streams:
+        main_stream: cam03_main
     detect:
       enabled: true
       width: 1280
@@ -103,8 +106,9 @@ cameras:
         - path: rtsp://127.0.0.1:8554/cam04_third
           roles:
             - detect
-    live:
-      stream_name: cam04_main
+    live:      
+      streams:
+        main_stream: cam04_main
     detect:
       enabled: true
       width: 1280
@@ -121,8 +125,9 @@ cameras:
         - path: rtsp://127.0.0.1:8554/cam05_third
           roles:
             - detect
-    live:
-      stream_name: cam05_main
+    live:      
+      streams:
+        main_stream: cam05_main
     detect:
       enabled: true
       width: 1280
