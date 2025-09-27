@@ -68,18 +68,21 @@ class DeploymentUpdate:
                     last_git_hash = commits[0].split("\t")[0]
 
                     result = GitHub.getStates(repository_owner, self.config.global_config["github_auth_token"], last_git_hash)
-                    
-                    states = Counter(result.values())
-                    
-                    if "failure" in states:
-                        smartserver_code = "ci_failed"
-                    elif "pending" in states:
-                        smartserver_code = "ci_pending"
-                    elif "success" not in states:
-                        smartserver_code = "ci_missing"
+                    if result:
+                        states = Counter(result.values())
+                        
+                        if "failure" in states:
+                            smartserver_code = "ci_failed"
+                        elif "pending" in states:
+                            smartserver_code = "ci_pending"
+                        elif "success" not in states:
+                            smartserver_code = "ci_missing"
+                        else:
+                            can_pull = True
+                            smartserver_code = "pulled_tested"
                     else:
                         can_pull = True
-                        smartserver_code = "pulled_tested"
+                        smartserver_code = "pulled_untested"
                 else:
                     can_pull = True
                     smartserver_code = "pulled_untested"
