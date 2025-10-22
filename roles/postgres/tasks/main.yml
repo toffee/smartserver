@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    postgres_version: "17.6-alpine3.22"
+    postgres_version: "17-3.6-alpine"
   tags: [ 'update_notifier_config' ]
 
 - name: "create user and group => user or group does not exists"
@@ -102,8 +102,8 @@
     type: "docker"
     url: "https://www.postgresql.org/docs/release/"
     config: {
-      repository: "postgres",
-      pattern: "^([0-9\\.]+)-alpine([0-9\\.]+)$"
+      repository: "postgis/postgis",
+      pattern: "^([0-9]+)-([0-9\\.]+)-alpine$"
     }
   include_tasks: roles/update_service/shared/add_software.yml
   tags: ['update_notifier_config']

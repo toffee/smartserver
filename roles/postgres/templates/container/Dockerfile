@@ -1,4 +1,4 @@
-FROM postgres:{{postgres_version}}
+FROM postgis/postgis:{{postgres_version}}
 
 USER root
 
