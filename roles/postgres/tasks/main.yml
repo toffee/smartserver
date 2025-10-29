@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    postgres_version: "17-3.6-alpine"
+    postgres_version: "18-3.6-alpine"
   tags: [ 'update_notifier_config' ]
 
 - name: "create user and group => user or group does not exists"
@@ -52,10 +52,11 @@
       - "5432"
     container_env:
       POSTGRES_PASSWORD: "{{postgres_password}}"
+      #PGDATA: "/var/lib/postgresql/17/docker"
       TZ: "{{timezone}}"
     container_volumes:
       - '{{ global_etc }}postgres:/etc/postgresql'
-      - '{{ global_lib }}postgres:/var/lib/postgresql/data'
+      - '{{ global_lib }}postgres:/var/lib/postgresql'
     container_readyness: {  "type": "port_check", "ip": "{{podman_postgres_ip}}", "port": "5432" }
   include_tasks: roles/container/shared/create_podman_service.yml
   tags: ['podman_container','systemd_watcher_config','systemd_service_config']
