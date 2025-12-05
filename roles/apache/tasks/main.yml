@@ -1,17 +1,17 @@
 - name: set version
   set_fact:
     apache_version: '2.4.65'
-    openidc_version: '2.4.18.1'
+    openidc_version: '2.4.19'
   tags: [ 'update_notifier_config' ]
   
 # SELFSIGNED CERTIFICATE
-- name: install required packages => is_rhel or is_fedora
+- name: install required packages => is_rhel
   yum:
     name: [
       python3-cryptography
     ]
     state: present
-  when: is_rhel or is_fedora
+  when: is_rhel
   
 - name: install required packages => is_ubuntu
   apt:
