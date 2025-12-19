@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    pgadmin_version: "9.10"
+    pgadmin_version: "9.11"
   tags: [ 'update_notifier_config' ]
   
 - name: prepare needed folder
