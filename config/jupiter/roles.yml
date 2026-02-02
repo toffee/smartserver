@@ -35,6 +35,7 @@
 #NICETOHAVE- { import_role: { name: "config/jupiter/roles/jekyll" }, tags: [ 'jekyll' ] }
 - { import_role: { name: "config/jupiter/roles/hugo" }, tags: [ 'hugo' ] }
 - { import_role: { name: "config/jupiter/roles/fittrackee" }, tags: [ 'fittrackee' ], when: "fittrackee_enabled"}
+- { import_role: { name: "config/jupiter/roles/onyx" }, tags: [ 'onyx' ]}
 
 - { meta: flush_handlers, tags: ["all", "fittrackee"] }
 

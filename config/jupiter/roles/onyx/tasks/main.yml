@@ -1,0 +1,19 @@
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rwx,o=rwx", owner: "root", group: "root", path: "{{global_log}}onyx" }
+  include_tasks: roles/_shared/create_directories.yml
+
+# ***** CRONJOB FOR SYNC ****
+- name: create cron job
+  vars:
+    name: "Onyx sync job"
+    cmd: "/root/git/toffee/onyx/bin/run_sync.sh"
+    group: "onyx"
+    weekday: "0"
+    hour: "7"
+    minute: "30"
+  include_tasks: roles/cron/shared/add_cronjob.yml
+  tags: ['cron_job']
+
+
