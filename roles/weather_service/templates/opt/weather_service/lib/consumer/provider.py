@@ -12,193 +12,34 @@ from smartserver.confighelper import ConfigHelper
 from smartserver.metric import Metric
 
 from lib.db import DBException
-from lib.helper.forecast import WeatherBlock, WeatherHelper
+from lib.helper.forecast import WeatherBlock, WeatherBlockList, WeatherHelper
+from lib.helper.fields import CurrentFields, ForecastFields, CurrentFieldFallbackMappings
 
 
-class ProviderConsumer():
-    '''Handler client'''
-    def __init__(self, config, mqtt, db, handler ):
-        location = config.location.split(",")
-        self.latitude = float(location[0])
-        self.longitude = float(location[1])
-
-        self.handler = handler
-
-        self.is_running = False
-
-        self.mqtt = mqtt
+class CurrentValues():
+    def __init__(self, db, latitude, longitude, icon_path, notify_callback):
         self.db = db
+        self.latitude = latitude
+        self.longitude = longitude
 
-        self.dump_path = "{}consumer_provider.json".format(config.lib_path)
-        self.version = 1
-        self.valid_cache_file = True
-
-        self.processed_current_values = None
-        self.processed_forecast_values = None
-
-        self.consume_errors = { "forecast": 0, "current": 0, "summery": 0 }
-        self.consume_refreshed = { "forecast": 0, "current": 0, "summery": 0 }
-
-        self.icon_path = config.icon_path
-
+        self.icon_path = icon_path
         self.icon_cache = {}
 
-        self.last_consume_error = None
+        self.notify_callback = notify_callback
 
         self.current_is_raining = False
-
-        self.station_fallback_lock = threading.Lock()
-        self.station_fallback_data = None
-        self.station_cloud_timer = None
-        self.station_cloud_svg = None
+        self.current_is_night = False
 
         self.station_values = {}
         self.station_values_last_modified = 0
 
-        self.is_night = False;
+        self.service_values = {}
 
-        with self.db.open() as db:
-            self.field_names = db.getFields()
-            self.current_values = db.getOffset(0)
+        self.current_values = {}
 
-    def start(self):
-        self._restore()
-        if not os.path.exists(self.dump_path):
-            self._dump()
+        self.build_lock = threading.Lock()
 
-        self.mqtt.subscribe('+/weather/provider/#', self.on_message)
-
-        self.checkSunriseSunset()
-        self.is_running = True
-
-    def terminate(self):
-        if self.is_running and os.path.exists(self.dump_path):
-            self._dump()
-        self.is_running = False
-
-    def _restore(self):
-        self.valid_cache_file, data = ConfigHelper.loadConfig(self.dump_path, self.version )
-        if data is not None:
-            self.consume_refreshed = data["consume_refreshed"]
-            logging.info("Loaded consumer (provider) values")
-
-    def _dump(self):
-        if self.valid_cache_file:
-            ConfigHelper.saveConfig(self.dump_path, self.version, { "consume_refreshed": self.consume_refreshed } )
-            logging.info("Saved consumer (provider) values")
-
-    def on_message(self,client,userdata,msg):
-        topic = msg.topic.split("/")
-        if topic[3] == u"current":
-            state_name = "current"
-        elif topic[3] == u"forecast":
-            state_name = "forecast"
-        if topic[3] == u"items":
-            state_name = "summary"
-
-        is_refreshed = topic[4] == u"refreshed"
-
-        try:
-            #logging.info("Topic " + msg.topic + ", message:" + str(msg.payload))
-            if state_name == u"current":
-                if is_refreshed:
-                    if self.processed_current_values is not None:
-                        currentIsModified = False
-                        with self.db.open() as db:
-                            datetime_str = msg.payload.decode("utf-8")
-                            #logging.info(datetime_str)
-                            #datetime_str = u"{0}{1}".format(datetime_str[:-3],datetime_str[-2:])
-                            validFrom = datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%S%z')
-                            update_values = []
-                            for field in self.processed_current_values:
-                                self.processed_current_values[field] = float(self.processed_current_values[field]) if "." in self.processed_current_values[field] else int(self.processed_current_values[field])
-                                if field in self.field_names:
-                                    update_values.append("`{}`='{}'".format(field,self.processed_current_values[field]))
-
-                            if db.hasEntry(validFrom.timestamp()):
-                                currentIsModified = db.update(validFrom.timestamp(),update_values)
-                                self.current_values = db.getOffset(0)
-                                logging.info(u"Current data processed • Updated {}".format( "yes" if currentIsModified else "no" ))
-                            else:
-                                logging.info(u"Current data not updated: Topic: " + msg.topic + ", message:" + str(msg.payload))
-
-                        self.processed_current_values = None
-                        if currentIsModified:
-                            with self.station_fallback_lock:
-                                if self.station_fallback_data is not None:
-                                    for field, value in self._buildFallbackStationValues().items():
-                                        if field in self.station_fallback_data and self.station_fallback_data[field] == value:
-                                            continue
-                                        self.station_fallback_data[field] = value
-                                        self.notifyCurrentValue(field, value)
-                    else:
-                        logging.info("Current not processed")
-                else:
-                    if self.processed_current_values is None:
-                        self.processed_current_values = {}
-                    self.processed_current_values[topic[4]] = msg.payload.decode("utf-8")
-            elif state_name == u"forecast":
-                if is_refreshed:
-                    if self.processed_forecast_values is not None:
-                        forecastsIsModified = False
-                        updateCount = 0
-                        insertCount = 0
-                        with self.db.open() as db:
-                            for timestamp in self.processed_forecast_values:
-                                validFrom = datetime.fromtimestamp(int(timestamp))
-                                update_values = []
-                                for field in self.processed_forecast_values[timestamp]:
-                                    update_values.append(u"`{}`='{}'".format(field,self.processed_forecast_values[timestamp][field]))
-
-                                isUpdate = db.hasEntry(validFrom.timestamp())
-                                try:
-                                    isModified = db.insertOrUpdate(validFrom.timestamp(),update_values)
-                                    if isModified:
-                                        forecastsIsModified = True
-                                        if isUpdate:
-                                            updateCount += 1
-                                        else:
-                                            insertCount += 1
-                                except Exception as e:
-                                    logging.info(update_values)
-                                    raise e
-
-                        logging.info("Forcecasts processed • Total: {}, Updated: {}, Inserted: {}".format(len(self.processed_forecast_values),updateCount,insertCount))
-                        self.processed_forecast_values = None
-                        if forecastsIsModified:
-                            self.handler.notifyChangedWeekData()
-                    else:
-                        logging.info("Forcecasts not processed")
-                else:
-                    if self.processed_forecast_values is None:
-                        self.processed_forecast_values = {}
-                        
-                    field = topic[4]
-                    timestamp = topic[5]
-
-                    if timestamp not in self.processed_forecast_values:
-                        self.processed_forecast_values[timestamp] = {}
-                        
-                    self.processed_forecast_values[timestamp][field] = msg.payload.decode("utf-8")
-            elif state_name == u"summary":
-                if is_refreshed:
-                    logging.info("Summery data processed")
-            else:
-                logging.info("Unknown topic " + msg.topic + ", message:" + str(msg.payload))
-
-            if is_refreshed:
-                self.consume_refreshed[state_name] = time.time()
-
-        except DBException:
-            self.consume_errors[state_name] = time.time()
-        #except MySQLdb._exceptions.OperationalError as e:
-        #    logging.info("{}: {}".format(str(e.__class__),str(e)))
-        #    self.service_metrics["mariadb"] = 0
-        #    self.consume_errors[state_name] = time.time()
-        except Exception as e:
-            logging.info("{}: {}".format(str(e.__class__),str(e)))
-            traceback.print_exc()
-            self.consume_errors[state_name] = time.time()
+        self._buildCurrentValues()
 
     def resetIconCache(self):
         self.icon_cache = {}
@@ -209,156 +50,260 @@ class ProviderConsumer():
                 self.icon_cache[icon_name] = f.read()
         return self.icon_cache[icon_name]
 
-    def stationValuesOutdated(self):
-        return time.time() - self.station_values_last_modified > 60 * 60 * 1
+    def getCurrentValues(self):
+        return self.current_values
 
-    def _buildFallbackStationValues(self):
-        result = {}
-        mapping = {
-            'currentAirTemperatureInCelsius': "airTemperatureInCelsius",
-            'currentPerceivedTemperatureInCelsius': "feelsLikeTemperatureInCelsius",
-            'currentWindGustInKilometerPerHour': "maxWindSpeedInKilometerPerHour",
-            'currentWindSpeedInKilometerPerHour': "windSpeedInKilometerPerHour",
-            'currentRainLastHourInMillimeter': "precipitationAmountInMillimeter",
-            'currentUvIndex': "uvIndexWithClouds"
-        }
+    def getCurrentValue(self, field):
+        return self.current_values[field] if field in self.current_values else None
 
-        if self.current_values is None:
-            for field, _field in mapping.items():
-                result[field] = -1
-        else:
-            for field, _field in mapping.items():
-                if _field is not None and _field in self.current_values:
-                    result[field] = self.current_values[_field]
-                else:
-                    result[field] = -1
+    def setStationValue(self, field, value):
+        if field not in self.current_values or field not in self.station_values or self.station_values[field] != value:
+            self.station_values[field] = value
+            self.station_values_last_modified = datetime.now().astimezone().timestamp()
+            self._buildCurrentValues()
 
-            end = datetime.now()
-            start = end.replace(hour=0, minute=0, second=0, microsecond=0)
-
-            result["currentRainRateInMillimeterPerHour"] = 0
-            result["currentRainLastHourInMillimeter"] = 0
-            result["currentRainLevel"] = 0
-
-            with self.db.open() as db:
-                values = db.getRangeSum(start, end, ["precipitationAmountInMillimeter"])
-            result["currentRainDailyInMillimeter"] = values["precipitationAmountInMillimeter"]
-
-
-        return result
-
-    def _buildCloudSVG(self):
-        if self.current_values is None:
-            return None
-
-        block = WeatherBlock(datetime.now())
-        block.apply(self.current_values)
-
-        currentRain = 0
-        currentRainLevel = self.station_values["currentRainLevel"] if not self.stationValuesOutdated() else None
-        if currentRainLevel is None:
-            currentRain = self.current_values["precipitationAmountInMillimeter"]
-        elif currentRainLevel > 0:
-            if self.current_is_raining or currentRainLevel > 2:
-                currentRain = 0.1
-                currentRainRatePerHour = self.station_values["currentRainRateInMillimeterPerHour"]
-                if currentRainRatePerHour > currentRain:
-                    currentRain = currentRainRatePerHour
-
-                currentRain1Hour = self.station_values["currentRainLastHourInMillimeter"]
-                if currentRain1Hour > currentRain:
-                    currentRain = currentRain1Hour
-        self.current_is_raining = currentRain > 0
-
-        block.setPrecipitationAmountInMillimeter(currentRain)
-
-        cloudCoverInOcta = self.station_values["currentCloudCoverInOcta"] if not self.stationValuesOutdated() else None
-        if cloudCoverInOcta is None:
-            cloudCoverInOcta = self.current_values["effectiveCloudCoverInOcta"]
-        block.effectiveCloudCoverInOcta = cloudCoverInOcta
-        #logging.info("{}".format(block.effectiveCloudCoverInOcta))
-
-        icon_name = WeatherHelper.convertOctaToSVG(self.latitude, self.longitude, block)
-
-        return self.getCachedIcon(icon_name)
-
-    def notifyStationValue(self, is_update, field, value, time):
-        self.station_values[field] = value;
-        if time > self.station_values_last_modified:
-            self.station_values_last_modified = time
-
-        if is_update:
-            with self.station_fallback_lock:
-                self.station_fallback_data = None
-            self.notifyCurrentValue(field, value)
-
-    def notifyCurrentValue(self, field, value):
-        self.handler.notifyChangedCurrentData(field, value)
-
-        if field in ["currentRainLevel", "currentRainRateInMillimeterPerHour", "currentRainLastHourInMillimeter", "currentCloudCoverInOcta"]:
-            if self.station_cloud_timer is not None:
-                self.station_cloud_timer.cancel()
-            self.station_cloud_timer = threading.Timer(15, self._notifyCloudValue)
-            self.station_cloud_timer.start()
+    def setServiceValues(self, values):
+        change_count = sum(1 for k in values if k not in self.service_values or values[k] != self.service_values[k])
+        if change_count > 0:
+            self.service_values = values
+            self._buildCurrentValues()
 
     def checkSunriseSunset(self):
         now = datetime.now()
         sunrise, sunset = WeatherHelper.getSunriseAndSunset(self.latitude, self.longitude, now)
-        is_night = ( now <= sunrise or now >= sunset )
-        if is_night != self.is_night:
-            self.is_night = is_night
-            self._notifyCloudValue()
+        current_is_night = ( now <= sunrise or now >= sunset )
+        if current_is_night != self.current_is_night:
+            self.current_is_night = current_is_night
 
-        logging.info("TRIGGER: checkSunriseSunset => " + str(self.is_night))
+            changed_values = None
+            with self.build_lock:
+                cloud_svg = self._buildCloudSVG()
+                if CurrentFields.CLOUDS_AS_SVG not in self.current_values or self.current_values[CurrentFields.CLOUDS_AS_SVG] != cloud_svg:
+                        self.current_values[CurrentFields.CLOUDS_AS_SVG] = cloud_svg
+                        changed_values = {CurrentFields.CLOUDS_AS_SVG: cloud_svg}
+            if changed_values is not None:
+                self.notify_callback(changed_values)
 
         if now < sunrise or now > sunset:
-            logging.info("SCHEDULE SUNRISE: " + sunrise.strftime("%H:%M:%S"))
+            logging.info("Sunrise/Sunset check: is night {}, Schedule next check at sunrise: {}".format(str(self.current_is_night), sunrise.strftime("%H:%M:%S")))
             schedule.every().day.at(sunrise.strftime("%H:%M:%S")).do(self.checkSunriseSunset)
         else:
-            logging.info("SCHEDULE SUNSET: " + sunset.strftime("%H:%M:%S"))
+            logging.info("Sunrise/Sunset check: is night {}, Schedule next check at sunset: {}".format(str(self.current_is_night), sunset.strftime("%H:%M:%S")))
             schedule.every().day.at(sunset.strftime("%H:%M:%S")).do(self.checkSunriseSunset)
 
         return schedule.CancelJob
 
-    def _notifyCloudValue(self):
-        self.station_cloud_timer = None
-        currentCloudsAsSVG = self._buildCloudSVG()
-        if self.station_cloud_svg != currentCloudsAsSVG:
-            self.handler.notifyChangedCurrentData("currentCloudsAsSVG", currentCloudsAsSVG)
-            self.station_cloud_svg = currentCloudsAsSVG
+    def _buildCurrentValues(self):
+        with self.build_lock:
+            current_values = {}
+            if not self._isStationOutdated():
+                current_values = self.station_values.copy()
+
+            for field in CurrentFields:
+                if field in current_values:
+                    continue
+
+                mapped_current_field = CurrentFieldFallbackMappings[field] if field in CurrentFieldFallbackMappings else None
+                if mapped_current_field is None or mapped_current_field not in self.service_values:
+                    if field in [CurrentFields.RAIN_RATE_IN_MILLIMETER_PER_HOUR, CurrentFields.RAIN_AMOUNT_IN_MILLIMETER, CurrentFields.RAIN_LEVEL]:
+                        current_values[field] = 0
+                    elif field in [CurrentFields.RAIN_DAILY_IN_MILLIMETER]:
+                        end = datetime.now()
+                        start = end.replace(hour=0, minute=0, second=0, microsecond=0)
+                        with self.db.open() as db:
+                            values = db.getRangeSum(start, end, [ForecastFields.RAIN_AMOUNT_IN_MILLIMETER])
+                        current_values[CurrentFields.RAIN_DAILY_IN_MILLIMETER] = values[ForecastFields.RAIN_AMOUNT_IN_MILLIMETER]
+                    else:
+                        current_values[field] = -1
+                else:
+                    current_values[field] = self.service_values[mapped_current_field]
+
+            current_values[CurrentFields.CLOUDS_AS_SVG] = self._buildCloudSVG()
+
+            is_raining = current_values[CurrentFields.RAIN_LEVEL] > 0 or current_values[CurrentFields.RAIN_AMOUNT_IN_MILLIMETER] > 0
+            current_values[CurrentFields.RAIN_PROBABILITY_IN_PERCENT] = 0 if not self.service_values or not is_raining else self.service_values[ForecastFields.RAIN_PROBABILITY_IN_PERCENT]
+            current_values[CurrentFields.SUNSHINE_DURATION_IN_MINUTES] = 0 if not self.service_values else self.service_values[ForecastFields.SUNSHINE_DURATION_IN_MINUTES]
+
+            changed_values = {k: current_values[k] for k in current_values if k not in self.current_values or current_values[k] != self.current_values[k]}
+            self.current_values = current_values
+        self.notify_callback(changed_values)
+
+    def _buildCloudSVG(self):
+        if not self.service_values:
+            return None
+
+        block = WeatherBlock(datetime.now())
+        block.apply(self.service_values)
+
+        skip_station_values = self._isStationOutdated()
+        if skip_station_values or CurrentFields.RAIN_LEVEL not in self.station_values or CurrentFields.RAIN_RATE_IN_MILLIMETER_PER_HOUR not in self.station_values or CurrentFields.RAIN_AMOUNT_IN_MILLIMETER not in self.station_values:
+            currentRain = self.service_values[ForecastFields.RAIN_AMOUNT_IN_MILLIMETER]
+        else:
+            currentRain = 0
+            currentRainLevel = self.station_values[CurrentFields.RAIN_LEVEL]
+            if (currentRainLevel > 0 and self.current_is_raining or currentRainLevel > 2):
+                currentRain = 0.1
+                currentRainRatePerHour = self.station_values[CurrentFields.RAIN_RATE_IN_MILLIMETER_PER_HOUR]
+                if currentRainRatePerHour > currentRain:
+                    currentRain = currentRainRatePerHour
+
+                currentRain1Hour = self.station_values[CurrentFields.RAIN_AMOUNT_IN_MILLIMETER]
+                if currentRain1Hour > currentRain:
+                    currentRain = currentRain1Hour
+        self.current_is_raining = currentRain > 0
+        block.setPrecipitationAmountInMillimeter(currentRain)
+
+        cloudCoverInOcta = self.service_values[ForecastFields.CLOUD_COVER_IN_OCTA] if not skip_station_values or CurrentFields.CLOUD_COVER_IN_OCTA not in self.station_values else self.station_values[CurrentFields.CLOUD_COVER_IN_OCTA]
+        block.setEffectiveCloudCover(cloudCoverInOcta)
+
+        return self.getCachedIcon(WeatherHelper.convertOctaToSVG(self.latitude, self.longitude, block))
+
+    def _isStationOutdated(self):
+        return datetime.now().astimezone().timestamp() - self.station_values_last_modified > 60 * 60 * 1
+
+class ProviderConsumer():
+    def __init__(self, config, mqtt, db, handler ):
+        latitude, longitude = config.location.split(",")
+        self.latitude = float(latitude)
+        self.longitude = float(longitude)
+
+        self.mqtt = mqtt
+        self.mqtt_forecast_topic = "{}/#".format(config.mqtt_forecast_topic)
+
+        self.db = db
+        self.handler = handler
+
+        self.is_running = False
+
+        self.dump_path = "{}consumer_provider.json".format(config.lib_path)
+        self.version = 2
+        self.valid_cache_file = True
+
+        self.processed_values = {}
+
+        self.last_error = 0
+        self.last_refreshed = 0
+
+        self.current_values = CurrentValues(self.db, self.latitude, self.longitude, config.icon_path, self._notifyCurrentValues)
+
+        with self.db.open() as db:
+            db_values = db.getOffset(0)
+            self.current_values.setServiceValues(db_values if db_values else {})
+
+    def start(self):
+        self._restore()
+        if not os.path.exists(self.dump_path):
+            self._dump()
+
+        self.mqtt.subscribe(self.mqtt_forecast_topic, self.on_message)
+
+        self.current_values.checkSunriseSunset()
+        self.is_running = True
+
+    def terminate(self):
+        if self.is_running and os.path.exists(self.dump_path):
+            self._dump()
+        self.is_running = False
+
+    def _restore(self):
+        self.valid_cache_file, data = ConfigHelper.loadConfig(self.dump_path, self.version )
+        if data is not None:
+            self.last_refreshed = data["last_refreshed"]
+            logging.info("Loaded consumer (provider) values")
+
+    def _dump(self):
+        if self.valid_cache_file:
+            ConfigHelper.saveConfig(self.dump_path, self.version, { "last_refreshed": self.last_refreshed } )
+            logging.info("Saved consumer (provider) values")
+
+    def on_message(self,client,userdata,msg):
+        topic = msg.topic.split("/")
+
+        try:
+            if topic[4] == u"refreshed":
+                if len(self.processed_values) > 0:
+                    now = datetime.now().astimezone()
+                    currentIsModified = forecastsIsModified = False
+                    totalCount = updateCount = insertCount = 0
+                    with self.db.open() as db:
+                        for timestamp in self.processed_values:
+                            try:
+                                validFrom = datetime.fromtimestamp(int(timestamp))
+                                isCurrent = validFrom.day == now.day and validFrom.hour == now.hour
+                                update_values = []
+                                for field in self.processed_values[timestamp]:
+                                    if field not in ForecastFields:
+                                        raise Exception("Unknown forecast field '{}'. Only follwoing values are allowed {}".format(field, list(ForecastFields)))
+                                    totalCount += 1
+                                    update_values.append(u"`{}`='{}'".format(field,self.processed_values[timestamp][field]))
+
+                                isUpdate = db.hasEntry(validFrom.timestamp())
+
+                                if isCurrent or isUpdate:
+                                    isModified = db.update(validFrom.timestamp(),update_values)
+                                else:
+                                    isModified = db.insertOrUpdate(validFrom.timestamp(),update_values)
+
+                                if isModified:
+                                    if isCurrent:
+                                        currentIsModified = True
+                                    forecastsIsModified = True
+                                    if isUpdate:
+                                        updateCount += 1
+                                    else:
+                                        insertCount += 1
+                            except Exception as e:
+                                logging.error(update_values)
+                                raise e
+
+                    logging.info("Forecasts processed • Total {} • Queries: {} • Updated: {} • Inserted: {}".format(totalCount, len(self.processed_values),updateCount,insertCount))
+                    self.processed_values = {}
+
+                    if forecastsIsModified:
+                        self.handler.notifyChangedWeekData()
+
+                    if currentIsModified:
+                        with self.db.open() as db:
+                            db_values = db.getOffset(0)
+                            self.current_values.setServiceValues(db_values if db_values else {})
+
+                    self.last_refreshed = now.timestamp()
+                else:
+                    logging.info("Forcecasts not processed")
+            else:
+                field = topic[4]
+                timestamp = topic[5]
+
+                if timestamp not in self.processed_values:
+                    self.processed_values[timestamp] = {}
+
+                self.processed_values[timestamp][field] = msg.payload.decode("utf-8")
+        except DBException:
+            self.last_error = datetime.now().astimezone().timestamp()
+        except Exception as e:
+            logging.error("Topic: {}".format(topic))
+            logging.error("{}: {}".format(str(e.__class__),str(e)))
+            traceback.print_exc()
+            self.last_error = datetime.now().astimezone().timestamp()
+
+    def _notifyCurrentValues(self, values):
+        for field, value in values.items():
+            self.handler.notifyChangedCurrentData(field, value)
+
+    def notifyStationValue(self, is_update, field, value, time):
+        self.current_values.setStationValue(field, value)
+
+    def resetIconCache(self):
+        self.current_values.resetIconCache()
 
     def getCurrentValues(self):
-        result = {}
-        if not self.stationValuesOutdated():
-            result = self.station_values
-            with self.station_fallback_lock:
-                self.station_fallback_data = None
-        else:
-            with self.station_fallback_lock:
-                self.station_fallback_data = self._buildFallbackStationValues()
-            result = self.station_fallback_data
-
-        if self.station_cloud_svg is None:
-            self.station_cloud_svg = self._buildCloudSVG()
-
-        result["currentCloudsAsSVG"] = self.station_cloud_svg
-
-        is_raining = result["currentRainLevel"] > 0 or result["currentRainLastHourInMillimeter"] > 0
-        result["currentRainProbabilityInPercent"] = 0 if self.current_values is None or not is_raining else self.current_values["precipitationProbabilityInPercent"]
-        result["currentSunshineDurationInMinutes"] = 0 if self.current_values is None else self.current_values["sunshineDurationInMinutes"]
-        return result
-
-    def _convertToDictList(self, blockList):
-        result = []
-        for block in blockList:
-            result.append(block.to_dict())
-        return result
+        return self.current_values.getCurrentValues()
 
     def _applyWeekDay(self, current_value, weekValues):
         current_value.setEnd((current_value.getStart() + timedelta(hours=24)).replace(hour=0, minute=0, second=0))
         icon_name = WeatherHelper.convertOctaToSVG(self.latitude, self.longitude, current_value)
         #logging.info(">>>> _applyWeekDay: icon_name: {} - start: {} - end: {}".format(icon_name, current_value.start, current_value.end))
-        current_value.setSVG(self.getCachedIcon(icon_name))
+        current_value.setSVG(self.current_values.getCachedIcon(icon_name))
         weekValues.append(current_value)
 
     def getWeekValues(self, requested_day = None):
@@ -372,7 +317,7 @@ class ProviderConsumer():
             end = activeDay.replace(hour=23, minute=59, second=59, microsecond=0)
 
             # DAY VALUES
-            todayValues = [];
+            todayValues = WeatherBlockList()
             dayList = db.getRangeList(start, end)
             if len(dayList) > 0:
                 minTemperature, maxTemperature, maxWindSpeed, sumSunshine, sumRain = WeatherHelper.calculateSummary(dayList)
@@ -386,7 +331,7 @@ class ProviderConsumer():
                         current_value.setEnd(hourlyData['datetime'])
                         icon_name = WeatherHelper.convertOctaToSVG(self.latitude, self.longitude, current_value)
                         #logging.info(">>>> DayList: icon_name: {} - start: {} - end: {}".format(icon_name, current_value.start, current_value.end))
-                        current_value.setSVG(self.getCachedIcon(icon_name))
+                        current_value.setSVG(self.current_values.getCachedIcon(icon_name))
                         todayValues.append( current_value )
                         current_value = WeatherBlock( hourlyData['datetime'] )
                     current_value.apply(hourlyData)
@@ -395,13 +340,13 @@ class ProviderConsumer():
                 current_value.setEnd(current_value.getStart() + timedelta(hours=3))
                 icon_name = WeatherHelper.convertOctaToSVG(self.latitude, self.longitude, current_value)
                 #logging.info(">>>> DayList: icon_name: {} - start: {} - end: {}".format(icon_name, current_value.start, current_value.end))
-                current_value.setSVG(self.getCachedIcon(icon_name))
+                current_value.setSVG(self.current_values.getCachedIcon(icon_name))
                 todayValues.append(current_value)
 
             else:
                 minTemperature = maxTemperature = maxWindSpeed = sumSunshine = sumRain = activeDay = None
 
-            values["dayList"] = self._convertToDictList(todayValues)
+            values["dayList"] = todayValues.toDictList()
             values["dayActive"] = activeDay.isoformat()
             values["dayMinTemperature"] = minTemperature
             values["dayMaxTemperature"] = maxTemperature
@@ -410,7 +355,7 @@ class ProviderConsumer():
             values["daySumRain"] = sumRain
 
             # WEEK VALUES
-            weekValues = []
+            weekValues = WeatherBlockList()
 
             weekFrom = datetime.now().replace(hour=0, minute=0, second=0)
             weekList = db.getWeekList(weekFrom)
@@ -432,7 +377,7 @@ class ProviderConsumer():
             else:
                 minTemperatureWeekly = maxTemperatureWeekly = maxWindSpeedWeekly = sumSunshineWeekly = sumRainWeekly = None
 
-            values["weekList"] = self._convertToDictList(weekValues)
+            values["weekList"] = weekValues.toDictList()
             values["weekMinTemperature"] = minTemperatureWeekly
             values["weekMaxTemperature"] = maxTemperatureWeekly
             values["weekMaxWindSpeed"] = maxWindSpeedWeekly
@@ -449,9 +394,8 @@ class ProviderConsumer():
 
             dayList = db.getRangeList(start, end)
             values = {}
+            todayValues = WeatherBlockList()
             if len(dayList) > 0:
-                todayValues = [];
-
                 blockConfigs = []
 
                 current_value = None;
@@ -461,7 +405,7 @@ class ProviderConsumer():
                     if hour_count >= 5:
                         current_value.setEnd(hourlyData['datetime'])
                         icon_name = WeatherHelper.convertOctaToSVG(self.latitude, self.longitude, current_value)
-                        current_value.setSVG(self.getCachedIcon(icon_name))
+                        current_value.setSVG(self.current_values.getCachedIcon(icon_name))
                         todayValues.append(current_value)
                         current_value = None
                         hour_count = 0
@@ -470,7 +414,7 @@ class ProviderConsumer():
                         current_value = WeatherBlock( hourlyData['datetime'] )
 
                     current_value.apply(hourlyData)
-                    if len(todayValues) == 4:
+                    if todayValues.getSize() == 4:
                         break
 
                     hour_count += 1
@@ -479,7 +423,7 @@ class ProviderConsumer():
             else:
                 minTemperature = maxTemperature = maxWindSpeed = sumSunshine = sumRain = None
 
-            values["dayList"] = self._convertToDictList(todayValues)
+            values["dayList"] = todayValues.toDictList()
             values["dayMinTemperature"] = minTemperature
             values["dayMaxTemperature"] = maxTemperature
             values["dayMaxWindSpeed"] = maxWindSpeed
@@ -489,16 +433,8 @@ class ProviderConsumer():
             return values
 
     def getStateMetrics(self):
-        now = time.time()
-        has_any_update = False
-        has_errors = False
-        for state_name in self.consume_errors:
-            if now - self.consume_refreshed[state_name] < 60 * 60 * 2:
-                has_any_update = True
-
-            if self.consume_errors[state_name] != 0 and self.consume_refreshed[state_name] != 0:
-                if self.consume_refreshed[state_name] - self.consume_errors[state_name] < 300:
-                    has_errors = True
+        has_any_update = True if datetime.now().astimezone().timestamp() - self.last_refreshed < 60 * 60 * 2 else False
+        has_errors = True if self.last_error != 0 and self.last_refreshed != 0 and self.last_refreshed - self.last_error < 300 else False
 
         return [
             Metric.buildProcessMetric("weather_service", "consumer_provider", "1" if self.is_running and not has_errors else "0"),

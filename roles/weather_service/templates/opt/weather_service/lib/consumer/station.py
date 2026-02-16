@@ -3,16 +3,16 @@ import logging
 import traceback
 import time
 
+from lib.helper.fields import StationFieldToCurrentFieldMappings
+
 from smartserver.confighelper import ConfigHelper
 from smartserver.metric import Metric
-
 
 class StationConsumer():
     '''Handler client'''
     def __init__(self, config, mqtt, provider_consumer):
         self.mqtt = mqtt
-
-        self.config = config
+        self.mqtt_station_topic = "{}/#".format(config.mqtt_station_topic)
 
         self.is_running = False
 
@@ -26,30 +26,11 @@ class StationConsumer():
 
         self.provider_consumer = provider_consumer
 
-        self.valid_mqtt_topic = [
-            "cloudCoverInOcta",
-            "rainLevel",
-            "rainDailyInMillimeter",
-            "rainLastHourInMillimeter",
-            "rainRateInMillimeterPerHour",
-            "windDirectionInDegree",
-            "windSpeedInKilometerPerHour",
-            "windGustInKilometerPerHour",
-            "dewpointInCelsius",
-            "airTemperatureInCelsius",
-            "airHumidityInPercent",
-            "perceivedTemperatureInCelsius",
-            "pressureInHectopascals",
-            "solarRadiationInWatt",
-            "lightLevelInLux",
-            "uvIndex"
-        ]
-
     def start(self):
         self._restore()
         if not os.path.exists(self.dump_path):
             self._dump()
-        self.mqtt.subscribe( '{}/weather/station/#'.format(self.config.station_consumer_topic), self.on_message)
+        self.mqtt.subscribe(self.mqtt_station_topic, self.on_message)
         self.is_running = True
 
     def terminate(self):
@@ -60,16 +41,15 @@ class StationConsumer():
     def _restore(self):
         self.valid_cache_file, data = ConfigHelper.loadConfig(self.dump_path, self.version )
         if data is not None:
-            self.station_values = {k: v for k, v in data["station_values"].items() if k in self.valid_mqtt_topic}
+            self.station_values = {k: v for k, v in data["station_values"].items() if k in StationFieldToCurrentFieldMappings}
             logging.info("Loaded {} consumer (station) values".format(len(self.station_values)))
 
-        for key in self.valid_mqtt_topic:
+        for key in StationFieldToCurrentFieldMappings:
             if key not in self.station_values:
                 self.station_values[key] = { "time": 0, "value": -1 }
 
         for key, data in self.station_values.items():
-            key = "current{}{}".format(key[0].upper(),key[1:])
-            self.provider_consumer.notifyStationValue(False, key, data["value"], data["time"] )
+            self.provider_consumer.notifyStationValue(False, StationFieldToCurrentFieldMappings[key], data["value"], data["time"] )
 
     def _dump(self):
         if self.valid_cache_file:
@@ -87,34 +67,13 @@ class StationConsumer():
         value = float(value) if "." in value else int(value)
         field = topic[3]
 
-        if field not in self.valid_mqtt_topic:
+        if field not in StationFieldToCurrentFieldMappings:
+            logging.error("Unknown station field '{}'. Only follwoing values are allowed {}".format(field, StationFieldToCurrentFieldMappings.keys()))
             return
 
         if field not in self.station_values or self.station_values[field]["value"] != value:
-            self.provider_consumer.notifyStationValue(True, "current{}{}".format(field[0].upper(),field[1:]), value, time.time() )
+            self.provider_consumer.notifyStationValue(True, StationFieldToCurrentFieldMappings[field], value, time.time() )
         self.station_values[field] = { "time": time.time(), "value": value  }
-
-    #def getValue(self, key, fallback = None ):
-    #    return self.station_values[key]["value"] if key in self.station_values else fallback
-
-    #def getValues(self):
-    #    if len(self.station_values) > 0:
-    #        result = {}
-    #        for key, data in self.station_values.items():
-    #            key = "current{}{}".format(key[0].upper(),key[1:])
-    #            result[key] = data["value"]
-    #    else:
-    #        result = None
-    #    return result
-
-    #def getLastModified(self, last_modified, requested_fields = None ):
-    #    _last_modified = last_modified
-    #    for key, data in self.station_values.items():
-    #        if requested_fields is not None and key not in requested_fields:
-    #            continue
-    #        if last_modified < data["time"] and _last_modified < data["time"]:
-    #            _last_modified = data["time"]
-    #    return _last_modified
 
     def getStateMetrics(self):
         has_any_update = False
