@@ -17,14 +17,112 @@ mx.WeatherCore = (function( ret ) {
     ret.active_day = null;
     var data = {};
 
-    function buildRow(id, time, cloud, maxTemperature, minTemperature, sunshineDuration, precipitationProbability, precipitationAmount, windSpeed, windDirection, clickDate)
+    startTime = endTime = null;
+
+    var cloudAnimatorTimer = null
+    function runCloudAnimator()
     {
-        let row = '<div id="' + id + '" class="hour';
+        if( cloudAnimatorTimer == null ) return
+
+        cloud_times = mx.$$(".forecast .today .hour .time span.animatedTime");
+        cloud_slider = mx.$$(".forecast .today .hour .cloud > div.animatedCloud");
+        cloud_slider.forEach(function(slider, index){
+            if( slider.lastChild.style.opacity == 0.0 )
+            {
+                let node = slider.removeChild(slider.lastChild);
+                node.style.opacity = "";
+                node.style.transform = "";
+                slider.insertBefore(node, slider.firstChild);
+            }
+
+            cloud_times[index].innerHTML = slider.lastChild.previousSibling.dataset.time ? '(' + slider.lastChild.previousSibling.dataset.time + ')' : '';
+
+            if(slider.lastChild.id == slider.lastChild.previousSibling.id){
+                slider.lastChild.previousSibling.style.transition = "";
+                slider.lastChild.previousSibling.style.opacity = 1.0;
+                slider.lastChild.style.transition = "";
+                slider.lastChild.style.opacity = 0.0;
+            }
+            else
+            {
+                slider.lastChild.style.transition = "all 0.4s ease-out";
+                slider.lastChild.previousSibling.style.transition = "all 0.5s ease-in";
+                window.setTimeout(function(){
+                    slider.lastChild.previousSibling.style.opacity = 1.0;
+                    //slider.firstChild.style.transition = "all 0.5s ease-out";
+                    slider.lastChild.style.transform = "translateX(-58px)";
+                    slider.lastChild.style.opacity = 0.0;
+                }, 0);
+            }
+        });
+
+        if( cloudAnimatorTimer == null ) return
+
+        cloudAnimatorTimer = window.setTimeout(runCloudAnimator, 1000)
+    }
+
+    function startCloudAnimator()
+    {
+        if( cloudAnimatorTimer == null )
+        {
+            cloud_slider = mx.$$(".forecast .today .hour .cloud > div");
+            cloud_slider.forEach(function(slider){
+                slider.lastChild.style.transition = "none";
+                slider.lastChild.style.opacity = 1.0;
+                slider.lastChild.style.transition = "";
+                slider.lastChild.style.willChange = "transform, opacity";
+            });
+            cloudAnimatorTimer = window.setTimeout(runCloudAnimator, 1000);
+        }
+    }
+
+    function stopCloudAnimator()
+    {
+        if( cloudAnimatorTimer != null )
+        {
+            window.clearTimeout(cloudAnimatorTimer);
+            cloudAnimatorTimer = null;
+        }
+    }
+
+    function buildDirectionName(direction)
+    {
+        direction += 90;
+        if( direction > 360 ) direction -= 360;
+
+        if( direction < 22.5 ) return 'O';
+        if( direction < 67.5 ) return 'SO';
+        if( direction < 112.5 ) return 'S';
+        if( direction < 157.5 ) return 'SW';
+        if( direction < 202.5 ) return 'W';
+        if( direction < 247.5 ) return 'NW';
+        if( direction < 292.5 ) return 'N';
+        if( direction < 337.5 ) return 'NO';
+        return 'O';
+    }
+
+    function buildRow(id, start, time, cloudIconMap, cloudIconNames, maxTemperature, minTemperature, sunshineDuration, precipitationProbability, precipitationAmount, windSpeed, windDirection, clickDate)
+    {
+        uniqueCloudIconNames = cloudIconNames.filter((value, index, array) => array.indexOf(value) === index);
+        animatedCloud = uniqueCloudIconNames.length > 1
+        if( !animatedCloud) cloudIconNames = uniqueCloudIconNames
+
+            let row = '<div id="' + id + '" class="hour';
         if( clickDate ) row += ' mvClickable" mv-date="' + clickDate + '"';
         else row += '"';
         row += '>';
-        row += '<div class="time">' + time + '</div>';
-        row += '<div class="cloud">' + cloud + '</div>';
+        row += '<div class="time"><span>' + time + '</span>';
+        if( animatedCloud ) row += '<span class="animatedTime"></span>';
+        row += '</div>';
+
+        row += '<div class="cloud"><div' + ( animatedCloud ? ' class="animatedCloud"' : '' ) + '>';
+        cloudIconNames.toReversed().forEach(function(icon_name, index){
+            row += "<svg id='" + icon_name + "'";
+            if(index < cloudIconNames.length - 1) row += " data-time='" + mx.WeatherHelper.formatHour(new Date(start.getTime() + (cloudIconNames.length - 1 - index) * 60 * 60 * 1000)) + "'";
+            row += " " + cloudIconMap[icon_name].split("<svg")[1];
+        });
+        row += '</div></div>';
+
         row += '<div class="temperature"><div><div class="main"><span class="max">' + mx.WeatherHelper.formatNumber(maxTemperature) + '</span><span class="min">' + mx.WeatherHelper.formatNumber(minTemperature) + '</span></div><div class="sub">°C</div></div></div>';
         row += '<div class="info">';
         row += '  <div class="sunshineDuration"><div class="sun icon"><?php echo str_replace("'", "\\'", getSVG('sun', 'sun_grayscaled') ); ?></div><div>' + mx.WeatherHelper.formatDuration( sunshineDuration ) + '</div></div>';
@@ -33,7 +131,7 @@ mx.WeatherCore = (function( ret ) {
         row += '</div>';
         row += '<div class="wind"><div>';
         row += '  <div>' + mx.WeatherHelper.formatNumber( windSpeed ) + ' km/h</div>';
-        row += '  <div class="compass">'
+        row += '  <div class="compass" data-tooltip=' + buildDirectionName(windDirection) + '>'
         row += '    <div class="circle"><?php echo str_replace("'", "\\'", getSVG('compass_circle', 'compass_circle_grayscaled') ); ?></div>';
         row += '    <div class="needle" style="transform: rotate(' + ( windDirection - 180 ) + 'deg)"><?php echo str_replace("'", "\\'", getSVG('compass_needle', 'compass_needle_grayscaled') ); ?></div>';
         row += '  </div>';
@@ -130,6 +228,9 @@ mx.WeatherCore = (function( ret ) {
         if( "current" in changed_data && "airTemperatureInCelsius" in changed_data["current"]) mx.$(".current .summary .temperature .value").innerHTML = mx.WeatherHelper.formatNumber(data["current"]["airTemperatureInCelsius"]) + ' °C';
         if( "current" in changed_data && "feelsLikeTemperatureInCelsius" in changed_data["current"]) mx.$(".current .summary .perceived .value").innerHTML = mx.WeatherHelper.formatNumber(data["current"]["feelsLikeTemperatureInCelsius"]) + ' °C';
 
+        if( "current" in changed_data && "relativeHumidityInPercent" in changed_data["current"]) mx.$(".current .summary .humidity .value").innerHTML = Math.trunc(data["current"]["relativeHumidityInPercent"]) + ' %';
+        if( "current" in changed_data && "pressureInHectopascals" in changed_data["current"]) mx.$(".current .summary .pressure .value").innerHTML = Math.trunc(data["current"]["pressureInHectopascals"]) + ' hPa';
+
         if( "current" in changed_data && ("windSpeedInKilometerPerHour" in changed_data["current"] || "windGustInKilometerPerHour" in changed_data["current"]))
         {
             let windSpeed = mx.WeatherHelper.formatNumber(data["current"]["windSpeedInKilometerPerHour"]);
@@ -137,10 +238,30 @@ mx.WeatherCore = (function( ret ) {
             let wind = windSpeed;
             if( windGust > 0 && windSpeed != windGust )
             {
-                wind += ' (' + windGust + ')';
+                wind += ' ' + mx.I18N.get("until") + ' ' + windGust;
             }
-            mx.$(".current .summary .wind .value").innerHTML = wind + ' km/h';
+
+            row =  '<div>';
+            row += '  <div class="compass" data-tooltip=' + buildDirectionName(data["current"]["windDirectionInDegree"]) + '>';
+            row += '    <div class="circle"><?php echo str_replace("'", "\\'", getSVG('compass_circle', 'compass_circle_grayscaled') ); ?></div>';
+            row += '    <div class="needle" style="transform: rotate(' + ( data["current"]["windDirectionInDegree"] - 180 ) + 'deg)"><?php echo str_replace("'", "\\'", getSVG('compass_needle', 'compass_needle_grayscaled') ); ?></div>';
+            row += '  </div>';
+            row += '  <div>' + wind + ' km/h</div>';
+            row += '</div>';
+
+            mx.$(".current .summary .wind .value").innerHTML = row;
+            //mx.$(".current .summary .wind .value").innerHTML = wind + ' km/h';
         }
+
+        /*if( "current" in changed_data && "windDirectionInDegree" in changed_data["current"])
+        {
+            let compass = ""
+            compass += '  <div class="compass">'
+            compass += '    <div class="circle"><?php echo str_replace("'", "\\'", getSVG('compass_circle', 'compass_circle_grayscaled') ); ?></div>';
+            compass += '    <div class="needle" style="transform: rotate(' + ( data["current"]["windDirectionInDegree"] - 180 ) + 'deg)"><?php echo str_replace("'", "\\'", getSVG('compass_needle', 'compass_needle_grayscaled') ); ?></div>';
+            compass += '  </div>';
+            mx.$(".current .summary .wind").innerHTML = compass;
+        }*/
 
         if( "current" in changed_data && ("precipitationRateInMillimeterPerHour" in changed_data["current"] || "precipitationDailyInMillimeter" in changed_data["current"]))
         {
@@ -186,6 +307,11 @@ mx.WeatherCore = (function( ret ) {
             }
         }
 
+        if( "dayList" in changed_data || "weekList" in changed_data )
+        {
+            stopCloudAnimator();
+        }
+
         let now = new Date();
 
         if( "dayList" in changed_data)
@@ -211,8 +337,10 @@ mx.WeatherCore = (function( ret ) {
                 let time = '<div class="from">' + mx.WeatherHelper.formatHour(start) + '</div>';
                 let html_row = buildRow(
                     id,
+                    start,
                     time,
-                    row["svg"],
+                    data["cloudIconMap"],
+                    row["cloudIconNames"],
                     row["maxAirTemperatureInCelsius"],
                     row["minAirTemperatureInCelsius"],
                     row["sunshineDurationInMinutes"],
@@ -250,8 +378,10 @@ mx.WeatherCore = (function( ret ) {
                 let id = "week_" + clickDate;
                 let html_row = buildRow(
                     id,
+                    start,
                     time,
-                    row["svg"],
+                    data["cloudIconMap"],
+                    row["cloudIconNames"],
                     row["maxAirTemperatureInCelsius"],
                     row["minAirTemperatureInCelsius"],
                     row["sunshineDurationInMinutes"],
@@ -280,6 +410,8 @@ mx.WeatherCore = (function( ret ) {
             }
         }
 
+        startCloudAnimator();
+
         mx.$$(".week .hours .active").forEach(function(element)
         {
             element.classList.remove("active");
@@ -288,6 +420,8 @@ mx.WeatherCore = (function( ret ) {
         if( mx.WeatherCore.active_day ) mx.$("#week_" + mx.WeatherCore.active_day.getFullYear() + '-' + mx.WeatherHelper.formatLeadingZero(mx.WeatherCore.active_day.getMonth() + 1) + '-' + mx.WeatherHelper.formatLeadingZero(mx.WeatherCore.active_day.getDate()) ).classList.add("active");
 
         if( mx.$(".week").classList.contains("open") ) document.getElementById("weekButton").click();
+
+        mx.Tooltip.init();
     }
 
     ret.init = function()
@@ -343,25 +477,24 @@ catch(e){
     </div>
     <div class="content">
         <div class="summary">
-            <div class="column">
+            <div class="column slot1">
                 <div class="cell temperature"><div class="icon"><?php echo getSVG('temperature', 'temperature_grayscaled'); ?></div><div class="name" data-i18n="Temperature"></div><div class="value"></div></div>
                 <div class="cell perceived"><div class="icon"><?php echo getSVG('temperature', 'temperature_grayscaled'); ?></div><div class="name" data-i18n="Perceived"></div><div class="value"></div></div>
+                <div class="cell humidity"><div class="icon"><?php echo getSVG('raindrop', 'raindrop_grayscaled'); ?></div><div class="name" data-i18n="Humidity"></div><div class="value"></div></div>
             </div>
-            <div class="column">
+            <div class="column slot2">
                 <div class="cell wind"><div class="icon"><?php echo getSVG('wind', 'wind_grayscaled'); ?></div><div class="name" data-i18n="Wind"></div><div class="value"></div></div>
                 <div class="cell rain"><div class="icon"><?php echo getSVG('rain', 'rain_grayscaled'); ?></div><div class="name" data-i18n="Rain"></div><div class="value"></div></div>
+                <div class="cell pressure"><div class="icon"><?php echo getSVG('pressure', 'pressure_grayscaled'); ?></div><div class="name" data-i18n="Pressure"></div><div class="value"></div></div>
             </div>
-            <div class="column cloud"></div>
-            <div class="column wrap"></div>
-            <div class="column">
+            <div class="column slot3">
+                <div class="cell cloud"></div>
+            </div>
+            <div class="column slot4">
                 <div class="cell sunrise"><div class="icon"><?php echo getSVG('sun', 'sun_grayscaled'); ?></div><div class="name" data-i18n="Sunrise"></div><div class="value"></div></div>
                 <div class="cell sunset"><div class="icon"><?php echo getSVG('sun', 'sun_grayscaled'); ?></div><div class="name" data-i18n="Sunset"></div><div class="value"></div></div>
-            </div>
-            <div class="column">
                 <div class="cell uv"><div class="icon"><?php echo getSVG('sun', 'sun_grayscaled'); ?></div><div class="name" data-i18n="UV Index"></div><div class="value"></div></div>
-                <div class="cell"></div>
             </div>
-            <div class="column dummy"></div>
         </div>
     </div>
 </div>
