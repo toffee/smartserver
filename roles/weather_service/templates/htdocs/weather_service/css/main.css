@@ -460,7 +460,7 @@ body{
     position: relative;
     width:58px;
     height: 58px;
-    overflow: hidden;
+    /*overflow: hidden;*/
 }
 .forecast .hour .cloud > div > svg {
     position: absolute;
@@ -569,7 +569,7 @@ body{
 .forecast .hour .info > .sunshineDuration {
     white-space: nowrap;
 }
-.forecast .hour.active .time {
+.forecast .hour.active .time span:first-child {
 	font-weight: bold !important;
 }
 @media only screen and (max-width: 800px) {
