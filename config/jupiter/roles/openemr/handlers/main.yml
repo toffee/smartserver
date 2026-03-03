@@ -1,0 +1,8 @@
+- name: restart openemr
+  systemd:
+    name: openemr
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    masked: no
+  listen: "restart openemr"

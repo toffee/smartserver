@@ -1,0 +1,105 @@
+- name: set version
+  set_fact:
+    openemr_version: '8.0.1'
+  tags: [ 'update_notifier_config' ]
+
+- name: prepare needed folder
+  file:
+    path: '{{item.path}}'
+    state: directory
+    owner: "{{item.user}}"
+    group: "{{item.group}}"
+    mode: "{{item.mode}}"
+  with_items:
+    - { user: "root", group: "root", mode: "u=rwx,g=rwx,o=rwx", path: "{{htdocs_path}}openemr/sites" }
+    - { user: "root", group: "root", mode: "u=rwx,g=rwx,o=rwx", path: "{{global_log}}openemr" }
+    - { user: "root", group: "root", mode: "u=rwx,g=rwx,o=rwx", path: "{{global_log}}openemr_apache" }
+  notify:
+    - restart openemr
+
+- name: create container service
+  vars:
+    container_name: "openemr"
+    container_image: "openemr/openemr:{{openemr_version}}"
+    container_network: "isolated"
+    container_ip: "{{podman_openemr_ip}}"
+    container_memory: "2g"
+    container_exposed_ports:
+      - "80"
+      #- "443"
+    container_env:
+      TZ: "{{timezone}}"
+      MYSQL_HOST: "mariadb"
+      MYSQL_PORT: "3306"
+      MYSQL_ROOT_USER: "root"
+      MYSQL_ROOT_PASS: "BLANK"
+      MYSQL_USER: "{{openemr_mariadb_username}}"
+      MYSQL_PASS: "{{openemr_mariadb_password}}"
+      MYSQL_DATABASE: "{{openemr_mariadb_db}}"
+      OE_USER: "{{openemr_username}}"
+      OE_PASS: "{{openemr_password}}"
+      REDIS_SERVER: "redis"
+      FORCE_INSTALL: "true"
+      SKIP_INSTALL: "false"
+      MANUAL_SETUP: "no"
+      DOMAIN: ""
+      DISABLE_SSL: "true"
+    container_volumes: 
+      #- '{{htdocs_path}}openemr/sites:/var/www/localhost/htdocs/openemr/sites'
+      - '{{global_log}}openemr:/var/log'
+      - '{{global_log}}openemr_apache:/var/log/apache2'
+    container_after: [ "mariadb" ]
+    container_readyness: { "type": "port_check", "ip": "{{podman_openemr_ip}}", "port": "80" }
+  include_tasks: roles/container/shared/create_podman_service.yml
+  tags: ['podman_container','systemd_watcher_config','systemd_service_config']
+
+- name: allow service
+  vars:
+    service_name: "openemr"
+    container_to_container_rules:
+      - { saddr: "{{podman_openemr_ip}}", daddr: "{{podman_mariadb_ip}}", protocol: "tcp", dport: "3306", comment: "openemr => mariadb" }
+      - { saddr: "{{podman_openemr_ip}}", daddr: "{{podman_redis_ip}}", protocol: "tcp", dport: "6379", comment: "openemr => redis" }
+  include_tasks: roles/firewall/shared/allow_service.yml
+  tags: ['firewall_config']
+
+- name: add container openemr name
+  vars:
+    host_name: "openemr"
+    host_ip_address: "{{podman_openemr_ip}}"
+  include_tasks: roles/_shared/add_to_hosts.yml
+
+# ***** FINALIZE *****
+- name: register webui
+  vars:
+    name: "openemr"
+    js_file: "templates/webui/openemr.js"
+    icons: [ 'templates/webui/icons/openemr_logo.svg' ]
+  include_tasks: roles/apache_webui/shared/add_webui.yml
+  tags: ['apache_webui_config']
+ 
+- name: copy apache vhost
+  vars:
+    sub_domain: "openemr"
+    usergroup: "user"
+    include: "templates/etc/apache2/_.ansible.vhost.d/openemr.inc"
+  include_tasks: roles/apache/shared/add_vhost.yml
+ 
+#- name: copy fluentd config
+#  vars:
+#    config_file: "templates/etc/fluent/_.ansible.d/fireflyiii.conf"
+#  include_tasks: roles/fluentd/shared/add_config.yml
+#  tags: ['fluentd_config']
+#  when: "monitoring_enabled"
+
+- name: register update notifier
+  vars:
+    name: "openemr"
+    type: "docker"
+    url: "https://github.com/openemr/openemr/tags"
+    config: {
+      repository: "openemr/openemr",
+      pattern: "^([0-9\\.]+)$"
+    }
+  include_tasks: roles/update_service/shared/add_software.yml
+  tags: ['update_notifier_config']
+  when: "update_service_software_check_enabled"
