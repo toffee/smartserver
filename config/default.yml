@@ -729,6 +729,24 @@ default_variables: {
     fittrackee_postgres_password:             { dependency: "{{fittrackee_enabled}}" },
     # **** END FITTRACKEE                                                              ***
     # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    
+    # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    # **** BEGIN OPENEMR                                                               ***
+    # Self-hosted openEMR
+    # Roles:
+    # - 'openemr'
+    openemr_enabled:                          { default: no,                                                       # disabled by default
+                                                requirement: "mariadb_enabled,redis_enabled" },
+    openemr_mariadb_db:                       { "default": "openemr",
+                                                dependency: "{{openemr_enabled}}" },
+    openemr_mariadb_username:                 { "default": "openemr",
+                                                dependency: "{{openemr_enabled}}" },
+    openemr_mariadb_password:                 { dependency: "{{openemr_enabled}}" },
+    openemr_username:                         { "default": "admin",
+                                                dependency: "{{openemr_enabled}}" },
+    openemr_password:                         { dependency: "{{openemr_enabled}}" },
+    # **** END FITTRACKEE                                                              ***
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 }
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -831,6 +849,7 @@ podman_ghostfolio_ip:             "172.16.0.217"
 podman_jekyll_ip:                 "172.16.0.218"
 podman_mongo_ip:                  "172.16.0.219"
 podman_pigallery2_ip:             "172.16.0.220"
+podman_openemr_ip:                "172.16.0.221"
 
 podman_vcontrold_ip:              "172.16.0.230"
 podman_optolink_splitter_ip:      "172.16.0.231"
