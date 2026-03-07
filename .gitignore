@@ -7,3 +7,9 @@ config/demo/backup/*
 !config/default.yml
 /*.retry
 */__pycache__/*
+!config/pluto/
+config/pluto/vault/wireguard_mobile/
+config/pluto/vault/wireguard_cloud/
+config/pluto/vault/fireflyiii/
+config/pluto/vault/ssh_auth/
+config/pluto/vault/letsencrypt.tgz

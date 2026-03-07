@@ -1,0 +1,17 @@
+vault_mailserver_password: "DfAFyBMg*mjPJ"
+
+vault_userpasswords: {
+    daniel: "Toffee@Pluto",
+    janko: "Zeze@Pluto",
+    lucian: "Luci@Pluto"
+}
+
+vault_form_auth_passphrase: "fu['7.Xx&w0y#CPGlj5k"
+
+vault_shared_mariadb_password: "omGnpCc8qR"
+
+#vault_nextcloud_instance_id:            ""
+#vault_nextcloud_password_salt:          ""
+#vault_nextcloud_secret:                 ""
+#vault_nextcloud_mariadb_password:       ""
+#vault_nextcloud_admin_password:         ""
