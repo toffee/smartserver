@@ -62,18 +62,22 @@
     priority: "100"
     state: present
   with_items:
-    - { name: "NVIDIA", url: "https://developer.download.nvidia.com/compute/cuda/repos/opensuse{{ansible_distribution_major_version}}/{{ansible_architecture}}/" }
+    - { name: "NVIDIA", url: "https://developer.download.nvidia.com/compute/cuda/repos/{{'' if is_suse_16 else 'open'}}suse{{ansible_distribution_major_version}}/{{ansible_architecture}}/" }
   when: "is_suse"
 
 - name: "nvidia : install required packages => is_suse"
   zypper:
-    name:
-      - nvidia-compute-G06
-#      - nvidia-compute-G06-32bit # used to mount frigate
-      - nvidia-compute-utils-G06
-      - nvidia-container-toolkit
-#      - nvidia-utils-G06
-      - nvtop
+    name: |
+      [
+        'nvidia-compute-G07',
+        'nvidia-compute-utils-G07',
+        {% if is_suse_16 %}
+        'nvidia-driver-G07',
+        {% else %}
+        'nvidia-container-toolkit',
+        {% endif %}
+        'nvtop'
+      ]
     state: present
   when: "is_suse"
 
@@ -101,7 +105,7 @@
     mode: 0644
   notify: "restart nvidia-uvm-init"
 
-- name: "nvidia : enable nvidia-persistanced" # temporary => missing libnvidia-cfg.so.1 on suse
+- name: "nvidia : enable nvidia-persistenced" # temporary => missing libnvidia-cfg.so.1 on suse
   systemd:
     name: nvidia-persistenced
     state: started
