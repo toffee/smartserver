@@ -1,6 +1,6 @@
 - name: set snapcast version
   set_fact:
-    snapcast_version: "0.34.0"
+    snapcast_version: "0.35.0"
   tags: [ 'update_notifier_config' ]
 
 - name: prepare needed folder
@@ -34,7 +34,7 @@
   
 - name: "clone snapcast git"
   git:
-    repo: 'https://github.com/badaix/snapcast'
+    repo: 'https://github.com/snapcast/snapcast'
     dest: '{{global_build}}snapcast'
     version: 'v{{snapcast_version}}'  
   register: snapcast_git
@@ -80,9 +80,9 @@
   vars:
     name: "snapcast"
     type: "github"
-    url: "https://github.com/badaix/snapcast/releases"
+    url: "https://github.com/snapcast/snapcast/releases"
     config: { 
-      project: "badaix/snapcast", 
+      project: "snapcast/snapcast", 
       pattern: "^v([0-9\\.]+)$",
       version: "v{{snapcast_version}}" 
     }
