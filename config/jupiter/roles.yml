@@ -19,6 +19,7 @@
 
 - { import_role: { name: "config/jupiter/roles/hosts" }, tags: [ 'hosts' ] }             # local firewalls rules
 - { import_role: { name: "config/jupiter/roles/hosts", tasks_from: openhab }, tags: [ 'openhab' ], when: "openhab_enabled" }
+- { import_role: { name: "config/jupiter/roles/hosts", tasks_from: sport_sync }, tags: [ 'sport_sync' ] }
 - { import_role: { name: "config/jupiter/roles/zigbee2mqtt" }, tags: [ 'zigbee2mqtt' ] } # configuration of zigbee2mqtt        
 - { import_role: { name: "config/jupiter/roles/unifi" }, tags: [ 'unifi' ] }
 - { import_role: { name: "config/jupiter/roles/mytracker" }, tags: [ 'mytracker' ] }

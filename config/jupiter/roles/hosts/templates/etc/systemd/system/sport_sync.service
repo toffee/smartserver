@@ -1,0 +1,6 @@
+[Unit]
+Description=SportsTracker to Strava and Fittrackee sync
+
+[Service]
+ExecStart=/root/git/toffee/onyx/venv/bin/python /root/git/toffee/onyx/sport_sync.py
+User=root
