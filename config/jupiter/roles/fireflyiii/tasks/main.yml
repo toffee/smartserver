@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    fireflyiii_core_version: 'version-6.6.1'
+    fireflyiii_core_version: 'version-6.6.2'
     fireflyiii_importer_version: 'version-2.3.2'
   tags: [ 'update_notifier_config' ]
 
@@ -85,7 +85,6 @@
       IMPORT_DIR_ALLOWLIST: "/var/www/html/storage/configurations"
       FIREFLY_III_URL: "http://{{podman_fireflyiii_core_ip}}:8080"
       VANITY_URL: "https://fireflyiii.{{server_domain}}"
-#      FIREFLY_III_CLIENT_ID: "{{vault_fireflyiii_client_id}}"
       FIREFLY_III_ACCESS_TOKEN: "{{fireflyiii_pat}}"
       TRUSTED_PROXIES: "**"
       NORDIGEN_ID: "{{fireflyiii_nordigen_id}}"
