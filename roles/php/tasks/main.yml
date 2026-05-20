@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    php_version: "8.5.5" #"8.3.30"
+    php_version: "8.5.6" #"8.3.30"
     php_container_os: "trixie"
   tags: [ 'update_notifier_config' ]
   
@@ -57,7 +57,7 @@
     container_to_host_rules:
       - { saddr: "{{podman_php_ip}}", protocol: "tcp", dport: "443", comment: "=> apache (rest api's ...)" }
     container_to_outside_rules:
-      - { saddr: "{{podman_php_ip}}", oif: "{{default_network_interface}}", comment: "php => all outgoing networks" }
+      - { oif: "{{default_network_interface}}", saddr: "{{podman_php_ip}}", comment: "php => outgoing networks" }
   include_tasks: roles/firewall/shared/allow_service.yml
   tags: ['firewall_config']
 
