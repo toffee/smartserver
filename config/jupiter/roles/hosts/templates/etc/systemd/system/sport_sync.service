@@ -1,6 +1,15 @@
 [Unit]
-Description=SportsTracker to Strava and Fittrackee sync
+Description=Sports Tracker Sync to Strava/FitTrackee
+After=network.target
 
 [Service]
-ExecStart=/root/git/toffee/onyx/venv/bin/python /root/git/toffee/onyx/sport_sync.py
+Type=oneshot
 User=root
+WorkingDirectory=/root/git/toffee/onyx
+Environment="PATH=/root/git/toffee/onyx/venv/bin
+ExecStart=/root/git/toffee/onyx/venv/bin/python /root/git/toffee/onyx/sport_sync.py
+StandardOutput=append:/var/log/sport_sync.log
+StandardError=append:/var/log/sport_sync.log
+
+[Install]
+WantedBy=multi-user.target

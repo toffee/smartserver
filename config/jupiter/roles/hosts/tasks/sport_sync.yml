@@ -5,7 +5,7 @@
     owner: root
     group: root
     mode: 0644
-  notify: "restart sport_sync"
+#  notify: "restart sport_sync"
   
 - name: "create systemd timer"
   template:
@@ -14,7 +14,7 @@
     owner: root
     group: root
     mode: 0644
-  notify: "restart sport_sync"
+#  notify: "restart sport_sync"
   
 - name: Enable and start the sport_sync timer
   ansible.builtin.systemd:
