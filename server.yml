@@ -9,8 +9,8 @@
   pre_tasks:
     - name: verify ansible versions
       verify_ansible_versions:
-        ansible_required_version: "4.10.0"
-        ansible_core_required_version: "2.11.12"
+        ansible_required_version: "11.12.0"
+        ansible_core_required_version: "2.18.17"
         collection_versions_cmd: "ansible-galaxy collection list"
         requirements: "./requirements.yml"
       tags: all
@@ -162,6 +162,8 @@
     - { import_role: { name: apache_webui },                                                 tags: [ 'apache_webui' ] }                                                                                         # responsive web ui
 
     - { import_role: { name: netdata },                                                      tags: [ 'netdata' ],                                            when: "netdata_enabled" }                          # server monitoring
+
+    - { import_role: { name: cockpit },                                                      tags: [ 'cockpit' ],                                            when: "cockpit_enabled" }                          # server monitoring
 
     - { import_role: { name: librenms },                                                     tags: [ 'librenms' ],                                           when: "librenms_enabled" }                         # network monitoring
     

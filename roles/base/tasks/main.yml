@@ -235,7 +235,7 @@
     path: /etc/sysctl.conf
     regexp: '^{{item.regex}}\s*='
     line: '{{item.line}}'
-    create: '{{is_suse_16}}'
+    create: '{{is_suse}}'
   with_items:
     #Each inotify watch uses 540 bytes of kernel memory on 32-bit architectures, and 1080 bytes on 64-bit architectures. Kernel memory is unswappable. So there is a memory cost, certainly.
     #- { regex: "fs\\.inotify\\.max_user_instances", line: "fs.inotify.max_user_instances = 256" }
@@ -253,7 +253,7 @@
     # 8333 should be enough for 1GBit => https://cromwell-intl.com/open-source/performance-tuning/ethernet.html
     # 20833 should be enough for 2.5GBit
     # networkspeed in mb * bytes per megabyte / frame size => needed backlog size
-    - { regex: "net\\.core\\.netdev_max_backlog", line: "net.core.netdev_max_backlog = {{ ((ansible_facts[default_network_interface]['speed'] * 125000) / ansible_facts[default_network_interface]['mtu']) | int }}" }
+    - { regex: "net\\.core\\.netdev_max_backlog", line: "net.core.netdev_max_backlog = {{ ((ansible_facts[default_network_interface]['speed'] * 12500) / ansible_facts[default_network_interface]['mtu']) | int }}" }
 
     - { regex: "net\\.core\\.optmem_max", line: "net.core.optmem_max = 65536" }
 
