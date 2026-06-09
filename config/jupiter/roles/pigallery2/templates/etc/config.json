@@ -125,10 +125,19 @@
             "loadFullImageOnZoom": true,
             "//[Titles]": "Set these to customize the text (caption, location, etc.) in the lightbox that are always visible over the photo (not in the info panel).",
             "Titles": {
-                "topLeftTitle": "title",
-                "topLeftSubtitle": "caption",
-                "bottomLeftTitle": "location",
-                "bottomLeftSubtitle": "persons"
+                "topLeftTitle": [
+                    6
+                ],
+                "topLeftSubtitle": [
+                    5
+                ],
+                "bottomLeftTitle": [
+                    10,
+                    9
+                ],
+                "bottomLeftSubtitle": [
+                    8
+                ]
             }
         },
         "//[Themes]": "Pigallery2 uses Bootstrap 5.3 (https://getbootstrap.com/docs/5.3) for design (css, layout). In dark mode it sets 'data-bs-theme=\"dark\"' to the <html> to take advantage bootstrap's color modes. For theming, read more at: https://getbootstrap.com/docs/5.3/customize/color-modes/",
@@ -609,15 +618,15 @@
         ],
         "//[excludeFileList]": "Files that mark a folder to be excluded from indexing. Any folder that contains a file with this name will be excluded from indexing.",
         "excludeFileList": []
-    },
+    },  
     "//[AlbumCover]": "Specify a search query and sorting that the app can use to pick the best photo for an album and folder cover. There is no way to manually pick folder and album cover in the app. You can tag some of your photos with 'cover' and set that as search query or rate them to 5 and set sorting to descending by rating.",
     "AlbumCover": {
         "//[SearchQuery]": "Filters the sub-folders with this search query. If filter results no photo, the app will search again without the filter.",
         "SearchQuery": {
             "type": 100,
-            "text": ""
+            "value": ""
         },
-        "//[Sorting]": "If multiple cover is available sorts them by these methods and selects the first one.",
+        "//[Sorting]": "If multiple cover is available sorts them by these methods and selects the first one. Using random sorting does not allow to use any other sorting method.",
         "Sorting": [
             {
                 "method": "Rating",

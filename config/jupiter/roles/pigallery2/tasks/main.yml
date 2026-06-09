@@ -9,7 +9,37 @@
       - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_etc }}pigallery2/" }
       - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_lib }}pigallery2/" }
       - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_tmp }}pigallery2/" }
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "/mnt/ds/photo" }
   include_tasks: roles/_shared/create_directories.yml
+
+- name: install required packages
+  ansible.builtin.zypper:
+    name:
+      - nfs-client
+    state: present
+  when: is_suse | bool
+
+- name: check nfs mount points
+  shell: "mount | grep /mnt/ds/photo"
+  register: "nfs_mount_result"
+  changed_when: "nfs_mount_result.rc == 1"
+  failed_when: no
+
+- name: create fstab mount entries
+  mount:
+    path: "/mnt/ds/photo"
+    src: "192.168.120.4:/volume1/photo"
+    fstype: nfs
+    state: present
+  register: "fstab_result"
+  
+- name: "activate automount"
+  shell: "systemctl daemon-reload"
+  when: "fstab_result.changed"
+
+- name: "start automount"
+  shell: "systemctl --all start *remote*.automount"
+  when: "fstab_result.changed"
 
 - name: copy config
   template:

@@ -4,12 +4,18 @@
     tasmota_version: '15.4.0'
   tags: [ 'update_notifier_config' ]
 
+- name: ensure rsyslog is installed
+  ansible.builtin.zypper:
+    name: rsyslog
+    state: present
+
 - name: prepare needed directories
   vars:
     directories:
       - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{ global_log }}rsyslog/" }
+      - { mode: "u=rwx,g=rx,o=rx", owner: "root", group: "root", path: "/etc/rsyslog.d/" }
   include_tasks: roles/_shared/create_directories.yml
-  
+
 - name: copy config
   template:
     src: "templates{{item.path}}"

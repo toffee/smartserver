@@ -12,25 +12,24 @@
     mode: 0750
   with_items:
     - "{{global_build}}snapcast"
-    
-- name: install required packages => is_suse
-  zypper:
-    name: [
-        gcc12-c++
-      , cmake-full
-      , libboost_headers1_75_0-devel
-      , libopenssl-devel
-      , soxr-devel
-      , alsa-devel
-      , libpulse-devel
-      , libvorbis-devel
-      , flac-devel
-      , libopus-devel
-      , libavahi-devel
-      , alsa-utils  
-    ]
+   
+- name: Install required packages on openSUSE
+  ansible.builtin.zypper:
+    name:
+      - gcc-c++
+      - cmake-full
+      - boost-devel
+      - libopenssl-devel
+      - soxr-devel
+      - alsa-devel
+      - libpulse-devel
+      - libvorbis-devel
+      - flac-devel
+      - libopus-devel
+      - libavahi-devel
+      - alsa-utils
     state: present
-  when: is_suse|bool
+  when: is_suse | bool
   
 - name: "clone snapcast git"
   git:
@@ -43,8 +42,8 @@
   shell: |
     mkdir build
     cd build
-    export CC=/usr/bin/gcc-12
-    export CXX=/usr/bin/g++-12
+    export CC=/usr/bin/gcc
+    export CXX=/usr/bin/g++
     cmake .. -DBUILD_CLIENT=ON -DBUILD_SERVER=OFF -DBUILD_WITH_PULSE=OFF -DBUILD_WITH_EXPAT=OFF
     cmake --build .
     install -s -D -g root -o root ../bin/snapclient /usr/bin/snapclient
