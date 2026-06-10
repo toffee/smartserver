@@ -1,17 +1,52 @@
 - name: prepare needed directories
   vars:
     directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "root", group: "root", path: "{{global_opt}}onyx" }
       - { mode: "u=rwx,g=rwx,o=rwx", owner: "root", group: "root", path: "{{global_log}}onyx" }
   include_tasks: roles/_shared/create_directories.yml
+
+- name: install needed python packages
+  pip:
+    name:
+      - requests-oauthlib
+      - python-dotenv
+    virtualenv: "{{global_opt}}onyx/env"
+    virtualenv_command: "python3 -m venv"
+  register: installer_state
+
+- name: copy python files
+  synchronize:
+    src: "/smartserver/data/home/root/git/toffee/onyx/{{item.path}}"
+    dest: "{{global_opt}}onyx/"
+    archive: no
+    checksum: yes
+    group: yes
+    owner: yes
+    perms: yes
+    recursive: yes
+    rsync_opts:
+      - "--chown=root:root"
+      - "--chmod={{item.chmod}}"
+  with_items:
+    - { "chmod": "D750,F750", "path": "sport_sync.py" }
+    - { "chmod": "D750,F750", "path": "sport_tokens.py" }
+
+- name: copy env file
+  template:
+    src: "templates/sport_sync.env"
+    dest: "{{global_opt}}/onyx/sport_sync.env"
+    owner: root
+    group: root
+    mode: 0750
 
 # ***** CRONJOB FOR SYNC ****
 - name: create cron job
   vars:
     name: "Onyx sync job"
-    cmd: "/root/git/toffee/onyx/bin/run_sync.sh"
+    cmd: "/smartserver/opt/onyx/env/bin/python3 /smartserver/opt/onyx/sport_sync.py"
     group: "onyx"
     weekday: "0"
-    hour: "7"
+    hour: "8"
     minute: "30"
   include_tasks: roles/cron/shared/add_cronjob.yml
   tags: ['cron_job']
