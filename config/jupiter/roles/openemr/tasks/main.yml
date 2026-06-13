@@ -12,11 +12,31 @@
     mode: "{{item.mode}}"
   with_items:
     - { user: "root", group: "root", mode: "u=rwx,g=rwx,o=rwx", path: "{{htdocs_path}}openemr/sites" }
+    - { user: "root", group: "root", mode: "u=rwx,g=rwx,o=rwx", path: "{{global_etc}}openemr/etc/apache2/conf.d/" }
     - { user: "root", group: "root", mode: "u=rwx,g=rwx,o=rwx", path: "{{global_log}}openemr" }
     - { user: "root", group: "root", mode: "u=rwx,g=rwx,o=rwx", path: "{{global_log}}openemr_apache" }
   notify:
     - restart openemr
 
+- name: copy configs
+  template:
+    src: "templates/{{item}}"
+    dest: "{{global_etc}}openemr/{{item}}"
+    owner: root
+    group: root
+    mode: 0640
+  with_items:
+    - "etc/apache2/conf.d/servername.conf"
+
+#To avoid spending time again...(Setting an empty directory as volume does not work)
+#1. Startupt the container:
+#    without mounting volume {{htdocs_path}}openemr/sites:/var/www/localhost/htdocs/openemr/sites:Z
+#    with FORCE_INSTALL: "true" and SKIP_INSTALL: "false"
+#The containre will create the needed data.
+#2. Copy the generated files to host
+#    mkdir -p /smartserver/htdocs/openemr/sites
+#    podman cp openemr:/var/www/localhost/htdocs/openemr/sites/default /smartserver/htdocs/openemr/sites/
+#3. Restart containre with volume in place and FORCE_INSTALL: "false" and SKIP_INSTALL: "true"
 - name: create container service
   vars:
     container_name: "openemr"
@@ -39,15 +59,16 @@
       OE_USER: "{{openemr_username}}"
       OE_PASS: "{{openemr_password}}"
       REDIS_SERVER: "redis"
-      FORCE_INSTALL: "true"
-      SKIP_INSTALL: "false"
+      FORCE_INSTALL: "false"
+      SKIP_INSTALL: "true"
       MANUAL_SETUP: "no"
-      DOMAIN: ""
+      DOMAIN: "" # Leave this blank to disable Certbot initialization
       DISABLE_SSL: "true"
-    container_volumes: 
-      #- '{{htdocs_path}}openemr/sites:/var/www/localhost/htdocs/openemr/sites'
-      - '{{global_log}}openemr:/var/log'
-      - '{{global_log}}openemr_apache:/var/log/apache2'
+    container_volumes:
+      - '{{global_etc}}openemr/etc/apache2/conf.d/servername.conf:/etc/apache2/conf.d/servername.conf:Z'
+      - '{{htdocs_path}}openemr/sites:/var/www/localhost/htdocs/openemr/sites:Z'
+      - '{{global_log}}openemr:/var/log:Z'
+      - '{{global_log}}openemr_apache:/var/log/apache2:Z'
     container_after: [ "mariadb" ]
     container_readyness: { "type": "port_check", "ip": "{{podman_openemr_ip}}", "port": "80" }
   include_tasks: roles/container/shared/create_podman_service.yml
