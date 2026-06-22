@@ -24,6 +24,16 @@ from smartserver.metric import Metric
 
 from config import config
 
+##### JUPITER BEGIN #####
+import socket
+import urllib3.util.connection as urllib3_cn
+
+# Override the default system behavior to force IPv4
+def allowed_gai_family():
+    return socket.AF_INET
+
+urllib3_cn.allowed_gai_family = allowed_gai_family
+##### JUPITER END #####
 
 class Handler(Server):
     '''Handler client'''
