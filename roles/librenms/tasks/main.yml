@@ -1,6 +1,6 @@
 - name: set version
   set_fact:
-    librenms_version: '26.4.1'
+    librenms_version: '26.6.1'
   tags: [ 'update_notifier_config' ]    
 
 - name: "create user and group => user or group does not exists"
@@ -69,9 +69,10 @@
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
       REDIS_DB: "1"
-      CACHE_DRIVER: "redis"
-      MEMORY_LIMIT: "2048M"
-#      APP_URL: "https://librenms.{{server_domain}}/"
+      #CACHE_DRIVER: "redis"
+      #MEMORY_LIMIT: "2048M"
+      APP_URL: "https://librenms.{{server_domain}}/"
+      APP_TRUSTED_PROXIES: "*"
 #      LIBRENMS_BASE_URL: "https://librenms.{{server_domain}}/"
     container_exposed_ports:
       - "162"
