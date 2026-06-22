@@ -13,7 +13,7 @@
   with_items: "{{check_result.stdout_lines}}"
 
 - name: trigger software update check
-  shell: "nohup /opt/update_service/software_version_check --confirm 2>&1 &"
+  shell: "nohup  /opt/update_service/env/bin/python3 /opt/update_service/software_version_check --confirm 2>&1 &"
   changed_when: no
 #  tags: ['all']
   
