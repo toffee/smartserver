@@ -118,7 +118,7 @@ class Fetcher(object):
 
         url = forecast_url.format(latitude=latitude,longitude=longitude,timezone=self.config.timezone,fields=",".join(fields))
         data = self.get(url)
-        if data is None or ("hourly" not in data and "minutely_15" not in data):
+        if data is None or "hourly" not in data: # and "minutely_15" not in data):
             raise ForecastDataException("Failed getting forecast data. Content: {}".format(data))
 
         forecasts = {}
