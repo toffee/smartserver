@@ -1,7 +1,7 @@
 - name: set version
   set_fact:
-    fireflyiii_core_version: 'version-6.6.3'
-    fireflyiii_importer_version: 'version-2.3.2'
+    fireflyiii_core_version: 'version-6.6.5'
+    fireflyiii_importer_version: 'version-2.3.3'
   tags: [ 'update_notifier_config' ]
 
 - name: prepare needed folder
@@ -87,6 +87,8 @@
       VANITY_URL: "https://fireflyiii.{{server_domain}}"
       FIREFLY_III_ACCESS_TOKEN: "{{fireflyiii_pat}}"
       TRUSTED_PROXIES: "**"
+      EXPECT_SECURE_URL: "true"
+      APP_URL: "https://fireflyiii-importer.{{server_domain}}"
       NORDIGEN_ID: "{{fireflyiii_nordigen_id}}"
       NORDIGEN_KEY: "{{fireflyiii_nordigen_key}}"
       NORDIGEN_SANDBOX: "false"
@@ -160,12 +162,6 @@
     icons: [ 'templates/webui/icons/fireflyiii_logo.svg', 'templates/webui/icons/financial_logo.svg' ]
   include_tasks: roles/apache_webui/shared/add_webui.yml
   tags: ['apache_webui_config']
-
-- name: copy apache config
-  vars:
-    config_file: "templates/etc/apache2/_.ansible.conf.d/fireflyiii.conf"
-  include_tasks: roles/apache/shared/add_config.yml
-  tags: ['apache_config']
  
 - name: copy apache vhost
   vars:
@@ -173,6 +169,13 @@
     usergroup: "user"
     include: "templates/etc/apache2/_.ansible.vhost.d/fireflyiii.inc"
   include_tasks: roles/apache/shared/add_vhost.yml
+ 
+- name: copy apache vhost importer
+  vars:
+    sub_domain: "fireflyiii-importer"
+    usergroup: "user"
+    include: "templates/etc/apache2/_.ansible.vhost.d/fireflyiii-importer.inc"
+  include_tasks: roles/apache/shared/add_vhost.yml 
  
 - name: copy fluentd config
   vars:

@@ -1,0 +1,7 @@
+<Location />
+    ProxyPass http://fireflyiii-importer:8080/
+    ProxyPassReverse http://fireflyiii-importer:8080/
+    
+    RequestHeader set X-Forwarded-Proto expr=%{REQUEST_SCHEME}
+    RequestHeader set X-Forwarded-SSL expr=%{HTTPS}
+</Location>
