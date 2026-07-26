@@ -77,7 +77,7 @@
       {% endif %}
         "--env TZ={{timezone}}",
       {% for key in container_env | default({}) %}
-        "--env '{{key}}={{ container_env[key] | replace('"', '\"') }}'",
+        "--env '{{key}}={{ container_env[key] | replace('"', '\"') | replace("'", "'\\''") }}'",
       {% endfor %}
       {% for value in container_volumes | default([]) %}
         "--volume {{value}}",

@@ -1,6 +1,6 @@
 - name: set openhab version
   set_fact:
-    openhab_version: "5.1.4"
+    openhab_version: "5.2.0"
   tags: [ 'update_notifier_config' ]
 
 - name: "create user and group => user or group does not exists"
@@ -15,7 +15,7 @@
     directories:
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_etc}}openhab" }
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_etc}}openhab/addons" }
-      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_etc}}openhab/conf" }
+      #- { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_etc}}openhab/conf" } # will be symlinked from openhab_config project
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_etc}}openhab/cont-init.d" }
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_lib}}openhab" }
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_lib}}openhab/graalpy" }
@@ -51,7 +51,7 @@
     git_mode:  "u=rwX,g=rX,o="
   include_tasks: roles/_shared/git_clone.yml
 
-# ***** PROCESS AND MERGE CONF FOLDER SYMLINKS *****
+# ***** LINK SHARED CONF FOLDER INTO CUSTOM CONF FOLDERS *****
 - name: check custom conf folder
   shell: "find . -type d | cut -c 3-"
   args:
@@ -70,85 +70,77 @@
 
 - name: collect conf folder links
   set_fact:
-    pythonscripting_enabled: "{{'automation/python' in custom_conf_folder_result.stdout_lines}}"
     collected_conf_folders: |
       [
         {% set ns = namespace(active_line = 'xxx', has_python = 'automation/python' in custom_conf_folder_result.stdout_lines) %}
-        {% for path in custom_conf_folder_result.stdout_lines %}
-          {% if path | length > 0 and not path.startswith(ns.active_line) %}
-              { "type": "link", "src": "{{projects_path}}openhab_config/conf/{{path}}", "dest": "{{global_etc}}openhab/conf/{{path}}", "is_root": "{{ '1' if '/' not in path else '0'}}" },
-              {% set ns.active_line = path %}
-          {% endif %}
-        {% endfor %}
         {% for path in shared_conf_folder_result.stdout_lines %}
           {% if path | length > 0 and path not in custom_conf_folder_result.stdout_lines and not path.startswith(ns.active_line) and ( ns.has_python or 'automation/python' not in path ) %}
-              { "type": "link", "src": "{{projects_path}}openhab_shared/conf/{{path}}", "dest": "{{global_etc}}openhab/conf/{{path}}", "is_root": "{{ '1' if '/' not in path else '0'}}" },
+              { "state": "link", "src": "{{projects_path}}openhab_shared/conf/{{path}}", "dest": "{{projects_path}}openhab_config/conf/{{path}}", "owner": "{{system_users['openhab'].name}}", "group": "{{system_groups['openhab'].name}}" },
               {% set ns.active_line = path %}
           {% endif %}
         {% endfor %}
 
-        {% for path in ["html", "icons", "items", "persistence", "rules", "scripts", "services", "sitemaps", "things", "transform"] %}
+        {% for path in ["automation", "html", "icons", "items", "persistence", "rules", "scripts", "services", "sitemaps", "things", "transform", "yaml", "yamlcomposer"] %}
           {% if path not in custom_conf_folder_result.stdout_lines and path not in shared_conf_folder_result.stdout_lines %}
-              { "type": "directory", "dest": "{{global_etc}}openhab/conf/{{path}}", "is_root": "1" },
+              { "state": "directory", "dest": "{{projects_path}}openhab_config/conf/{{path}}", "owner": "{{system_users['openhab'].name}}", "group": "{{system_groups['openhab'].name}}" },
           {% endif %}
         {% endfor %}
       ]
 
-- name: check for invalid conf folders
-  stat:
-    path: "{{item.dest}}"
-  changed_when: "not checked_conf_folders.stat.exists or (item.type == 'link' and not checked_conf_folders.stat.islnk)"
-  register: checked_conf_folders
-  loop_control:
-    label: "{{item.dest if item.type == 'directory' else item.src + ' => ' + item.dest }}"
+- name: create missing folders and link shared conf folders
+  file: "{{item}}"
   with_items: "{{collected_conf_folders}}"
 
-- name: collect invalid conf folders
-  set_fact:
-    collected_invalid_conf_folder_cmds: |
-      [
-        {% for result in checked_conf_folders.results %}
-          {% if result.changed %}
-            {
-              "cmd": {
-                  {% if result.item.type == 'link' %}
-                      "src": "{{result.item.src}}",
-                      "dest": "{{result.item.dest}}",
-                  {% else %}
-                      "path": "{{result.item.dest}}",
-                  {% endif %}
-                  "state": "{{result.item.type}}",
-                  "owner": "{{system_users['openhab'].name}}",
-                  "group": "{{system_groups['openhab'].name}}"
-              },
-              "dest": "{{result.item.dest}}",
-              "is_root": "{{result.item.is_root}}"
-            },
-          {% endif %}
-        {% endfor %}
-      ]
-    collected_invalid_conf_folders_needs_container_rebuild: |
-      [
-        {% for result in checked_conf_folders.results %}
-          {% if result.changed and result.item.is_root == '1'%}
-              1,
-          {% endif %}
-        {% endfor %}
-      ]
+# ***** CONF TEMPLATES (e.g. Services) *****
+# have to fetch files before, because ansible template module works only with local files
+# **** IMPORTANT - You have to exclude the generated configs via .gitignore in your openhab_config project
+- name: prepare template configs
+  synchronize:
+    src: "{{projects_path}}openhab_config/templates/"
+    dest: "/tmp/ansible/openhab/"
+    mode: "pull"
+    archive: no
+    checksum: yes
+    rsync_opts:
+      - "--chown=root:root"
+      - "--chmod=D755,F644"
+    recursive: yes
+  changed_when: no
 
-- name: clean root conf folder
+- name: collect template config files
+  shell: "find /tmp/ansible/openhab/ -type f  | sed 's|/tmp/ansible/openhab/||'"
+  register: custom_conf_template_result
+  changed_when: no
+  check_mode: false
+
+- name: copy template configs
+  template:
+    src: "/tmp/ansible/openhab/{{item}}"
+    dest: "{{projects_path}}openhab_config/conf/{{item}}"
+    owner: "{{system_users['openhab'].name}}"
+    group: "{{system_groups['openhab'].name}}"
+    mode: 0640
+  with_items: "{{custom_conf_template_result.stdout_lines}}"
+#  notify: "restart openhab"
+
+- name: clean template configs
   file:
-    path: "{{item.dest}}"
+    path: "/tmp/ansible/openhab/"
     state: absent
-  when: "item.is_root == '1'"
-  loop_control:
-    label: '{{item.dest}}'
-  with_items: "{{collected_invalid_conf_folder_cmds}}"
+  changed_when: no
 
-- name: create conf folders
-  file: "{{item.cmd}}"
-  with_items: "{{collected_invalid_conf_folder_cmds}}"
+# ***** SET MAIN CONF FOLDER SYM LINK *****
+- name: set symbolic link to conf folder
+  file:
+    src: "{{projects_path}}openhab_config/conf"
+    dest: "{{global_etc}}openhab/conf"
+    state: link
+    follow: no
+    owner: "{{system_users['openhab'].name}}"
+    group: "{{system_groups['openhab'].name}}"
+  changed_when: no
 
+# ***** HABPANEL *****
 # habpanel if exists
 - name: check habpanel config
   shell: "ls {{projects_path}}openhab_config/jsondb/uicomponents_habpanel_panelconfig.json"
@@ -186,7 +178,7 @@
     - "uicomponents_ui_page.json"
     - "uicomponents_ui_widget.json"
 
-# addons folder
+# ***** ADDONS *****
 - name: copy addons folder
   synchronize:
     src: "{{projects_path}}openhab_config/addons/"
@@ -199,56 +191,14 @@
       - "--chmod=D750,F640"
     recursive: yes
 
-# SERVICES
-# have to fetch files before, because ansible template module works only with local files
-- name: prepare service configs
-  synchronize:
-    src: "{{projects_path}}openhab_config/templates/"
-    dest: "/tmp/ansible/openhab/"
-    mode: "pull"
-    archive: no
-    checksum: yes
-    rsync_opts:
-      - "--chown=root:root"
-      - "--chmod=D755,F644"
-    recursive: yes
-  changed_when: no
-
-- name: copy service configs
-  template:
-    src: "{{item}}"
-    dest: "{{ global_etc }}openhab/conf/services/{{item | basename}}"
-    owner: "{{system_users['openhab'].name}}"
-    group: "{{system_groups['openhab'].name}}"
-    mode: 0640
-  with_fileglob: "/tmp/ansible/openhab/services/*"
-  notify: "restart openhab"
-
-# THINGS
-- name: copy things configs
-  template:
-    src: "{{item}}"
-    dest: "{{ global_etc }}openhab/conf/things/{{item | basename}}"
-    owner: "{{system_users['openhab'].name}}"
-    group: "{{system_groups['openhab'].name}}"
-    mode: 0640
-  with_fileglob: "/tmp/ansible/openhab/things/*"
-  notify: "restart openhab"
-  
-# UDEV
+# ***** UDEV *****
 - name: copy udev rules
   vars:
-    udev_rules_path: "/tmp/ansible/openhab/udev/rules.d/"
+    udev_rules_path: "{{config_path}}templates/openhab/udev_rules/"
     udev_rules_trigger: "restart openhab"
   include_tasks: roles/_shared/synchronize_udev_rules.yml
 
-# CLEANUP  
-- name: clean configs
-  file:
-    path: "/tmp/ansible/openhab/"
-    state: absent
-  changed_when: no
-  
+# ***** PYTHON CONFIG *****
 - name: copy python configuration
   template:
     src: "templates/python/configuration.py"
@@ -256,9 +206,10 @@
     owner: "{{system_users['openhab'].name}}"
     group: "{{system_groups['openhab'].name}}"
     mode: 0640
-  when: "pythonscripting_enabled"
+  when: "'automation/python' in custom_conf_folder_result.stdout_lines"
   notify: "restart openhab"
   
+# ***** COLLECT DEVICES *****
 - name: collect devices
   shell: "grep -P  \"^[^#]+$\" {{projects_path}}openhab_config/templates/udev/rules.d/*.rules | grep -oP \"SYMLINK\\+=\\\"\\K([^\\\"])+\""
   register: device_result
@@ -291,12 +242,6 @@
 #  with_indexed_items: "{{device_result.stdout_lines}}"
 #  when: "device_result.rc == 0 and symlink_result.results[item.0].rc == 0"
   
-# conf volumens must be mounted seperatly, because openhab has problems internaly to follow symlinks
-- name: check conf volumens
-  shell: "ls -1 {{global_etc}}openhab/conf"
-  register: conf_folder_result
-  changed_when: no
-
 - name: create container service
   vars:
     container_force_recreation: "{{true if collected_invalid_conf_folders_needs_container_rebuild | length > 0 else false}}"
@@ -309,19 +254,25 @@
       - "5007"
       - "8101"
     container_no_healthcheck: yes # disable healthcheck, because systemd is watching processes. Sometimes the initialization takes so long that the health check thinks it is frozen and kills the container.
-    container_env:
-      USER_ID: "{{system_users['openhab'].id}}"
-      GROUP_ID: "{{system_groups['openhab'].id}}"
-      EXTRA_JAVA_OPTS: "{{ openhab_extra_args | join(' ') }}"
-      EXTRA_SHELL_OPTS: "+x" # disable debug logs in entrypoint bash script
-      OPENHAB_HTTP_ADDRESS: "0.0.0.0"
-      CRYPTO_POLICY: "unlimited"
-      LC_ALL: "{{locale}}" # Language settings are needed to have correct 'locale' support in graal based scripting languages like javascript or python
-      LANG: "{{locale}}"
-      LANGUAGE: "{{locale}}"
-#      OPENHAB_LOGDIR: "/openhab/logs"
+    # "EXTRA_SHELL_OPTS": "+x" > disable debug logs in entrypoint bash script,
+    # "LC_ALL": "{{locale}}" => Language settings are needed to have correct 'locale' support in graal based scripting languages like javascript or python
+    container_env: |
+      {
+          "USER_ID": "{{system_users['openhab'].id}}",
+          "GROUP_ID": "{{system_groups['openhab'].id}}",
+          "EXTRA_JAVA_OPTS": "{{ openhab_extra_args | join(' ') }}",
+          "EXTRA_SHELL_OPTS": "+x",
+          "OPENHAB_HTTP_ADDRESS": "127.0.0.1",
+          "CRYPTO_POLICY": "unlimited",
+          "LC_ALL": "{{locale}}",
+          "LANG": "{{locale}}",
+          "LANGUAGE": "{{locale}}",
+          {% for name in (openhab_custom_env_map | default({})) %}
+              "{{name}}": "{{openhab_custom_env_map[name]}}",
+          {% endfor %}
+      }
     # all volumes needs to writeable, because openhab runs chown on OPENHAB_HOME
-#    container_devices: "{{openhab_device_mounts | default([])}}"
+    # container_devices: "{{openhab_device_mounts | default([])}}"
     container_privileged: yes
     container_volumes: |
       [
@@ -342,9 +293,7 @@
 
         '{{global_log}}openhab:/openhab/userdata/logs:rw',
 
-        {% for name in conf_folder_result.stdout_lines %}
-            '{{global_etc}}openhab/conf/{{name}}:/openhab/conf/{{name}}:rw',
-        {% endfor %}
+        '{{global_etc}}openhab/conf/:/openhab/conf/:rw',
       ]
 #        '{{global_etc}}openhab/conf:/openhab/conf:rw',
     container_timeout_stop_sec: 60
