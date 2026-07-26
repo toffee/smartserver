@@ -165,19 +165,6 @@
       - "--chmod=F640"
   when: "habpanel_result.rc == 0"
   
-- name: set symbolic link to jsondb files
-  file: 
-    src: "{{projects_path}}openhab_config/userdata/jsondb/{{item}}"
-    dest: "{{global_lib}}/openhab/jsondb/{{item}}"
-    state: link
-    follow: no
-    owner: "{{system_users['openhab'].name}}"
-    group: "{{system_groups['openhab'].name}}"
-  with_items:
-    - "automation_rules.json"
-    - "uicomponents_ui_page.json"
-    - "uicomponents_ui_widget.json"
-
 # ***** ADDONS *****
 - name: copy addons folder
   synchronize:
@@ -211,7 +198,7 @@
   
 # ***** COLLECT DEVICES *****
 - name: collect devices
-  shell: "grep -P  \"^[^#]+$\" {{projects_path}}openhab_config/templates/udev/rules.d/*.rules | grep -oP \"SYMLINK\\+=\\\"\\K([^\\\"])+\""
+  shell: "grep -P  \"^[^#]+$\" {{config_path}}templates/openhab/udev_rules/*.rules | grep -oP \"SYMLINK\\+=\\\"\\K([^\\\"])+\""
   register: device_result
   changed_when: no
   failed_when: no
@@ -262,7 +249,7 @@
           "GROUP_ID": "{{system_groups['openhab'].id}}",
           "EXTRA_JAVA_OPTS": "{{ openhab_extra_args | join(' ') }}",
           "EXTRA_SHELL_OPTS": "+x",
-          "OPENHAB_HTTP_ADDRESS": "127.0.0.1",
+          "OPENHAB_HTTP_ADDRESS": "0.0.0.0",
           "CRYPTO_POLICY": "unlimited",
           "LC_ALL": "{{locale}}",
           "LANG": "{{locale}}",
