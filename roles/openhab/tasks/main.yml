@@ -198,7 +198,7 @@
   
 # ***** COLLECT DEVICES *****
 - name: collect devices
-  shell: "grep -P  \"^[^#]+$\" {{projects_path}}openhab_config/templates/udev/rules.d/*.rules | grep -oP \"SYMLINK\\+=\\\"\\K([^\\\"])+\""
+  shell: "grep -P  \"^[^#]+$\" {{config_path}}templates/openhab/udev_rules/*.rules | grep -oP \"SYMLINK\\+=\\\"\\K([^\\\"])+\""
   register: device_result
   changed_when: no
   failed_when: no
