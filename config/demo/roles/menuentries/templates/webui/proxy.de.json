@@ -4,5 +4,10 @@
     "HPLaserJet": "HPLaserJet",
     "Router": "Router",
     "FritzBox": "FritzBox"
-  }
+  },
+  "automation_openhab": {
+    "Management UI": "Management UI",
+    "Homecontrol": "Haussteuerung",
+    "Basic UI": "Basic UI"
+ }
 }

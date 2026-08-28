@@ -249,6 +249,7 @@
     container_volumes: |
       [
         '/dev:/dev:rw',
+
         '/etc/localtime:/etc/localtime:ro',
         '/var/run/dbus:/var/run/dbus:rw',
         '/etc/machine-id:/etc/machine-id:ro',
