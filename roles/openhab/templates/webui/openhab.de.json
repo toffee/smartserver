@@ -3,12 +3,8 @@
     "Openhab": "Openhab"
   },
   "automation_openhab": {
-    "Homecontrol": "Haussteuerung",
-    "Basic UI": "Basic UI",
     "Administration": "Administration",
     "Main UI": "Main UI",
-    "Chatbot": "Chatbot",
-    "Habot": "Habot",
     "Metrics": "Metrics",
     "Grafana": "Grafana"
   }
