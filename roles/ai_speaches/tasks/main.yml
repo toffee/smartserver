@@ -1,0 +1,80 @@
+- name: set ollama version
+  set_fact:
+    speaches_version: 'v0.9.0-rc.3'
+  tags: [ 'update_notifier_config' ]
+
+- name: prepare needed directories
+  vars:
+    directories:
+      - { mode: "u=rwx,g=rx,o=", owner: "1000", group: "1000", path: "{{global_etc}}speaches" }
+      - { mode: "u=rwx,g=rx,o=", owner: "1000", group: "1000", path: "{{global_lib}}speaches" }
+  include_tasks: roles/_shared/create_directories.yml
+
+- name: collect gpu devices
+  shell: |
+      {% if cuda_enabled and cuda_device=='nvidia' %}
+          echo 'nvidia.com/gpu=all'
+      {% endif %}
+  register: "speaches_gpu_devices"
+  changed_when: no
+  failed_when: no
+  when: "cuda_enabled and cuda_device in ['nvidia']"
+
+- name: create container service
+  vars:
+    container_name: "speaches"
+    container_image: "ghcr.io/speaches-ai/speaches:latest-cuda"
+    container_network: "isolated"
+    container_ip: "{{podman_speaches_ip}}"
+    container_exposed_ports:
+      - "8000/tcp"
+    container_devices: |
+      [
+          {% if speaches_gpu_devices.stdout_lines is defined %}
+              {% for device in speaches_gpu_devices.stdout_lines %}
+                "{{device}}",
+              {% endfor %}
+          {% endif %}
+      ]
+    container_volumes:
+      #- '{{global_etc}}speaches:/root/.speaches/:rw'
+      - '{{global_lib}}speaches:/home/ubuntu/.cache/huggingface/hub'
+    container_readyness: { "type": "port_check", "ip": "speaches", "port": "8000" }
+  include_tasks: roles/container/shared/create_podman_service.yml
+  tags: ['podman_container','systemd_watcher_config','systemd_service_config']
+
+- name: allow container service
+  vars:
+    service_name: "speaches"
+    container_to_outside_rules:
+      - { "oif": "{{default_network_interface}}", saddr: "{{podman_speaches_ip}}", comment: "speaches => intern networks" }
+  include_tasks: roles/firewall/shared/allow_service.yml
+  tags: ['firewall_config']
+
+- name: add service name
+  vars:
+    host_name: "speaches"
+    host_ip_address: "{{podman_speaches_ip}}"
+  include_tasks: roles/_shared/add_to_hosts.yml
+
+- name: copy apache vhost
+  vars:
+    sub_domain: "speaches"
+    usergroup: "admin"
+    include: "templates/etc/apache2/_.ansible.vhost.d/speaches.inc"
+  include_tasks: roles/apache/shared/add_vhost.yml
+  tags: ['apache_config']
+
+#- name: register update notifier
+#  vars:
+#    name: "librenms"
+#    type: "docker"
+#    url: "https://github.com/librenms/librenms/releases"
+#    config: {
+#      repository: "librenms/librenms",
+#      pattern: "^([0-9\\.]+)$"
+#    }
+#  include_tasks: roles/update_service/shared/add_software.yml
+#  tags: ['update_notifier_config']
+#  when: "update_service_software_check_enabled"
+

@@ -755,6 +755,7 @@ podman_nextcloud_service_ip:      "172.16.0.118"
 
 podman_openclaw_ip:               "172.16.0.150"
 podman_ollama_ip:                 "172.16.0.151"
+podman_speaches_ip:               "172.16.0.152"
 
 podman_weather_service_ip:        "172.16.0.201"
 podman_cloud_check_ip:            "172.16.0.202"
