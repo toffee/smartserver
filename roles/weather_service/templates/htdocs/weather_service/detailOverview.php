@@ -191,6 +191,14 @@ mx.WeatherCore = (function( ret ) {
         // target => 1516323.13/6863234.61
 
         var rainButton = document.querySelector("#rainButton");
+        if(document.location.search=='?withoutToday=1'){
+          document.getElementById("current").style.display='none';
+          rainButton.parentNode.removeChild(rainButton)
+
+          let container = document.querySelector(".forecast .week .headline")
+          container.appendChild(rainButton);
+        }
+
         var rainFrame = document.querySelector("#rainFrame iframe");
         rainFrame.src="about:blank";
         rainButton.addEventListener("click",function(){
@@ -481,7 +489,7 @@ catch(e){
 }
 </script>
 <script>mx.OnScriptReady.push( function(){ mx.Page.initFrame("", mx.I18N.get("Weather"), theme); } );</script>
-<div class="current">
+<div class="current" id="current">
     <div class="headline">
         <div class="title" data-i18n="Current"></div>
         <div id="rainButton" class="form button">Radar</div>
@@ -543,7 +551,5 @@ catch(e){
 </div>
 
 <div id="rainFrame"><iframe src=""></iframe></div>
-<script>
-</script>
 </body>
 </html>
