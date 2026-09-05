@@ -1,9 +1,26 @@
 - name: set terminus version
   set_fact:
     terminus_version: '24.10.4'
-    tasmota_version: '15.5.0'
+    tasmota_version: '15.6.0'
   tags: [ 'update_notifier_config' ]
 
+#for building openHAB bindings (like snapcast, proheat, digiplex) needs the follwoing:
+# zypper install git maven java-21-openjdk-devel
+# TODO: install with ansible. For now manually...
+# after build the binding with: mvn clean install -pl :org.openhab.binding.snapcast -DskipTests -DskipChecks
+# the rsult can be found in: ls -la bundles/org.openhab.binding.snapcast/target/*.jar
+
+# For building nextrack hugo site it's needed:
+# zypper ref
+# zypper up
+# zypper install git
+# zypper install nodejs npm
+# zypper install hugo (needs to be extended version)
+# zypper install go
+# Install Standalone Dart Sass - download the archive and extract it into /usr/local/bin
+# and in nextrack directory
+# npm approve-scripts hugo-extended
+# hugo server --bind 0.0.0.0 --baseURL http://192.168.120.5:1313
 - name: ensure rsyslog is installed
   ansible.builtin.zypper:
     name: rsyslog
