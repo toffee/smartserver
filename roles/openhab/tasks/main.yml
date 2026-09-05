@@ -1,6 +1,6 @@
 - name: set openhab version
   set_fact:
-    openhab_version: "5.2.0"
+    openhab_version: "5.2.1"
   tags: [ 'update_notifier_config' ]
 
 - name: "create user and group => user or group does not exists"
@@ -18,7 +18,7 @@
       #- { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_etc}}openhab/conf" } # will be symlinked from openhab_config project
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_etc}}openhab/cont-init.d" }
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_lib}}openhab" }
-      - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_lib}}openhab/graalpy" }
+      #- { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_lib}}openhab/graalpy" }
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_lib}}openhab/jsondb" }
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_lib}}openhab/config" }
       - { mode: "u=rwx,g=rx,o=", owner: "{{system_users['openhab'].name}}", group: "{{system_groups['openhab'].name}}", path: "{{global_lib}}openhab/persistance" }
@@ -94,6 +94,12 @@
 # ***** CONF TEMPLATES (e.g. Services) *****
 # have to fetch files before, because ansible template module works only with local files
 # **** IMPORTANT - You have to exclude the generated configs via .gitignore in your openhab_config project
+- name: create template deployment folder
+  file:
+    path: "/tmp/ansible/openhab/"
+    state: directory
+  changed_when: no
+
 - name: prepare template configs
   synchronize:
     src: "{{projects_path}}openhab_config/templates/"
@@ -140,31 +146,6 @@
     group: "{{system_groups['openhab'].name}}"
   changed_when: no
 
-# ***** HABPANEL *****
-# habpanel if exists
-- name: check habpanel config
-  shell: "ls {{projects_path}}openhab_config/jsondb/uicomponents_habpanel_panelconfig.json"
-  register: habpanel_result
-  changed_when: no
-  failed_when: no
-  tags: [ 'apache_webui_config' ]
-   
-- name: synchronize habpanel config => habpanel_result.rc == 0
-  synchronize:
-    src: "{{projects_path}}openhab_config/jsondb/uicomponents_habpanel_panelconfig.json"
-    dest: "{{global_lib}}openhab/jsondb/uicomponents_habpanel_panelconfig.json"
-    mode: "pull"
-    archive: no
-    checksum: yes
-    group: yes
-    owner: yes
-    perms: yes
-    recursive: yes
-    rsync_opts:
-      - "--chown={{system_users['openhab'].name}}:{{system_groups['openhab'].name}}"
-      - "--chmod=F640"
-  when: "habpanel_result.rc == 0"
-  
 # ***** ADDONS *****
 - name: copy addons folder
   synchronize:
@@ -261,17 +242,23 @@
     # all volumes needs to writeable, because openhab runs chown on OPENHAB_HOME
     # container_devices: "{{openhab_device_mounts | default([])}}"
     container_privileged: yes
+    #cap_add:
+    #  - NET_ADMIN
+    #  - SYS_ADMIN
+    # '{{global_lib}}openhab/graalpy:/openhab/graalpy:rw',
     container_volumes: |
       [
         '/dev:/dev:rw',
+
+        '/etc/localtime:/etc/localtime:ro',
+        '/var/run/dbus:/var/run/dbus:rw',
+        '/etc/machine-id:/etc/machine-id:ro',
 
         '{{projects_path}}openhab_config:{{projects_path}}openhab_config:rw',
         '{{projects_path}}openhab_shared:{{projects_path}}openhab_shared:rw',
 
         '{{global_etc}}openhab/cont-init.d:/etc/cont-init.d:rw',
         '{{global_etc}}openhab/addons:/openhab/addons:rw',
-
-        '{{global_lib}}openhab/graalpy:/openhab/graalpy:rw',
 
         '{{global_lib}}openhab/config:/openhab/userdata/config:rw',
         '{{global_lib}}openhab/jsondb:/openhab/userdata/jsondb:rw',
@@ -282,7 +269,6 @@
 
         '{{global_etc}}openhab/conf/:/openhab/conf/:rw',
       ]
-#        '{{global_etc}}openhab/conf:/openhab/conf:rw',
     container_timeout_stop_sec: 60
     container_after: [ "mariadb", "influxdb", "mosquitto" ]
     container_readyness: { "type": "port_check", "ip": "127.0.0.1", "port": "8080" }
@@ -364,17 +350,8 @@
     name: "openhab"
     js_file: "templates/webui/openhab.js"
     i18n_files: [ { language: "de", file: "templates/webui/openhab.de.json" } ]
-    icons: [ 'templates/webui/icons/openhab_logo.svg', 'templates/webui/icons/openhab_basicui.svg', 'templates/webui/icons/openhab_adminui.svg', 'templates/webui/icons/openhab_habot.svg', 'templates/webui/icons/openhab_habpanel.svg' ]
+    icons: [ 'templates/webui/icons/openhab_logo.svg', 'templates/webui/icons/openhab_basicui.svg', 'templates/webui/icons/openhab_adminui.svg', 'templates/webui/icons/openhab_habot.svg' ] #, 'templates/webui/icons/openhab_habpanel.svg' ]
   include_tasks: roles/apache_webui/shared/add_webui.yml
-  tags: ['apache_webui_config']
-
-- name: register habpanel webui
-  vars:
-    name: "openhab_habpanel"
-    js_file: "templates/webui/openhab_habpanel.js"
-    i18n_files: [ { language: "de", file: "templates/webui/openhab_habpanel.de.json" } ]
-  include_tasks: roles/apache_webui/shared/add_webui.yml
-  when: "habpanel_result.rc == 0"
   tags: ['apache_webui_config']
 
 - name: copy apache vhost
