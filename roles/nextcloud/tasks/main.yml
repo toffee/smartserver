@@ -139,19 +139,28 @@
     owner: "{{system_users['www'].name}}"
     group: "{{system_groups['www'].name}}"
 
+#- name: synchronize theme
+#  synchronize:
+#    src: "templates/themes/smartserver"
+#    dest: "{{htdocs_path}}nextcloud/themes/"
+#    archive: no
+#    checksum: yes
+#    group: yes
+#    owner: yes
+#    perms: yes
+#    recursive: yes
+#    rsync_opts:
+#      - "--chown={{system_users['www'].name}}:{{system_groups['www'].name}}"
+#      - "--chmod=D750,F640"
+      
 - name: synchronize theme
-  synchronize:
-    src: "templates/themes/smartserver"
-    dest: "{{htdocs_path}}nextcloud/themes/"
-    archive: no
-    checksum: yes
-    group: yes
-    owner: yes
-    perms: yes
-    recursive: yes
-    rsync_opts:
-      - "--chown={{system_users['www'].name}}:{{system_groups['www'].name}}"
-      - "--chmod=D750,F640"
+  copy:
+    src: "templates/themes/smartserver/"
+    dest: "{{htdocs_path}}nextcloud/themes/smartserver/"
+    owner: "{{system_users['www'].name}}"
+    group: "{{system_groups['www'].name}}"
+    directory_mode: "0750"
+    mode: "0640"
 
 - name: copy config
   template:
