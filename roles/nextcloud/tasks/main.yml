@@ -142,7 +142,7 @@
 - name: synchronize theme
   synchronize:
     src: "templates/themes/smartserver"
-    dest: "{{htdocs_path}}nextcloud/themes/"
+    dest: "{{htdocs_path}}nextcloud-{{nextcloud_version}}/themes/" # must be the version path. otherwise it will fail with "Too many levels of symbolic links"
     archive: no
     checksum: yes
     group: yes
