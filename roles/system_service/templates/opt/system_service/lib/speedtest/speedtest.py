@@ -138,27 +138,26 @@ class Speedtest():
                     self.handler.notifyChangedSpeedtestData(self.is_testing)
 
                     self.startSpeedtest(retry - 1)
-                return
+            else:
+                self.mqtt.publish("speedtest/time", "{:02d}:{:02d}".format(datetime.now().hour,datetime.now().minute))
+                self.mqtt.publish("speedtest/location", location)
 
-            self.mqtt.publish("speedtest/time", "{:02d}:{:02d}".format(datetime.now().hour,datetime.now().minute))
-            self.mqtt.publish("speedtest/location", location)
+                messurement_values.append("lastrun=\"{}\"".format("{:02d}:{:02d}".format(datetime.now().hour,datetime.now().minute)))
+                messurement_values.append("location=\"{}\"".format(location))
 
-            messurement_values.append("lastrun=\"{}\"".format("{:02d}:{:02d}".format(datetime.now().hour,datetime.now().minute)))
-            messurement_values.append("location=\"{}\"".format(location))
+                retry_count = 5
+                while not self.event.is_set() and retry_count > 0:
+                    state = self.influxdb.submit(["speedtest {}".format(",".join(messurement_values))])
+                    if state == 1:
+                        break
+                    self.event.wait(self.config.influxdb_publish_interval)
+                    retry_count -= 1
 
-            retry_count = 5
-            while not self.event.is_set() and retry_count > 0:
-                state = self.influxdb.submit(["speedtest {}".format(",".join(messurement_values))])
-                if state == 1:
-                    break
-                self.event.wait(self.config.influxdb_publish_interval)
-                retry_count -= 1
+                if retry_count == 0:
+                    logging.error("Maximum publish retries reached. Discard results now")
 
-            if retry_count == 0:
-                logging.error("Maximum publish retries reached. Discard results now")
-
-            self.is_testing = False
-            self.handler.notifyChangedSpeedtestData(self.is_testing)
+                self.is_testing = False
+                self.handler.notifyChangedSpeedtestData(self.is_testing)
 
     def getStateMetrics(self):
         metrics = []

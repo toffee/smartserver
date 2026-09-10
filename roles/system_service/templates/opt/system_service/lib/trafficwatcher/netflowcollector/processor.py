@@ -367,6 +367,8 @@ class Processor(threading.Thread):
         self.device_base_time = 0
         self.device_base_error = 0
 
+        self.listener = None
+
         #_ip = "192.168.0.1"
         #ip = ipaddress.IPv4Address(_ip)
         #logging.info("IP: {}, is_multicast: {}, is_private: {}, is_global: {}, is_unspecified: {}, is_reserved: {}, is_loopback: {}, is_link_local: {}".format(_ip, ip.is_multicast, ip.is_private, ip.is_global, ip.is_unspecified, ip.is_reserved, ip.is_loopback, ip.is_link_local))
@@ -565,8 +567,9 @@ class Processor(threading.Thread):
             self.is_running = False
             raise e
         finally:
-            self.listener.stop()
-            self.listener.join()
+            if self.listener is not None:
+                self.listener.stop()
+                self.listener.join()
             logging.info("Netflow processor stopped")
 
     def getStateMetrics(self):
